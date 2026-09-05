@@ -70,7 +70,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. CLEAN DATABASE ENGINE (NO DUMMY EXERCISES)
+# 2. SECURE DATABASE INITIALIZATION
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
@@ -83,13 +83,6 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
-    
-    # Check if workouts table has the complete new schema. If old/broken, recreate it clean.
-    c.execute("PRAGMA table_info(workouts)")
-    cols = [row[1] for row in c.fetchall()]
-    if cols and "norm_power_w" not in cols:
-        c.execute("DROP TABLE workouts")
-        
     c.execute("""
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,8 +129,9 @@ init_db()
 # ---------------------------------------------------------
 # 3. STRAVA API INTEGRATION ENGINE
 # ---------------------------------------------------------
-CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "277202")
-CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "").strip().strip('"')
+CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "277202").strip().strip('"')
+CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "ddcc15be9c096ea443ad20a00ece1d2ac893e73d").strip().strip('"')
+DEFAULT_REFRESH = st.secrets.get("STRAVA_REFRESH_TOKEN", "f1fa3da33c8edf990b99374efe3c1890cab613a1").strip().strip('"')
 GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "").strip().strip('"')
 
 def get_config(key):
@@ -152,7 +146,7 @@ def set_config(key, val):
     conn.commit()
     conn.close()
 
-# Auto-handle Strava OAuth code exchange if redirected
+# Auto-handle authorization code exchange if present in URL
 if "code" in st.query_params:
     auth_code = st.query_params["code"]
     res = requests.post("https://www.strava.com/oauth/token", data={
@@ -165,12 +159,13 @@ if "code" in st.query_params:
         token_data = res.json()
         set_config("strava_access_token", token_data["access_token"])
         set_config("strava_refresh_token", token_data["refresh_token"])
-        st.success("Successfully authorized Strava with full activity access!")
+        st.success("Successfully linked Strava with full activity access!")
         st.query_params.clear()
         st.rerun()
 
 def get_valid_token():
-    refresh_token = get_config("strava_refresh_token") or "11fa3da33c8edf990b99374efe3c1890cab613a1"
+    # Use saved refresh token if available, otherwise fallback to secrets
+    refresh_token = get_config("strava_refresh_token") or DEFAULT_REFRESH
     res = requests.post("https://www.strava.com/oauth/token", data={
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
@@ -201,11 +196,16 @@ def sync_strava():
     
     headers = {"Authorization": f"Bearer {token}"}
     res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=60", headers=headers)
+    
     if res.status_code != 200:
         st.error(f"Strava Fetch Error ({res.status_code}): {res.text}")
         return -1
     
     activities = res.json()
+    if not isinstance(activities, list):
+        st.error(f"Unexpected response from Strava: {activities}")
+        return -1
+        
     conn = get_db()
     new_count = 0
     
@@ -215,10 +215,14 @@ def sync_strava():
         if exists:
             continue
         
-        act_type = "Ride (MTB)" if act["type"] in ["Ride", "MountainBikeRide", "EBikeRide"] else "Run (Road)"
-        dt_raw = act["start_date_local"]
-        dt_obj = datetime.datetime.fromisoformat(dt_raw.replace("Z", ""))
-        date_str = dt_obj.strftime("%Y-%m-%d %H:%M")
+        act_type = "Ride (MTB)" if act.get("type") in ["Ride", "MountainBikeRide", "EBikeRide"] else "Run (Road)"
+        dt_raw = act.get("start_date_local", "")
+        try:
+            dt_obj = datetime.datetime.fromisoformat(dt_raw.replace("Z", ""))
+            date_str = dt_obj.strftime("%Y-%m-%d %H:%M")
+        except:
+            dt_obj = datetime.datetime.now()
+            date_str = dt_obj.strftime("%Y-%m-%d %H:%M")
         
         code = generate_code(conn, act_type, dt_obj)
         dist_km = round(act.get("distance", 0.0) / 1000.0, 2)
@@ -284,9 +288,29 @@ tab_feed, tab_analytics, tab_compare, tab_progress = st.tabs(["📋 Feed", "📊
 
 # --- TAB 1: FEED & ONE-TAP SYNC ---
 with tab_feed:
-    # 1-Tap Strava Authorization Link (to unlock read_all scope)
-    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri=https://share.streamlit.io&approval_prompt=force&scope=activity:read_all"
-    st.caption(f"If activities don't sync, [Tap here to authorize Strava read permissions]({auth_url})")
+    with st.expander("🔑 Strava One-Time Activity Authorization"):
+        st.write("Strava requires explicit permission to read full activity details (speed, heart rate, power).")
+        st.markdown(f"""
+        1. [Tap here to grant Strava Activity Access](https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri=http://localhost&approval_prompt=force&scope=activity:read_all)
+        2. Tap **Authorize** on Strava.
+        3. Your browser will open a blank page with `code=...` in the address bar. Copy that code and paste it below:
+        """)
+        code_input = st.text_input("Paste Authorization Code here:")
+        if st.button("Save & Link Token"):
+            res = requests.post("https://www.strava.com/oauth/token", data={
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+                "code": code_input.strip(),
+                "grant_type": "authorization_code"
+            })
+            if res.status_code == 200:
+                d = res.json()
+                set_config("strava_access_token", d["access_token"])
+                set_config("strava_refresh_token", d["refresh_token"])
+                st.success("Authorized with activity:read_all! You can now sync.")
+                st.rerun()
+            else:
+                st.error(f"Auth Error: {res.text}")
 
     col_sync, col_count = st.columns([2, 1])
     with col_sync:
