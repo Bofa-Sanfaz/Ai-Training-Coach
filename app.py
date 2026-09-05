@@ -70,7 +70,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. DATABASE INITIALIZATION (ZERO DUMMY EXERCISES)
+# 2. CLEAN DATABASE ENGINE (NO DUMMY EXERCISES)
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
@@ -82,12 +82,14 @@ def get_db():
 def init_db():
     conn = get_db()
     c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS config (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    )
-    """)
+    c.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
+    
+    # Check if workouts table has the complete new schema. If old/broken, recreate it clean.
+    c.execute("PRAGMA table_info(workouts)")
+    cols = [row[1] for row in c.fetchall()]
+    if cols and "norm_power_w" not in cols:
+        c.execute("DROP TABLE workouts")
+        
     c.execute("""
     CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,26 +134,43 @@ def init_db():
 init_db()
 
 # ---------------------------------------------------------
-# 3. STRAVA DEEP DATA EXTRACTION
+# 3. STRAVA API INTEGRATION ENGINE
 # ---------------------------------------------------------
 CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "277202")
-CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "")
-GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "")
+CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "").strip().strip('"')
+GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "").strip().strip('"')
 
-def get_saved_token(key):
+def get_config(key):
     conn = get_db()
     r = conn.execute("SELECT value FROM config WHERE key=?", (key,)).fetchone()
     conn.close()
     return r["value"] if r else None
 
-def save_token(key, val):
+def set_config(key, val):
     conn = get_db()
     conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, str(val)))
     conn.commit()
     conn.close()
 
-def refresh_access_token():
-    refresh_token = get_saved_token("strava_refresh_token") or "11fa3da33c8edf990b99374efe3c1890cab613a1"
+# Auto-handle Strava OAuth code exchange if redirected
+if "code" in st.query_params:
+    auth_code = st.query_params["code"]
+    res = requests.post("https://www.strava.com/oauth/token", data={
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "code": auth_code,
+        "grant_type": "authorization_code"
+    })
+    if res.status_code == 200:
+        token_data = res.json()
+        set_config("strava_access_token", token_data["access_token"])
+        set_config("strava_refresh_token", token_data["refresh_token"])
+        st.success("Successfully authorized Strava with full activity access!")
+        st.query_params.clear()
+        st.rerun()
+
+def get_valid_token():
+    refresh_token = get_config("strava_refresh_token") or "11fa3da33c8edf990b99374efe3c1890cab613a1"
     res = requests.post("https://www.strava.com/oauth/token", data={
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
@@ -160,10 +179,12 @@ def refresh_access_token():
     })
     if res.status_code == 200:
         data = res.json()
-        save_token("strava_access_token", data["access_token"])
-        save_token("strava_refresh_token", data["refresh_token"])
+        set_config("strava_access_token", data["access_token"])
+        set_config("strava_refresh_token", data["refresh_token"])
         return data["access_token"]
-    return None
+    else:
+        st.error(f"Strava Auth Failed ({res.status_code}): {res.text}")
+        return None
 
 def generate_code(conn, activity_type, date_obj):
     prefix = "Run" if "Run" in activity_type else "Bike"
@@ -173,17 +194,16 @@ def generate_code(conn, activity_type, date_obj):
     count = c.fetchone()[0] + 1
     return f"{prefix}-{count:03d}-{month_str}"
 
-def sync_strava_deep():
-    token = refresh_access_token()
+def sync_strava():
+    token = get_valid_token()
     if not token:
-        st.error("Could not authenticate with Strava. Check Secrets.")
-        return 0
+        return -1
     
     headers = {"Authorization": f"Bearer {token}"}
     res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=60", headers=headers)
     if res.status_code != 200:
-        st.error(f"Strava Sync Error ({res.status_code}): {res.text}")
-        return 0
+        st.error(f"Strava Fetch Error ({res.status_code}): {res.text}")
+        return -1
     
     activities = res.json()
     conn = get_db()
@@ -244,7 +264,7 @@ def sync_strava_deep():
 # ---------------------------------------------------------
 def call_gemini(prompt):
     if not GEMINI_KEY:
-        st.error("GEMINI_API_KEY is not set in Secrets.")
+        st.error("GEMINI_API_KEY is missing in Secrets.")
         return None
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
     payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
@@ -256,23 +276,27 @@ def call_gemini(prompt):
         return None
 
 # ---------------------------------------------------------
-# 5. UI TABS & NAVIGATION
+# 5. USER INTERFACE
 # ---------------------------------------------------------
 st.title("⚡ Apex Vault")
 
 tab_feed, tab_analytics, tab_compare, tab_progress = st.tabs(["📋 Feed", "📊 Graphs", "⚖️ Compare", "📈 Reports"])
 
-# --- TAB 1: ACTIVITY FEED ---
+# --- TAB 1: FEED & ONE-TAP SYNC ---
 with tab_feed:
+    # 1-Tap Strava Authorization Link (to unlock read_all scope)
+    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri=https://share.streamlit.io&approval_prompt=force&scope=activity:read_all"
+    st.caption(f"If activities don't sync, [Tap here to authorize Strava read permissions]({auth_url})")
+
     col_sync, col_count = st.columns([2, 1])
     with col_sync:
         if st.button("🔄 Sync All from Strava", use_container_width=True, type="primary"):
-            with st.spinner("Downloading full Strava metrics..."):
-                added = sync_strava_deep()
+            with st.spinner("Downloading activities from Strava..."):
+                added = sync_strava()
                 if added > 0:
                     st.success(f"Added {added} new activities!")
                     st.rerun()
-                else:
+                elif added == 0:
                     st.info("Vault is completely up to date.")
 
     conn = get_db()
@@ -284,7 +308,7 @@ with tab_feed:
 
     st.markdown("---")
     if df.empty:
-        st.info("No workouts found yet. Tap 'Sync All from Strava' above to load your training history.")
+        st.info("Your vault is clean. Tap '🔄 Sync All from Strava' above to pull your workouts.")
     else:
         for _, r in df.iterrows():
             st.markdown(f"""
@@ -313,7 +337,7 @@ with tab_feed:
             </div>
             """, unsafe_allow_html=True)
 
-# --- TAB 2: DETAILED GRAPHS & VISUALIZATIONS ---
+# --- TAB 2: GRAPHS & VISUALIZATIONS ---
 with tab_analytics:
     st.subheader("📊 Performance Trends")
     conn = get_db()
@@ -322,7 +346,6 @@ with tab_analytics:
     
     if len(chart_df) >= 2:
         chart_df['date_short'] = pd.to_datetime(chart_df['date']).dt.strftime('%m/%d')
-        
         st.markdown("#### Speed Progression (Avg vs Peak)")
         st.line_chart(chart_df.set_index("date_short")[["avg_speed_kmh", "max_speed_kmh"]])
         
@@ -330,13 +353,11 @@ with tab_analytics:
         valid_power = chart_df[chart_df['avg_power_w'] > 0]
         if not valid_power.empty:
             st.line_chart(valid_power.set_index("date_short")[["avg_power_w", "avg_hr"]])
-        else:
-            st.caption("Power data will plot automatically as power readings are logged.")
             
         st.markdown("#### Volume Breakdown (Distance & Ascent)")
         st.bar_chart(chart_df.set_index("date_short")[["distance_km", "elevation_gain_m"]])
     else:
-        st.info("Log at least 2 sessions to generate trend charts.")
+        st.info("Need at least 2 logged sessions to plot trend curves.")
 
 # --- TAB 3: 1-TO-1 & 1-TO-2 COMPARISONS ---
 with tab_compare:
@@ -368,7 +389,7 @@ with tab_compare:
         st.dataframe(comp_display, use_container_width=True)
 
         if st.button("🤖 Run In-Depth AI Comparison", type="primary", use_container_width=True):
-            with st.spinner("AI evaluating biomechanical and metabolic differences..."):
+            with st.spinner("AI evaluating biomechanical differences..."):
                 prompt = f"""
 You are an expert sports physiologist analyzing athlete Mustafa (190 cm, ~115 kg, transitioning from MTB to aero road bike).
 Analyze and contrast these specific workouts:
@@ -376,10 +397,10 @@ Analyze and contrast these specific workouts:
 {comp_display.to_string()}
 
 Provide an elite coaching comparison:
-1. **Pacing & Aerobic Efficiency**: Speed relative to HR decoupling and cadence stability.
-2. **Torque vs Cadence Profile**: How mechanical power output shifted under gradient/ascent.
-3. **Metabolic Load**: Work done (kJ) and cardiac stress.
-4. **Concrete Training Takeaway**: Exactly what adjustment to make in the next block.
+1. Pacing & Aerobic Efficiency (Speed vs HR decoupling).
+2. Torque vs Cadence Profile (Power under grade/ascent).
+3. Metabolic Load (kJ work and cardiac strain).
+4. Concrete Training Takeaway for next ride.
 """
                 verdict = call_gemini(prompt)
                 if verdict:
@@ -412,14 +433,14 @@ with tab_progress:
                 summary_str = filtered[["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "max_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m", "kilojoules"]].to_string(index=False)
                 prompt = f"""
 You are an elite cycling coach reviewing athlete Mustafa's ({horizon}) training progression.
-Session data:
+Data:
 {summary_str}
 
 Provide a structured, rigorous assessment:
-1. **Executive Load Assessment**: Total volume, mechanical work (kJ), and adherence.
-2. **Cardiovascular Adaptation**: Aerobic base building vs anaerobic strain (Zone 2 efficiency vs Zone 5 redline).
-3. **Peak Benchmarks**: Power spikes, speed ceilings, and climbing capacity.
-4. **Prescription**: Exact target cadence, power zones, and caloric strategy for the upcoming block.
+1. Executive Load Assessment (Volume, kJ work, consistency).
+2. Cardiovascular Adaptation (Zone 2 aerobic base vs Zone 5 redline).
+3. Peak Benchmarks (Power spikes, speed ceilings, climbing under body mass).
+4. Prescription (Pacing, cadence, and caloric strategy for next block).
 """
                 audit = call_gemini(prompt)
                 if audit:
