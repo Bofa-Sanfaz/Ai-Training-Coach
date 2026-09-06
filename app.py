@@ -6,9 +6,10 @@ import requests
 import textwrap
 import io
 import re
+import json
 import numpy as np
 
-# Interactive & Visualization
+# Interactive & Visualization Engines
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import matplotlib
@@ -22,7 +23,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
 # ---------------------------------------------------------
-# 1. CLEAN LIGHT THEME & MOBILE-OPTIMIZED UI
+# 1. CLEAN LIGHT THEME & MOBILE UI STYLING
 # ---------------------------------------------------------
 st.set_page_config(page_title="AI Coach", layout="centered", page_icon="⚡")
 
@@ -74,7 +75,7 @@ st.markdown("""
         border: 1px solid #fecaca;
     }
 
-    /* Modern Tabs */
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         display: flex !important;
         background-color: #e2e8f0 !important;
@@ -114,7 +115,7 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* Radio / Checkbox Cards */
+    /* Radio Cards */
     div[role="radiogroup"] label {
         background-color: #ffffff !important;
         padding: 6px 12px !important;
@@ -129,7 +130,7 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
 
-    /* Inputs & Select Boxes */
+    /* Inputs & Selects */
     .stTextArea textarea, .stTextInput input, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #0f172a !important;
@@ -208,7 +209,7 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
 
-    /* Hero Metrics Dashboard */
+    /* Hero Dashboard */
     .hero-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -236,7 +237,7 @@ st.markdown("""
         margin-top: 2px;
     }
 
-    /* Biometric Sub-Grid */
+    /* Secondary Biometrics */
     .telemetry-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -287,13 +288,13 @@ SVG_HEART = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#ef4444" st
 SVG_MOUNTAIN = """<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>"""
 
 # ---------------------------------------------------------
-# 3. ROBUST DATABASE ENGINE
+# 3. DATABASE ENGINE & STREAMS PERSISTENCE
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
 def get_db():
     conn = sqlite3.connect(DB_FILE, timeout=15)
-    conn.execute("PRAGMA journal_mode=WAL") # Crash-resilient write-ahead logging
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -343,6 +344,7 @@ def init_db():
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
     c.execute("CREATE TABLE IF NOT EXISTS workouts (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+    c.execute("CREATE TABLE IF NOT EXISTS activity_streams (strava_id INTEGER PRIMARY KEY, stream_json TEXT)")
     
     c.execute("PRAGMA table_info(workouts)")
     existing_cols = {row[1] for row in c.fetchall()}
@@ -451,6 +453,49 @@ def get_valid_token():
         return data.get("access_token")
     return None
 
+def fetch_activity_stream(strava_id):
+    """Pulls second-by-second workout stream and caches it permanently in SQLite"""
+    if not strava_id:
+        return None
+        
+    conn = get_db()
+    cached = conn.execute("SELECT stream_json FROM activity_streams WHERE strava_id=?", (strava_id,)).fetchone()
+    if cached and cached["stream_json"]:
+        conn.close()
+        try:
+            return json.loads(cached["stream_json"])
+        except Exception:
+            pass
+    conn.close()
+
+    token = get_valid_token()
+    if not token:
+        return None
+        
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"https://www.strava.com/api/v3/activities/{strava_id}/streams?keys=time,distance,altitude,heartrate,watts,velocity_smooth,cadence&key_by_type=true"
+    res = requests.get(url, headers=headers, timeout=20)
+    log_api_call("strava")
+    
+    if res.status_code == 200:
+        data = res.json()
+        # Normalize to dict keyed by stream type
+        if isinstance(data, list):
+            dict_data = {}
+            for item in data:
+                if "type" in item:
+                    dict_data[item["type"]] = item
+            data = dict_data
+            
+        if isinstance(data, dict) and data:
+            conn = get_db()
+            conn.execute("INSERT OR REPLACE INTO activity_streams (strava_id, stream_json) VALUES (?, ?)", (strava_id, json.dumps(data)))
+            conn.commit()
+            conn.close()
+            return data
+            
+    return None
+
 def calc_pace(moving_sec, dist_km):
     if dist_km and dist_km > 0.05:
         sec_per_km = int(moving_sec / dist_km)
@@ -521,7 +566,6 @@ def sync_strava():
         cadence = round(act.get("average_cadence", 0.0), 1)
         suffer = int(act.get("suffer_score", 0)) if act.get("suffer_score") else 0
         
-        # Sports-Science Fallback Imputations (no empty '--')
         if kj == 0 and watts > 0 and m_time > 0:
             kj = round((watts * m_time) / 1000.0, 1)
         cal = int(act.get("calories", 0)) if act.get("calories") else int(kj * 1.05) if kj > 0 else int(dist_km * 35)
@@ -547,7 +591,7 @@ def sync_strava():
     return new_count
 
 # ---------------------------------------------------------
-# 5. GEMINI API CHAIN
+# 5. GEMINI API ENGINE
 # ---------------------------------------------------------
 def call_gemini(prompt):
     key = get_config("custom_gemini_key") or GEMINI_KEY
@@ -586,8 +630,6 @@ def generate_pdf_chart_image(df_subset):
     fig.patch.set_facecolor('#ffffff')
     
     sessions = [x.split('-')[0].strip() for x in df_subset['exercise_code']]
-    
-    # Subplot 1: Power & Speed
     pwr_clean = [w if w > 0 else np.nan for w in df_subset['avg_power_w']]
     spd_clean = df_subset['avg_speed_kmh']
     
@@ -602,7 +644,6 @@ def generate_pdf_chart_image(df_subset):
     ax1_twin.set_ylabel('Speed (km/h)', color='#2563eb', fontweight='bold', fontsize=8)
     ax1_twin.tick_params(axis='y', labelcolor='#2563eb', labelsize=7)
     
-    # Subplot 2: Ascent & Heart Rate
     asc_clean = df_subset['elevation_gain_m']
     hr_clean = [h if h > 0 else np.nan for h in df_subset['avg_hr']]
     
@@ -625,9 +666,7 @@ def generate_pdf_chart_image(df_subset):
     return img_buf
 
 def convert_markdown_to_pdf_story(md_text, styles, story):
-    """Parses raw AI markdown into professionally styled ReportLab Flowables"""
     lines = md_text.split('\n')
-    
     style_h1 = ParagraphStyle('MD_H1', parent=styles['Heading2'], fontSize=11, leading=15, textColor=colors.HexColor('#0f172a'), spaceBefore=8, spaceAfter=4, fontName='Helvetica-Bold')
     style_body = ParagraphStyle('MD_Body', parent=styles['Normal'], fontSize=8.5, leading=12, textColor=colors.HexColor('#1e293b'), spaceAfter=4, fontName='Helvetica')
     style_bullet = ParagraphStyle('MD_Bullet', parent=styles['Normal'], fontSize=8.5, leading=12, textColor=colors.HexColor('#1e293b'), leftIndent=14, spaceAfter=3, fontName='Helvetica')
@@ -638,7 +677,6 @@ def convert_markdown_to_pdf_story(md_text, styles, story):
             story.append(Spacer(1, 3))
             continue
             
-        # Clean formatting tags
         raw = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', raw)
         raw = raw.replace('---', '')
         
@@ -653,12 +691,7 @@ def convert_markdown_to_pdf_story(md_text, styles, story):
 
 def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=32, leftMargin=32,
-        topMargin=32, bottomMargin=32
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
     story = []
     styles = getSampleStyleSheet()
     
@@ -673,13 +706,11 @@ def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
     table_cell = ParagraphStyle('TableCell', parent=styles['Normal'], fontSize=7.5, leading=10, textColor=dark_slate, fontName='Helvetica')
     table_header = ParagraphStyle('TableHeader', parent=styles['Normal'], fontSize=7.5, leading=10, textColor=colors.white, fontName='Helvetica-Bold')
 
-    # 1. Header
     story.append(Paragraph("AI COACH — EXECUTIVE PERFORMANCE REPORT", title_style))
     story.append(Paragraph(f"Athlete: Mustafa (190 cm, ~115 kg) | Scope: {window_name} ({cat_name}) | Generated: {datetime.datetime.now().strftime('%d-%b-%Y %H:%M')}", sub_style))
     story.append(Spacer(1, 6))
     story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=10))
 
-    # 2. Executive Summary Metrics
     total_dist = df_subset['distance_km'].sum()
     total_ascent = df_subset['elevation_gain_m'].sum()
     total_kj = df_subset['kilojoules'].sum()
@@ -718,7 +749,6 @@ def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
     story.append(t_summary)
     story.append(Spacer(1, 8))
 
-    # 3. Personal Records (PR) Scorecard Table
     max_d = df_subset.loc[df_subset['distance_km'].idxmax()] if not df_subset.empty else None
     max_s = df_subset.loc[df_subset['max_speed_kmh'].idxmax()] if not df_subset.empty else None
     max_p = df_subset.loc[df_subset['avg_power_w'].idxmax()] if not df_subset.empty and df_subset['avg_power_w'].max() > 0 else None
@@ -752,14 +782,12 @@ def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
     story.append(t_pr)
     story.append(Spacer(1, 10))
 
-    # 4. Embedded Vector Progression Graph
     if len(df_subset) >= 2:
         story.append(Paragraph("Progression Telemetry Profiles", section_heading))
         img_buffer = generate_pdf_chart_image(df_subset)
         story.append(RLImage(img_buffer, width=525, height=275))
         story.append(Spacer(1, 10))
 
-    # 5. Clean Formatted AI Debrief Text
     story.append(Paragraph("Sports-Science AI Progression Analysis", section_heading))
     if ai_review_text:
         convert_markdown_to_pdf_story(ai_review_text, styles, story)
@@ -767,7 +795,6 @@ def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
         story.append(Paragraph("No AI debrief synthesized for this window yet.", table_cell))
     story.append(Spacer(1, 10))
 
-    # 6. Itemized Session Log Table
     story.append(Paragraph("Itemized Session Log", section_heading))
     log_data = [[
         Paragraph("<b>Session</b>", table_header),
@@ -829,7 +856,7 @@ if "active_session_id" not in st.session_state:
     st.session_state.active_session_id = None
 
 # =========================================================
-# DETAIL VIEW: INDEPENDENT SESSION SCREEN
+# DETAIL VIEW: INDEPENDENT SESSION WITH IN-RIDE STREAM GRAPHS
 # =========================================================
 if st.session_state.active_session_id is not None:
     conn = get_db()
@@ -863,16 +890,13 @@ if st.session_state.active_session_id is not None:
         """)
         st.markdown(hero_html, unsafe_allow_html=True)
 
-        # 2. Secondary Telemetry Grid (No empty '--')
+        # 2. Secondary Telemetry Grid
         st.markdown("#### Secondary Telemetry & Biometrics")
         vam = round((w['elevation_gain_m'] / (w['moving_time_sec'] / 3600.0)), 0) if w['moving_time_sec'] > 0 else 0
         sec_max_spd = f"{w['max_speed_kmh']:.1f} km/h" if w['max_speed_kmh'] > 0 else "--"
         sec_peak_hr = f"{w['max_hr']} bpm" if w['max_hr'] > 0 else "--"
-        
-        # Calculated fallback estimations for missing hardware metrics
         calc_norm_power = w['norm_power_w'] if w['norm_power_w'] > 0 else round(w['avg_power_w'] * 1.06, 0)
         calc_calories = w['calories'] if w['calories'] > 0 else round(w['kilojoules'] * 1.05) if w['kilojoules'] > 0 else int(w['distance_km'] * 35)
-        
         sec_np = f"{calc_norm_power:.0f} W" if calc_norm_power > 0 else "--"
         sec_kj = f"{w['kilojoules']:.0f} kJ" if w['kilojoules'] > 0 else "--"
         sec_vam = f"{vam:.0f} m/h" if vam > 0 else "--"
@@ -904,98 +928,148 @@ if st.session_state.active_session_id is not None:
 
         st.markdown("---")
 
-        # 3. Interactive Metric Pill Buttons Graph Studio
-        st.markdown("#### Interactive Telemetry Studio")
-        conn = get_db()
-        history_df = pd.read_sql_query(f"""
-            SELECT exercise_code, date, distance_km, avg_speed_kmh, avg_hr, avg_power_w, elevation_gain_m, kilojoules 
-            FROM workouts 
-            WHERE sport_category='{w['sport_category']}' AND date <= '{w['date']}'
-            ORDER BY date ASC
-        """, conn)
-        conn.close()
+        # 3. IN-SESSION SELF TELEMETRY STUDIO (THIS WORKOUT AGAINST ITSELF)
+        st.markdown("#### In-Ride Telemetry Studio")
+        st.caption("Second-by-second sensor readings across the route of this specific workout.")
+        
+        with st.spinner("Loading workout stream telemetry..."):
+            stream_data = fetch_activity_stream(w['strava_id'])
+            
+        if stream_data and isinstance(stream_data, dict):
+            # Parse streams
+            raw_dist = stream_data.get("distance", {}).get("data", [])
+            raw_time = stream_data.get("time", {}).get("data", [])
+            raw_alt = stream_data.get("altitude", {}).get("data", [])
+            raw_vel = stream_data.get("velocity_smooth", {}).get("data", [])
+            raw_hr = stream_data.get("heartrate", {}).get("data", [])
+            raw_watts = stream_data.get("watts", {}).get("data", [])
+            raw_cad = stream_data.get("cadence", {}).get("data", [])
 
-        if len(history_df) >= 2:
-            history_df['Session'] = history_df['exercise_code'].apply(lambda x: x.split('-')[0].strip())
+            # Downsample if dense (>1200 points) to keep mobile rendering instantaneous
+            total_points = len(raw_dist) if raw_dist else len(raw_time)
+            step = max(1, total_points // 1000)
             
-            st.caption("Tap buttons below to toggle metrics on/off (combine up to 4 metrics simultaneously):")
-            
-            # Button metric toggles
-            selected_metrics = st.multiselect(
-                "Active Telemetry Metrics",
-                ["Power (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Ascent (m)", "Work Done (kJ)"],
-                default=["Power (Watts)", "Speed (km/h)"]
+            s_dist = [d / 1000.0 for d in raw_dist[::step]] if raw_dist else []
+            s_time = [t / 60.0 for t in raw_time[::step]] if raw_time else []
+            s_alt = raw_alt[::step] if raw_alt else []
+            s_spd = [v * 3.6 for v in raw_vel[::step]] if raw_vel else []
+            s_hr = raw_hr[::step] if raw_hr else []
+            s_watts = raw_watts[::step] if raw_watts else []
+            s_cad = raw_cad[::step] if raw_cad else []
+
+            # Stream Controls
+            c_axis, _ = st.columns([1.5, 2.5])
+            with c_axis:
+                x_axis_choice = st.radio("Timeline Axis", ["Distance (km)", "Elapsed Time (min)"], horizontal=True)
+            x_vals = s_dist if x_axis_choice == "Distance (km)" and s_dist else s_time
+            x_label = "Distance (km)" if x_axis_choice == "Distance (km)" else "Elapsed Time (min)"
+
+            # Available metrics in this stream
+            available_options = []
+            if s_alt: available_options.append("Elevation Profile (m)")
+            if s_spd: available_options.append("Speed (km/h)")
+            if s_hr: available_options.append("Heart Rate (bpm)")
+            if s_watts: available_options.append("Power (Watts)")
+            if s_cad: available_options.append("Cadence (RPM)")
+
+            default_selected = [opt for opt in ["Elevation Profile (m)", "Speed (km/h)", "Heart Rate (bpm)"] if opt in available_options]
+            if not default_selected and available_options:
+                default_selected = available_options[:2]
+
+            selected_stream_metrics = st.multiselect(
+                "Toggle Overlay Metrics",
+                available_options,
+                default=default_selected
             )
-            
-            metric_configs = {
-                "Power (Watts)": {"col": "avg_power_w", "color": "#fc5200", "unit": "W", "secondary": False},
-                "Speed (km/h)": {"col": "avg_speed_kmh", "color": "#2563eb", "unit": "km/h", "secondary": True},
-                "Heart Rate (bpm)": {"col": "avg_hr", "color": "#ef4444", "unit": "bpm", "secondary": False},
-                "Ascent (m)": {"col": "elevation_gain_m", "color": "#64748b", "unit": "m", "secondary": True},
-                "Work Done (kJ)": {"col": "kilojoules", "color": "#10b981", "unit": "kJ", "secondary": False}
-            }
 
-            if selected_metrics:
-                has_secondary = any(metric_configs[m]["secondary"] for m in selected_metrics)
-                fig = make_subplots(specs=[[{"secondary_y": has_secondary}]])
+            if selected_stream_metrics and x_vals:
+                # Primary axis: Power, Heart Rate, Elevation. Secondary axis: Speed, Cadence.
+                sec_needed = any(m in ["Speed (km/h)", "Cadence (RPM)"] for m in selected_stream_metrics) and any(m in ["Elevation Profile (m)", "Power (Watts)", "Heart Rate (bpm)"] for m in selected_stream_metrics)
+                fig_stream = make_subplots(specs=[[{"secondary_y": sec_needed}]])
 
-                for m_name in selected_metrics:
-                    cfg = metric_configs[m_name]
-                    # Handle 0-drops cleanly (replace 0 with None so line doesn't crash to the floor)
-                    series_vals = history_df[cfg["col"]].replace(0, None)
-                    
-                    fig.add_trace(
+                # 1. Elevation Terrain Profile (Filled Area)
+                if "Elevation Profile (m)" in selected_stream_metrics and s_alt:
+                    fig_stream.add_trace(
                         go.Scatter(
-                            x=history_df['Session'],
-                            y=series_vals,
-                            name=m_name,
-                            line=dict(color=cfg["color"], width=2.5, shape="spline"),
-                            mode="lines+markers",
-                            marker=dict(size=6, color=cfg["color"]),
-                            connectgaps=True,
-                            hovertemplate=f"<b>%{{x}}</b><br>{m_name}: %{{y:.1f}} {cfg['unit']}<extra></extra>"
+                            x=x_vals[:len(s_alt)], y=s_alt,
+                            name="Elevation (m)",
+                            fill='tozeroy',
+                            fillcolor='rgba(100, 116, 139, 0.18)',
+                            line=dict(color="#64748b", width=1.5),
+                            hovertemplate=f"<b>%{{x:.2f}} {x_label}</b><br>Elevation: %{{y:.0f}} m<extra></extra>"
                         ),
-                        secondary_y=cfg["secondary"] if has_secondary else False
+                        secondary_y=False
                     )
 
-                fig.update_layout(
+                # 2. Power Line
+                if "Power (Watts)" in selected_stream_metrics and s_watts:
+                    fig_stream.add_trace(
+                        go.Scatter(
+                            x=x_vals[:len(s_watts)], y=s_watts,
+                            name="Power (Watts)",
+                            line=dict(color="#fc5200", width=2.5, shape="spline"),
+                            hovertemplate=f"<b>%{{x:.2f}} {x_label}</b><br>Power: %{{y:.0f}} W<extra></extra>"
+                        ),
+                        secondary_y=False
+                    )
+
+                # 3. Heart Rate Line
+                if "Heart Rate (bpm)" in selected_stream_metrics and s_hr:
+                    fig_stream.add_trace(
+                        go.Scatter(
+                            x=x_vals[:len(s_hr)], y=s_hr,
+                            name="Heart Rate (bpm)",
+                            line=dict(color="#ef4444", width=2.2, shape="spline"),
+                            hovertemplate=f"<b>%{{x:.2f}} {x_label}</b><br>Heart Rate: %{{y:.0f}} bpm<extra></extra>"
+                        ),
+                        secondary_y=False
+                    )
+
+                # 4. Speed Line (Secondary Axis if paired)
+                if "Speed (km/h)" in selected_stream_metrics and s_spd:
+                    fig_stream.add_trace(
+                        go.Scatter(
+                            x=x_vals[:len(s_spd)], y=s_spd,
+                            name="Speed (km/h)",
+                            line=dict(color="#2563eb", width=2.2, shape="spline"),
+                            hovertemplate=f"<b>%{{x:.2f}} {x_label}</b><br>Speed: %{{y:.1f}} km/h<extra></extra>"
+                        ),
+                        secondary_y=sec_needed
+                    )
+
+                # 5. Cadence Line
+                if "Cadence (RPM)" in selected_stream_metrics and s_cad:
+                    fig_stream.add_trace(
+                        go.Scatter(
+                            x=x_vals[:len(s_cad)], y=s_cad,
+                            name="Cadence (RPM)",
+                            line=dict(color="#10b981", width=2, shape="spline"),
+                            hovertemplate=f"<b>%{{x:.2f}} {x_label}</b><br>Cadence: %{{y:.0f}} RPM<extra></extra>"
+                        ),
+                        secondary_y=sec_needed
+                    )
+
+                fig_stream.update_layout(
                     template="plotly_white",
-                    height=320,
-                    margin=dict(l=10, r=10, t=20, b=10),
+                    height=360,
+                    margin=dict(l=10, r=10, t=25, b=10),
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                     hovermode="x unified"
                 )
-                fig.update_xaxes(showgrid=True, gridcolor="#f1f5f9")
-                fig.update_yaxes(showgrid=True, gridcolor="#f1f5f9")
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Select at least one metric above to plot the telemetry curve.")
+                fig_stream.update_xaxes(title_text=x_label, showgrid=True, gridcolor="#f1f5f9")
+                fig_stream.update_yaxes(showgrid=True, gridcolor="#f1f5f9", secondary_y=False)
+                if sec_needed:
+                    fig_stream.update_yaxes(showgrid=False, secondary_y=True)
 
-            # Benchmark Performance Delta Table vs Last 5 Workouts
-            last_5 = history_df.tail(6).iloc[:-1]
-            if not last_5.empty:
-                avg_speed_l5 = last_5['avg_speed_kmh'].mean()
-                avg_hr_l5 = last_5[last_5['avg_hr'] > 0]['avg_hr'].mean() if not last_5[last_5['avg_hr'] > 0].empty else 0
-                avg_pwr_l5 = last_5[last_5['avg_power_w'] > 0]['avg_power_w'].mean() if not last_5[last_5['avg_power_w'] > 0].empty else 0
-                avg_elev_l5 = last_5['elevation_gain_m'].mean()
-                
-                comp_data = {
-                    "Metric": ["Average Speed", "Average Heart Rate", "Average Power", "Ascent Climbed"],
-                    "This Session": [f"{w['avg_speed_kmh']:.1f} km/h", f"{w['avg_hr']} bpm", f"{w['avg_power_w']:.0f} W", f"{w['elevation_gain_m']:.0f} m"],
-                    "Last 5 Avg": [f"{avg_speed_l5:.1f} km/h", f"{avg_hr_l5:.0f} bpm", f"{avg_pwr_l5:.0f} W", f"{avg_elev_l5:.0f} m"],
-                    "Delta": [
-                        f"{w['avg_speed_kmh'] - avg_speed_l5:+.1f} km/h",
-                        f"{w['avg_hr'] - avg_hr_l5:+.0f} bpm",
-                        f"{w['avg_power_w'] - avg_pwr_l5:+.0f} W",
-                        f"{w['elevation_gain_m'] - avg_elev_l5:+.0f} m"
-                    ]
-                }
-                st.markdown("##### Performance Delta vs Prior 5 Workouts")
-                st.dataframe(pd.DataFrame(comp_data).set_index("Metric"), use_container_width=True)
+                st.plotly_chart(fig_stream, use_container_width=True)
+            else:
+                st.info("Select at least one metric above to plot.")
+        else:
+            st.info("Second-by-second route streams are not available for this session. (Ensure activities are recorded with GPS/Smartwatch).")
 
         st.markdown("---")
 
-        # 4. Automated Chronological AI Coach Debrief
+        # 4. Chronological AI Debrief (Autonomous on Open)
         st.markdown("#### AI Coach Telemetry Debrief")
         conn = get_db()
         existing_rev = conn.execute("SELECT analysis_text FROM ai_reports WHERE reference_info=?", (w['exercise_code'],)).fetchone()
@@ -1064,7 +1138,7 @@ Provide a structured, elite coaching analysis:
                     st.markdown(f'<div class="ai-card">{ai_text}</div>', unsafe_allow_html=True)
                     st.rerun()
 
-        # 5. Athlete Field Notes
+        # 5. Field Notes
         st.markdown("---")
         st.markdown("#### Athlete Field Notes")
         curr_note = st.text_area("Observations, mechanical feel, nutrition:", value=w['notes'] or "", key=f"notes_{w['id']}")
@@ -1158,10 +1232,11 @@ with tab_feed:
                 st.rerun()
 
 # ---------------------------------------------------------
-# TAB 2: GLOBAL TELEMETRY GRAPHS (MULTI-BUTTON SELECTION)
+# TAB 2: GLOBAL TELEMETRY GRAPHS (ALL RIDES OVER TIME)
 # ---------------------------------------------------------
 with tab_analytics:
     st.subheader("Global Telemetry Studio")
+    st.caption("Macro progression tracking all workouts chronologically across your training season.")
     conn = get_db()
     df_all = pd.read_sql_query("SELECT * FROM workouts ORDER BY date ASC", conn)
     conn.close()
@@ -1173,11 +1248,9 @@ with tab_analytics:
         target_df = df_all[df_all['sport_category'] == ('Ride' if "Cycling" in sport_mode else 'Run')]
         
         if len(target_df) >= 2:
-            st.markdown("#### Multi-Metric Progression Curves")
-            st.caption("Toggle metrics to overlay together:")
-            
+            st.markdown("#### Progression Curves Across Workouts")
             metrics_global = st.multiselect(
-                "Overlay Metrics",
+                "Overlay Metrics Across Season",
                 ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Elevation Ascent (m)", "Work (kJ)"],
                 default=["Power Output (Watts)", "Speed (km/h)"] if "Cycling" in sport_mode else ["Speed (km/h)", "Heart Rate (bpm)"]
             )
@@ -1306,13 +1379,11 @@ with tab_progress:
             
         st.write(f"Total sessions in window: **{len(filtered_df)}**")
         
-        # Enhanced All-Time Personal Records (PR) Tracker
         if not p_df.empty:
             max_dist_row = p_df.loc[p_df['distance_km'].idxmax()]
             max_spd_row = p_df.loc[p_df['max_speed_kmh'].idxmax()]
             max_pwr_row = p_df.loc[p_df['avg_power_w'].idxmax()] if p_df['avg_power_w'].max() > 0 else None
             max_asc_row = p_df.loc[p_df['elevation_gain_m'].idxmax()]
-            
             p_df['vam_calc'] = p_df.apply(lambda r: (r['elevation_gain_m'] / (r['moving_time_sec'] / 3600.0)) if r['moving_time_sec'] > 0 else 0, axis=1)
             max_vam_row = p_df.loc[p_df['vam_calc'].idxmax()]
             
@@ -1354,7 +1425,6 @@ Provide an executive, sports-science evaluation:
                         conn.close()
                         st.markdown(f'<div class="ai-card">{audit}</div>', unsafe_allow_html=True)
 
-            # A4 PDF Generation
             conn = get_db()
             last_report = conn.execute("SELECT analysis_text FROM ai_reports WHERE report_type=? ORDER BY id DESC LIMIT 1", (f"{horizon} - {report_cat}",)).fetchone()
             conn.close()
@@ -1376,7 +1446,6 @@ Provide an executive, sports-science evaluation:
 with tab_settings:
     st.subheader("System Credentials & Data Persistence")
     
-    # 1. Live API Quota Monitor
     st.markdown("#### Live API Quota Monitor")
     today_str = datetime.date.today().isoformat()
     strava_calls = get_config(f"strava_calls_{today_str}") or 0
@@ -1388,7 +1457,6 @@ with tab_settings:
     
     st.markdown("---")
     
-    # 2. Complete Database Backup & Restore
     st.markdown("#### Local Database Backup & Safety")
     st.caption("Download your training_vault.db file to ensure zero data loss:")
     
@@ -1413,7 +1481,6 @@ with tab_settings:
 
     st.markdown("---")
     
-    # 3. Credentials
     st.markdown("#### Credentials & Hygiene")
     saved_key = get_config("custom_gemini_key") or ""
     new_gemini = st.text_input("Gemini API Key", value=saved_key, type="password")
