@@ -6,65 +6,37 @@ import requests
 import textwrap
 
 # ---------------------------------------------------------
-# 1. CONSUMER LIGHT-THEME UI (SAMSUNG HEALTH & STRAVA STYLE)
+# 1. LIGHT-THEME CONSUMER UI (SAMSUNG HEALTH & STRAVA STYLE)
 # ---------------------------------------------------------
 st.set_page_config(page_title="AI Coach", layout="centered", page_icon="⚡")
 
 st.markdown("""
 <style>
-    /* Global Clean Light Surface */
+    /* Clean Light Theme */
     .stApp {
         background-color: #f8fafc;
         color: #0f172a;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     
-    /* Prominent Top Navigation Tabs (Fix invisible text & contrast) */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: #e2e8f0;
-        padding: 4px;
-        border-radius: 12px;
-        border: 1px solid #cbd5e1;
-        margin-bottom: 12px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        padding: 6px 14px;
-        font-weight: 700;
-        font-size: 0.85rem;
-        color: #475569 !important;
-        border-radius: 8px;
-        background-color: transparent;
-        border: none !important;
-        transition: all 0.15s ease;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #fc5200 !important; /* Strava Signature Orange */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-    }
-    .stTabs [data-baseweb="tab-highlight"] {
-        display: none !important;
-    }
-
-    /* Top Brand Header */
+    /* Header Bar */
     .header-bar {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding-bottom: 8px;
+        padding-bottom: 12px;
         border-bottom: 2px solid #e2e8f0;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
     }
     .brand-title {
-        font-size: 1.45rem;
-        font-weight: 900;
-        color: #fc5200;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #fc5200; /* Strava Orange */
         letter-spacing: -0.5px;
     }
     .status-pill {
         font-size: 0.72rem;
-        font-weight: 800;
+        font-weight: 700;
         padding: 4px 10px;
         border-radius: 9999px;
         display: inline-flex;
@@ -74,32 +46,28 @@ st.markdown("""
     .status-synced {
         background-color: #dcfce7;
         color: #15803d;
-        border: 1px solid #86efac;
+        border: 1px solid #bbf7d0;
     }
     .status-unlinked {
         background-color: #fee2e2;
         color: #b91c1c;
-        border: 1px solid #fca5a5;
+        border: 1px solid #fecaca;
     }
 
-    /* High-Density Card (~80px height) */
+    /* High-Density Card (~75px height) */
     .workout-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 10px 12px;
-        margin-bottom: 6px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        transition: transform 0.1s ease, box-shadow 0.1s ease;
-    }
-    .workout-card:hover {
-        border-color: #cbd5e1;
     }
     .card-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
     }
     .card-left {
         display: flex;
@@ -108,39 +76,38 @@ st.markdown("""
         overflow: hidden;
     }
     .card-title {
-        font-size: 0.88rem;
-        font-weight: 800;
-        color: #0f172a;
+        font-size: 0.90rem;
+        font-weight: 700;
+        color: #1e293b;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .tag-badge {
         font-size: 0.68rem;
-        font-weight: 800;
-        padding: 2px 7px;
+        font-weight: 700;
+        padding: 2px 6px;
         border-radius: 6px;
-        white-space: nowrap;
     }
     .tag-ride {
         background-color: #eff6ff;
         color: #2563eb;
-        border: 1px solid #bfdbfe;
+        border: 1px solid #dbeafe;
     }
     .tag-run {
         background-color: #f0fdf4;
         color: #16a34a;
-        border: 1px solid #bbf7d0;
+        border: 1px solid #dcfce7;
     }
 
-    /* Metric Strip */
+    /* Stat Strip */
     .metric-strip {
         display: flex;
         justify-content: space-between;
         align-items: center;
         background-color: #f8fafc;
         border-radius: 8px;
-        padding: 5px 8px;
+        padding: 6px 12px;
         margin-top: 4px;
         border: 1px solid #f1f5f9;
     }
@@ -155,71 +122,62 @@ st.markdown("""
     }
     .metric-lbl {
         font-size: 0.58rem;
-        font-weight: 700;
+        font-weight: 600;
         color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.3px;
     }
 
-    /* Form Controls, Inputs & Button Contrast Fixes */
-    div.stButton > button {
-        border-radius: 10px;
-        font-weight: 800;
-        font-size: 0.88rem;
-        border: none;
+    /* Contrast Fixes for Buttons & Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        background-color: #f1f5f9;
+        padding: 4px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
     }
+    .stTabs [data-baseweb="tab"] {
+        height: 38px;
+        padding: 0 16px;
+        border-radius: 8px;
+        color: #475569 !important;
+        font-weight: 700 !important;
+        font-size: 0.88rem !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #fc5200 !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    
     div.stButton > button[kind="primary"] {
-        background-color: #fc5200;
-        color: #ffffff;
+        background-color: #fc5200 !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: 700 !important;
+        border-radius: 10px;
     }
     div.stButton > button[kind="secondary"] {
-        background-color: #ffffff;
-        color: #0f172a;
-        border: 1px solid #cbd5e1;
-    }
-    .stTextInput > div > div > input, .stTextArea textarea {
         background-color: #ffffff !important;
         color: #0f172a !important;
         border: 1px solid #cbd5e1 !important;
-        border-radius: 8px !important;
-    }
-    .streamlit-expanderHeader {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        font-weight: 700 !important;
-        border-radius: 8px !important;
-        border: 1px solid #e2e8f0 !important;
-    }
-    .streamlit-expanderContent {
-        background-color: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-top: none !important;
-        border-bottom-left-radius: 8px;
-        border-bottom-right-radius: 8px;
-    }
-    .ai-bubble {
-        background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
-        border: 1px solid #fed7aa;
+        font-weight: 600 !important;
         border-radius: 10px;
-        padding: 10px 12px;
-        margin-top: 8px;
-        margin-bottom: 8px;
-        color: #9a3412;
-        font-size: 0.84rem;
-        line-height: 1.45;
     }
 </style>
 """, unsafe_allow_html=True)
 
-SVG_BIKE = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>"""
-SVG_RUN = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="5" r="1.5"/><path d="m14 11 2-2-3-3-4 3 2 4-3 5 2 2 3-4 3 3"/></svg>"""
-SVG_HEART = """<svg width="13" height="13" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" stroke-width="2" style="vertical-align: middle;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>"""
-SVG_BOLT = """<svg width="13" height="13" viewBox="0 0 24 24" fill="#eab308" stroke="#ca8a04" stroke-width="1.5" style="vertical-align: middle;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>"""
-SVG_MOUNTAIN = """<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>"""
-SVG_AI = """<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>"""
+# ---------------------------------------------------------
+# 2. VECTOR SVG ICONS (NO EMOJIS)
+# ---------------------------------------------------------
+SVG_BIKE = """<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>"""
+SVG_RUN = """<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="5" r="1.5"/><path d="m14 11 2-2-3-3-4 3 2 4-3 5 2 2 3-4 3 3"/></svg>"""
+SVG_HEART = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" stroke-width="2" style="vertical-align: middle;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>"""
+SVG_BOLT = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#eab308" stroke="#ca8a04" stroke-width="1.5" style="vertical-align: middle;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>"""
+SVG_MOUNTAIN = """<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>"""
 
 # ---------------------------------------------------------
-# 2. DATABASE ENGINE, SCHEMA & DEDUPLICATION MIGRATION
+# 3. DATABASE ENGINE
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
@@ -228,13 +186,12 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_and_migrate_db():
+def init_db():
     conn = get_db()
     c = conn.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
     c.execute("CREATE TABLE IF NOT EXISTS workouts (id INTEGER PRIMARY KEY AUTOINCREMENT)")
     
-    # Check existing columns
     c.execute("PRAGMA table_info(workouts)")
     existing_cols = {row[1] for row in c.fetchall()}
     
@@ -242,8 +199,6 @@ def init_and_migrate_db():
         "strava_id": "INTEGER",
         "exercise_code": "TEXT",
         "date": "TEXT",
-        "start_time_str": "TEXT",
-        "end_time_str": "TEXT",
         "activity_type": "TEXT",
         "sport_category": "TEXT",
         "title": "TEXT",
@@ -266,8 +221,7 @@ def init_and_migrate_db():
         "avg_cadence": "REAL",
         "calories": "INTEGER",
         "suffer_score": "INTEGER",
-        "notes": "TEXT",
-        "ai_analysis": "TEXT"
+        "notes": "TEXT"
     }
     
     for col_name, col_type in required_cols.items():
@@ -278,34 +232,35 @@ def init_and_migrate_db():
                 pass
                 
     c.execute("""
+    UPDATE workouts 
+    SET sport_category = CASE 
+        WHEN activity_type LIKE '%Run%' OR activity_type LIKE '%Walk%' THEN 'Run'
+        ELSE 'Ride'
+    END
+    WHERE sport_category IS NULL OR sport_category = ''
+    """)
+    
+    c.execute("""
     CREATE TABLE IF NOT EXISTS ai_reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         report_type TEXT,
-        sport_scope TEXT,
         reference_info TEXT,
         created_at TEXT,
         analysis_text TEXT
     )
     """)
-    
-    # Auto-deduplicate workouts sharing the exact same date & distance or strava_id
-    c.execute("""
-    DELETE FROM workouts 
-    WHERE id NOT IN (
-        SELECT MIN(id) 
-        FROM workouts 
-        GROUP BY COALESCE(strava_id, date || distance_km)
-    )
-    """)
-    
     conn.commit()
     conn.close()
 
-init_and_migrate_db()
+init_db()
 
-CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "277202").strip().strip('"')
-CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "ddcc15be9c096ea443ad20a00ece1d2ac893e73d").strip().strip('"')
-DEFAULT_REFRESH = st.secrets.get("STRAVA_REFRESH_TOKEN", "f1fa3da33c8edf990b99374efe3c1890cab613a1").strip().strip('"')
+# ---------------------------------------------------------
+# 4. CREDENTIALS & SECRETS (100% SANITIZED - ZERO SECRETS IN CODE)
+# ---------------------------------------------------------
+# All values are loaded dynamically from Streamlit Secrets or database only.
+CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "").strip().strip('"')
+CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "").strip().strip('"')
+DEFAULT_REFRESH = st.secrets.get("STRAVA_REFRESH_TOKEN", "").strip().strip('"')
 GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "").strip().strip('"')
 
 def get_config(key):
@@ -320,7 +275,7 @@ def set_config(key, val):
     conn.commit()
     conn.close()
 
-# Auto-handle Strava OAuth code redirect
+# Auto-handle Strava OAuth code exchange if redirected
 if "code" in st.query_params:
     auth_code = st.query_params["code"]
     res = requests.post("https://www.strava.com/oauth/token", data={
@@ -338,8 +293,9 @@ if "code" in st.query_params:
 
 def get_valid_token():
     refresh_token = get_config("strava_refresh_token") or DEFAULT_REFRESH
-    if not refresh_token:
+    if not refresh_token or not CLIENT_ID or not CLIENT_SECRET:
         return None
+        
     res = requests.post("https://www.strava.com/oauth/token", data={
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
@@ -360,54 +316,59 @@ def calc_pace(moving_sec, dist_km):
         return f"{pm}:{ps:02d} /km"
     return "--"
 
-def format_time_range(dt_start, duration_sec):
-    dt_end = dt_start + datetime.timedelta(seconds=duration_sec)
-    date_part = f"{dt_start.day}/{dt_start.strftime('%b/%Y')}"
-    # Format e.g.: 9:15AM > 12:00PM
-    start_str = dt_start.strftime("%-I:%M%p")
-    end_str = dt_end.strftime("%-I:%M%p")
-    return date_part, f"{start_str} > {end_str}"
+def format_session_code(sport_prefix, seq_num, dt_obj, moving_sec):
+    day_str = dt_obj.strftime("%d/%b/%Y").lstrip("0")
+    start_time = dt_obj.strftime("%I:%M%p").lstrip("0")
+    end_dt = dt_obj + datetime.timedelta(seconds=int(moving_sec or 0))
+    end_time = end_dt.strftime("%I:%M%p").lstrip("0")
+    return f"{sport_prefix} {seq_num:03d} - {day_str} - {start_time} > {end_time}"
 
-def renumber_all_workouts(conn):
-    """Sorts all workouts chronologically and reassigns clean sequence numbers (Ride 001, Run 001)."""
+def clean_and_renumber_vault():
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT id, sport_category, date, elapsed_time_sec, moving_time_sec FROM workouts ORDER BY date ASC")
-    rows = c.fetchall()
-    
+    c.execute("""
+    DELETE FROM workouts 
+    WHERE id NOT IN (
+        SELECT MIN(id) 
+        FROM workouts 
+        GROUP BY date, distance_km
+    )
+    """)
+    conn.commit()
+
+    all_w = conn.execute("SELECT id, sport_category, date, moving_time_sec FROM workouts ORDER BY date ASC").fetchall()
     ride_counter = 1
     run_counter = 1
     
-    for row in rows:
-        w_id = row[0]
-        cat = row[1] or "Ride"
-        dt_raw = row[2]
-        elapsed = row[3] or row[4] or 0
-        
+    for row in all_w:
+        w_id = row['id']
+        sport = row['sport_category'] or 'Ride'
+        m_sec = row['moving_time_sec'] or 0
         try:
-            dt_obj = datetime.datetime.fromisoformat(dt_raw)
-        except Exception:
-            dt_obj = datetime.datetime.now()
+            dt = datetime.datetime.strptime(row['date'], "%Y-%m-%d %H:%M")
+        except:
+            dt = datetime.datetime.now()
             
-        date_part, time_range = format_time_range(dt_obj, elapsed)
-        
-        if cat == "Ride":
-            code = f"Ride {ride_counter:03d} - {date_part} - {time_range}"
+        if sport == 'Ride':
+            new_code = format_session_code("Ride", ride_counter, dt, m_sec)
             ride_counter += 1
         else:
-            code = f"Run {run_counter:03d} - {date_part} - {time_range}"
+            new_code = format_session_code("Run", run_counter, dt, m_sec)
             run_counter += 1
             
-        c.execute("UPDATE workouts SET exercise_code=? WHERE id=?", (code, w_id))
+        c.execute("UPDATE workouts SET exercise_code=? WHERE id=?", (new_code, w_id))
+        
     conn.commit()
+    conn.close()
 
 def sync_strava():
     token = get_valid_token()
     if not token:
-        st.error("Strava session expired or not authenticated. Reconnect below.")
+        st.error("Strava credentials missing or expired. Connect in the Settings tab.")
         return -1
         
     headers = {"Authorization": f"Bearer {token}"}
-    res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=80", headers=headers)
+    res = requests.get("https://www.strava.com/api/v3/athlete/activities?per_page=60", headers=headers)
     if res.status_code != 200:
         st.error(f"Strava Sync Error ({res.status_code}): {res.text}")
         return -1
@@ -426,7 +387,6 @@ def sync_strava():
             continue
             
         raw_type = act.get("type", "Ride")
-        # Walks and runs grouped together as requested
         is_run = raw_type in ["Run", "TrailRun", "VirtualRun", "Walk", "Hike"]
         sport_cat = "Run" if is_run else "Ride"
         act_type = f"Run ({raw_type})" if is_run else f"Ride ({raw_type})"
@@ -469,91 +429,53 @@ def sync_strava():
             strava_id, exercise_code, date, activity_type, sport_category, title, distance_km, 
             moving_time_str, moving_time_sec, elapsed_time_sec, avg_speed_kmh, max_speed_kmh, 
             pace_str, elevation_gain_m, elev_high_m, elev_low_m, avg_hr, max_hr, avg_power_w, 
-            max_power_w, norm_power_w, kilojoules, avg_cadence, calories, suffer_score, notes, ai_analysis
+            max_power_w, norm_power_w, kilojoules, avg_cadence, calories, suffer_score, notes
         )
-        VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '')
+        VALUES (?, 'Pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
         """, (s_id, date_str, act_type, sport_cat, title, dist_km, time_str, m_time, e_time, avg_spd, max_spd, pace_str, elev, elev_high, elev_low, avg_hr, max_hr, watts, max_watts, norm_watts, kj, cadence, cal, suffer))
         new_count += 1
         
-    # Renumber sequentially without gaps or duplicates
-    renumber_all_workouts(conn)
     conn.commit()
     conn.close()
+    
+    clean_and_renumber_vault()
     return new_count
 
 # ---------------------------------------------------------
-# 3. GEMINI COACHING ENGINE & PROGRESSIVE REASONING
+# 5. GEMINI API CALL ENGINE (SUPPORTS BOTH API KEYS & OAUTH)
 # ---------------------------------------------------------
 def call_gemini(prompt):
-    if not GEMINI_KEY:
-        st.error("GEMINI_API_KEY missing in Secrets.")
+    key = get_config("custom_gemini_key") or GEMINI_KEY
+    if not key:
+        st.error("No Gemini Key configured. Add your key in the Settings tab.")
         return None
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
+        
     payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
-    res = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+    
+    # Check if OAuth Token (starts with AQ.) or API Key (starts with AIzaSy)
+    if key.startswith("AQ."):
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    else:
+        headers = {"Content-Type": "application/json"}
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}"
+        
+    res = requests.post(url, json=payload, headers=headers)
     if res.status_code == 200:
         return res.json()["candidates"][0]["content"]["parts"][0]["text"]
     else:
+        # Fallback trial
+        if not key.startswith("AQ."):
+            fb_headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            fb_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            res2 = requests.post(fb_url, json=payload, headers=fb_headers)
+            if res2.status_code == 200:
+                return res2.json()["candidates"][0]["content"]["parts"][0]["text"]
         st.error(f"Gemini API Error ({res.status_code}): {res.text}")
         return None
 
-def generate_workout_ai_debrief(workout_id):
-    conn = get_db()
-    # Fetch target workout
-    target = conn.execute("SELECT * FROM workouts WHERE id=?", (workout_id,)).fetchone()
-    if not target:
-        conn.close()
-        return None
-        
-    # Fetch up to 3 prior workouts of the same sport category for progressive comparison
-    priors = conn.execute("""
-        SELECT * FROM workouts 
-        WHERE sport_category=? AND date < ? 
-        ORDER BY date DESC LIMIT 3
-    """, (target['sport_category'], target['date'])).fetchall()
-    conn.close()
-    
-    prior_summary = ""
-    if priors:
-        prior_summary = "PRIOR SESSIONS IN CHRONOLOGICAL SEQUENCE (Oldest to Most Recent):\n"
-        for p in reversed(priors):
-            prior_summary += f"- {p['exercise_code']} | Dist: {p['distance_km']}k | Time: {p['moving_time_str']} | Avg Spd/Pace: {p['avg_speed_kmh']} km/h ({p['pace_str']}) | HR: {p['avg_hr']} bpm (Peak: {p['max_hr']}) | Power: {p['avg_power_w']}W | Elev: {p['elevation_gain_m']}m\n"
-    else:
-        prior_summary = "This is the initial baseline session recorded in this category.\n"
-        
-    prompt = f"""
-You are an expert sports scientist and cycling/running coach analyzing athlete Mustafa (190 cm, ~115 kg, training on a Kron XC150 MTB with flat pedals, building an aerobic base to transition to an aero road bike).
-Max Heart Rate: 202 bpm. Estimated FTP: 220 W.
-
-CURRENT SESSION TELEMETRY:
-- Session: {target['exercise_code']}
-- Category: {target['sport_category']} ({target['activity_type']})
-- Distance: {target['distance_km']} km | Moving Duration: {target['moving_time_str']}
-- Average Speed: {target['avg_speed_kmh']} km/h | Max Speed: {target['max_speed_kmh']} km/h
-- Heart Rate Profile: Avg {target['avg_hr']} bpm | Peak {target['max_hr']} bpm ({round((target['avg_hr']/202)*100, 1)}% of max HR)
-- Estimated Power: Avg {target['avg_power_w']} W | Norm Power: {target['norm_power_w']} W | Max Power: {target['max_power_w']} W
-- Cadence: {target['avg_cadence']} RPM | Mechanical Work: {target['kilojoules']} kJ
-- Elevation: Gain {target['elevation_gain_m']} m | High {target['elev_high_m']} m | Low {target['elev_low_m']} m
-- Suffer Score: {target['suffer_score']}
-
-{prior_summary}
-
-TASK:
-Write an elite, concise, highly structured physiological debrief (3-4 bullet points max):
-1. **Cardiovascular & Decoupling Audit**: Relate heart rate drift to speed/pace and duration. Is the aerobic engine holding or did it spike into Zone 5 redline?
-2. **Torque vs Cadence & Elevation**: Evaluate mechanical stress, watt output, or running pace relative to the terrain gradient.
-3. **Progressive Delta & Actionable Takeaway**: Explicitly compare this session to the prior session(s). What improved, what decayed, and what is the exact tactical cue for next time?
-"""
-    analysis = call_gemini(prompt)
-    if analysis:
-        conn = get_db()
-        conn.execute("UPDATE workouts SET ai_analysis=? WHERE id=?", (analysis, workout_id))
-        conn.commit()
-        conn.close()
-    return analysis
-
 # ---------------------------------------------------------
-# 4. APPLICATION HEADER & CONTRAST NAVIGATION BAR
+# 6. APPLICATION HEADER & NAVIGATION
 # ---------------------------------------------------------
 is_connected = bool(get_config("strava_refresh_token") or DEFAULT_REFRESH)
 status_html = '<span class="status-pill status-synced">● STRAVA CONNECTED</span>' if is_connected else '<span class="status-pill status-unlinked">● DISCONNECTED</span>'
@@ -565,50 +487,169 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-tab_feed, tab_analytics, tab_compare, tab_progress = st.tabs(["Feed", "Graphs", "Compare", "Reports"])
+# Session state check for independent detail screen
+if "active_session_id" not in st.session_state:
+    st.session_state.active_session_id = None
+
+# =========================================================
+# DETAIL VIEW: INDEPENDENT WORKOUT SCREEN
+# =========================================================
+if st.session_state.active_session_id is not None:
+    conn = get_db()
+    w = conn.execute("SELECT * FROM workouts WHERE id=?", (st.session_state.active_session_id,)).fetchone()
+    conn.close()
+
+    if st.button("← Back to All Sessions", type="secondary"):
+        st.session_state.active_session_id = None
+        st.rerun()
+
+    if w:
+        is_run = (w['sport_category'] == 'Run')
+        st.markdown(f"## {w['exercise_code']}")
+        st.caption(f"Activity Type: **{w['activity_type']}** | Logged: **{w['date']}**")
+        
+        # Telemetry Metrics Grid
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Distance", f"{w['distance_km']:.2f} km")
+        c2.metric("Moving Time", w['moving_time_str'])
+        if is_run:
+            c3.metric("Pace", w['pace_str'])
+        else:
+            c3.metric("Avg Speed", f"{w['avg_speed_kmh']:.1f} km/h")
+
+        c4, c5, c6 = st.columns(3)
+        c4.metric("Avg Heart Rate", f"{w['avg_hr']} bpm" if w['avg_hr'] > 0 else "--")
+        c5.metric("Peak Heart Rate", f"{w['max_hr']} bpm" if w['max_hr'] > 0 else "--")
+        c6.metric("Ascent", f"{w['elevation_gain_m']:.0f} m")
+
+        c7, c8, c9 = st.columns(3)
+        if not is_run:
+            c7.metric("Avg Power", f"{w['avg_power_w']:.0f} W" if w['avg_power_w'] > 0 else "--")
+            c8.metric("Work Done", f"{w['kilojoules']:.0f} kJ" if w['kilojoules'] > 0 else "--")
+            c9.metric("Peak Speed", f"{w['max_speed_kmh']:.1f} km/h")
+        else:
+            c7.metric("Cadence", f"{int(w['avg_cadence'] * 2)} spm" if w['avg_cadence'] > 0 else "--")
+            c8.metric("Calories", f"{w['calories']} kcal" if w['calories'] > 0 else "--")
+            c9.metric("Suffer Score", f"{w['suffer_score']}" if w['suffer_score'] > 0 else "--")
+
+        st.markdown("---")
+
+        # Heart Rate Zone Telemetry
+        if w['avg_hr'] > 0:
+            st.markdown("#### Heart Rate Intensity")
+            pct_max = int((w['avg_hr'] / 202.0) * 100)
+            if pct_max < 60:
+                zone_desc = "Zone 1 (Active Recovery)"
+            elif pct_max < 70:
+                zone_desc = "Zone 2 (Aerobic Endurance Base)"
+            elif pct_max < 80:
+                zone_desc = "Zone 3 (Tempo / Aerobic Power)"
+            elif pct_max < 90:
+                zone_desc = "Zone 4 (Lactate Threshold)"
+            else:
+                zone_desc = "Zone 5 (Anaerobic / Neuromuscular Redline)"
+
+            st.write(f"**Cardiac Load:** {w['avg_hr']} bpm average ({pct_max}% of 202 bpm Max) — **{zone_desc}**")
+            st.progress(min(1.0, w['avg_hr'] / 202.0))
+
+        # Field Notes
+        st.markdown("---")
+        st.markdown("#### Athlete Field Notes")
+        curr_note = st.text_area("Observations, mechanical feel, nutrition:", value=w['notes'] or "", key=f"note_area_{w['id']}")
+        if st.button("Save Field Notes", type="secondary"):
+            conn = get_db()
+            conn.execute("UPDATE workouts SET notes=? WHERE id=?", (curr_note, w['id']))
+            conn.commit()
+            conn.close()
+            st.success("Notes saved.")
+            st.rerun()
+
+        # Dedicated In-Session AI Debrief
+        st.markdown("---")
+        st.markdown("#### AI Coach Telemetry Debrief")
+        
+        # Check if an existing review exists
+        conn = get_db()
+        existing_rev = conn.execute("SELECT analysis_text FROM ai_reports WHERE reference_info=?", (w['exercise_code'],)).fetchone()
+        conn.close()
+        
+        if existing_rev:
+            st.info(existing_rev['analysis_text'])
+            if st.button("Re-Analyze Session with AI", type="secondary"):
+                conn = get_db()
+                conn.execute("DELETE FROM ai_reports WHERE reference_info=?", (w['exercise_code'],))
+                conn.commit()
+                conn.close()
+                st.rerun()
+        else:
+            if st.button("Generate In-Depth AI Analysis", type="primary", use_container_width=True):
+                with st.spinner("AI evaluating biomechanics and cardiovascular response..."):
+                    # Pull prior sessions for chronological context
+                    conn = get_db()
+                    prior = conn.execute("""
+                        SELECT exercise_code, date, distance_km, avg_speed_kmh, pace_str, avg_hr, max_hr, avg_power_w 
+                        FROM workouts 
+                        WHERE date < ? AND sport_category=? 
+                        ORDER BY date DESC LIMIT 3
+                    """, (w['date'], w['sport_category'])).fetchall()
+                    conn.close()
+                    
+                    prior_context = "PRIOR HISTORICAL BENCHMARKS (For Progress Comparison):\n"
+                    for p in prior:
+                        prior_context += f"- {p['exercise_code']}: {p['distance_km']}km, Avg HR {p['avg_hr']}bpm, Spd/Pace {p['avg_speed_kmh']}km/h\n"
+                        
+                    prompt = f"""
+You are an expert cycling and running sports scientist coaching athlete Mustafa (190 cm, ~115 kg, training on an XC MTB and road running).
+DEBRIEF THIS SPECIFIC TRAINING SESSION:
+- Code: {w['exercise_code']}
+- Sport: {w['activity_type']}
+- Distance & Duration: {w['distance_km']} km in {w['moving_time_str']}
+- Pace / Speed: Avg {w['avg_speed_kmh']} km/h, Max {w['max_speed_kmh']} km/h, Pace {w['pace_str']}
+- Heart Rate: Avg {w['avg_hr']} bpm, Peak {w['max_hr']} bpm (Max HR benchmark is 202 bpm)
+- Power & Mechanical Load: {w['avg_power_w']} W Avg, Work {w['kilojoules']} kJ, Ascent {w['elevation_gain_m']} m
+- Athlete Field Notes: {w['notes']}
+
+{prior_context}
+
+Provide a structured, rigorous sports-science breakdown:
+1. **Cardiovascular Drift & Pacing Efficiency**: Analyze average vs peak HR relative to speed/power.
+2. **Torque vs Cadence & Elevation**: Evaluate mechanical work done under body mass.
+3. **Delta vs Prior Sessions**: Is the athlete demonstrating improved aerobic base, or accumulating fatigue?
+4. **Prescription**: One concrete technical adjustment for the next session.
+"""
+                    analysis = call_gemini(prompt)
+                    if analysis:
+                        conn = get_db()
+                        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                        conn.execute("INSERT INTO ai_reports (report_type, reference_info, created_at, analysis_text) VALUES ('Session Review', ?, ?, ?)",
+                                     (w['exercise_code'], now_str, analysis))
+                        conn.commit()
+                        conn.close()
+                        st.markdown(analysis)
+
+    st.stop()
+
+# =========================================================
+# MAIN APP TABS: FEED, GRAPHS, COMPARE, REPORTS, SETTINGS
+# =========================================================
+tab_feed, tab_analytics, tab_compare, tab_progress, tab_settings = st.tabs(["Feed", "Graphs", "Compare", "Reports", "Settings"])
 
 # ---------------------------------------------------------
 # TAB 1: CONSUMER HIGH-DENSITY FEED
 # ---------------------------------------------------------
 with tab_feed:
-    col_sync, col_renumber = st.columns([1.6, 1.4])
-    with col_sync:
+    col_btn, col_filter = st.columns([1.8, 1.2])
+    with col_btn:
         if st.button("Sync Strava", type="primary", use_container_width=True):
-            with st.spinner("Syncing latest sessions..."):
+            with st.spinner("Syncing activities..."):
                 added = sync_strava()
                 if added > 0:
                     st.success(f"+{added} New Sessions!")
                     st.rerun()
                 elif added == 0:
-                    st.info("Vault is up to date.")
-    with col_renumber:
-        # One-touch renumber and deduplicate utility
-        if st.button("Clean & Renumber Codes", type="secondary", use_container_width=True):
-            conn = get_db()
-            init_and_migrate_db()
-            renumber_all_workouts(conn)
-            conn.close()
-            st.success("Cleaned duplicates and renumbered chronologically!")
-            st.rerun()
-
-    filter_col1, filter_col2 = st.columns([1.5, 1.5])
-    with filter_col1:
-        view_filter = st.selectbox("Category Filter", ["All Activities", "Rides Only", "Runs & Walks"], label_visibility="collapsed")
-    with filter_col2:
-        batch_ai = st.button("Auto-Analyze All Sessions", type="secondary", use_container_width=True, help="Generates chronological AI notes for all unanalyzed workouts")
-        if batch_ai:
-            conn = get_db()
-            unanalyzed = conn.execute("SELECT id FROM workouts WHERE ai_analysis IS NULL OR ai_analysis = '' ORDER BY date ASC").fetchall()
-            conn.close()
-            if unanalyzed:
-                prog_bar = st.progress(0)
-                for i, row in enumerate(unanalyzed):
-                    generate_workout_ai_debrief(row[0])
-                    prog_bar.progress((i + 1) / len(unanalyzed))
-                st.success("All workouts analyzed!")
-                st.rerun()
-            else:
-                st.info("All workouts already have AI analyses.")
+                    st.info("Up to date.")
+    with col_filter:
+        view_filter = st.selectbox("Category", ["All", "Rides Only", "Runs & Walks"], label_visibility="collapsed")
 
     conn = get_db()
     df = pd.read_sql_query("SELECT * FROM workouts ORDER BY date DESC", conn)
@@ -621,52 +662,42 @@ with tab_feed:
             df = df[df['sport_category'] == 'Run']
 
     if df.empty:
-        st.info("No activities found. Tap 'Sync Strava' to load your training history.")
+        st.info("No activities found. Tap 'Sync Strava' above.")
     else:
         for _, r in df.iterrows():
-            w_id = r['id']
-            sport = r.get('sport_category', 'Ride') or 'Ride'
-            is_run = (sport == 'Run')
-            
+            is_run = (r['sport_category'] == 'Run')
             icon_svg = SVG_RUN if is_run else SVG_BIKE
             tag_class = "tag-run" if is_run else "tag-ride"
             
-            hr_val = f"{int(r['avg_hr'])}" if pd.notna(r.get('avg_hr')) and r['avg_hr'] > 0 else "--"
-            elev_val = f"{int(r['elevation_gain_m'])}m" if pd.notna(r.get('elevation_gain_m')) else "--"
-            dist_val = f"{r['distance_km']:.1f}k" if pd.notna(r.get('distance_km')) else "--"
-            time_val = str(r.get('moving_time_str', '--'))
+            hr_val = f"{int(r['avg_hr'])}" if pd.notna(r['avg_hr']) and r['avg_hr'] > 0 else "--"
+            elev_val = f"{int(r['elevation_gain_m'])}m" if pd.notna(r['elevation_gain_m']) else "--"
+            dist_val = f"{r['distance_km']:.1f}k" if pd.notna(r['distance_km']) else "--"
+            time_val = str(r['moving_time_str'] or '--')
             
-            # Primary & secondary metrics
             if is_run:
-                primary_metric_lbl = "Pace"
-                primary_metric_val = r.get('pace_str') or calc_pace(r.get('moving_time_sec', 0), r.get('distance_km', 0))
-                sec_metric_lbl = "Cadence"
-                sec_metric_val = f"{int(r['avg_cadence'] * 2)} spm" if pd.notna(r.get('avg_cadence')) and r['avg_cadence'] > 0 else "--"
+                primary_lbl = "Pace"
+                primary_val = r['pace_str'] if r['pace_str'] and r['pace_str'] != '--' else calc_pace(r['moving_time_sec'], r['distance_km'])
+                sec_lbl = "Cadence"
+                sec_val = f"{int(r['avg_cadence'] * 2)} spm" if pd.notna(r['avg_cadence']) and r['avg_cadence'] > 0 else "--"
             else:
-                primary_metric_lbl = "Speed"
-                primary_metric_val = f"{r.get('avg_speed_kmh', 0.0):.1f} <span style='font-size:0.62rem;color:#64748b;'>km/h</span>"
-                sec_metric_lbl = "Power"
-                sec_metric_val = f"{int(r['avg_power_w'])}W" if pd.notna(r.get('avg_power_w')) and r['avg_power_w'] > 0 else "--"
-
-            # Clean workout title matching user schema: Ride 001 - 5/Sep/2026 - 4:36PM > 4:50PM
-            disp_code = r.get('exercise_code')
-            if not disp_code or " - " not in disp_code:
-                disp_code = f"{r.get('exercise_code', '')} {r.get('date', '')}"
+                primary_lbl = "Speed"
+                primary_val = f"{r['avg_speed_kmh']:.1f} <span style='font-size:0.62rem;color:#64748b;'>km/h</span>"
+                sec_lbl = "Power"
+                sec_val = f"{int(r['avg_power_w'])}W" if pd.notna(r['avg_power_w']) and r['avg_power_w'] > 0 else "--"
 
             card_html = textwrap.dedent(f"""
             <div class="workout-card">
                 <div class="card-top">
                     <div class="card-left">
                         {icon_svg}
-                        <span class="card-title">{disp_code}</span>
+                        <span class="card-title">{r['exercise_code']}</span>
                     </div>
-                    <span class="tag-badge {tag_class}">{sport.upper()}</span>
                 </div>
                 <div class="metric-strip">
                     <div class="metric-cell"><div class="metric-num">{dist_val}</div><div class="metric-lbl">Dist</div></div>
                     <div class="metric-cell"><div class="metric-num">{time_val}</div><div class="metric-lbl">Time</div></div>
-                    <div class="metric-cell"><div class="metric-num">{primary_metric_val}</div><div class="metric-lbl">{primary_metric_lbl}</div></div>
-                    <div class="metric-cell"><div class="metric-num">{sec_metric_val}</div><div class="metric-lbl">{sec_metric_lbl}</div></div>
+                    <div class="metric-cell"><div class="metric-num">{primary_val}</div><div class="metric-lbl">{primary_lbl}</div></div>
+                    <div class="metric-cell"><div class="metric-num">{sec_val}</div><div class="metric-lbl">{sec_lbl}</div></div>
                     <div class="metric-cell"><div class="metric-num">{SVG_HEART} {hr_val}</div><div class="metric-lbl">HR</div></div>
                     <div class="metric-cell"><div class="metric-num">{SVG_MOUNTAIN} {elev_val}</div><div class="metric-lbl">Asc</div></div>
                 </div>
@@ -674,55 +705,12 @@ with tab_feed:
             """)
             st.markdown(card_html, unsafe_allow_html=True)
             
-            with st.expander(f"Inspect Telemetry & AI Notes"):
-                # Detailed telemetry metrics grid
-                t1, t2, t3, t4 = st.columns(4)
-                t1.metric("Max Speed", f"{r.get('max_speed_kmh', 0.0):.1f} km/h")
-                t2.metric("Peak HR", f"{r.get('max_hr', 0)} bpm")
-                t3.metric("Work (kJ)", f"{r.get('kilojoules', 0.0):.0f} kJ")
-                t4.metric("Suffer Score", f"{r.get('suffer_score', 0)}")
-
-                # In-Session Telemetry Comparison Chart
-                st.markdown("##### Session Effort Profile")
-                chart_data = pd.DataFrame({
-                    "Metric": ["Avg Speed (km/h)", "Peak Speed (km/h)", "Avg Power / 10", "Avg HR / 10"],
-                    "Value": [
-                        r.get('avg_speed_kmh', 0.0), 
-                        r.get('max_speed_kmh', 0.0), 
-                        r.get('avg_power_w', 0.0) / 10.0, 
-                        r.get('avg_hr', 0.0) / 10.0
-                    ]
-                }).set_index("Metric")
-                st.bar_chart(chart_data, height=160)
-
-                # AI Coaching Debrief Section
-                st.markdown(f"##### {SVG_AI} AI Coach Telemetry Breakdown", unsafe_allow_html=True)
-                existing_ai = r.get('ai_analysis')
-                if existing_ai:
-                    st.markdown(f'<div class="ai-bubble">{existing_ai}</div>', unsafe_allow_html=True)
-                else:
-                    st.caption("No AI debrief generated for this session yet.")
-                
-                # Button to generate/refresh AI analysis for this session
-                if st.button("Generate / Refresh AI Analysis", key=f"ai_btn_{w_id}", type="primary"):
-                    with st.spinner("Analyzing cardiovascular decoupling and mechanical torque..."):
-                        new_ai = generate_workout_ai_debrief(w_id)
-                        if new_ai:
-                            st.success("Analysis complete!")
-                            st.rerun()
-
-                # User Field Notes
-                note_input = st.text_input("Athlete Field Note", value=r.get('notes', ''), key=f"note_in_{w_id}")
-                if st.button("Save Field Note", key=f"save_n_{w_id}", type="secondary"):
-                    conn = get_db()
-                    conn.execute("UPDATE workouts SET notes=? WHERE id=?", (note_input, w_id))
-                    conn.commit()
-                    conn.close()
-                    st.success("Note saved.")
-                    st.rerun()
+            if st.button(f"Open Telemetry & Debrief →", key=f"btn_open_{r['id']}", use_container_width=True):
+                st.session_state.active_session_id = r['id']
+                st.rerun()
 
 # ---------------------------------------------------------
-# TAB 2: INTERACTIVE & CLEAN METRIC CHARTS
+# TAB 2: TELEMETRY GRAPHS
 # ---------------------------------------------------------
 with tab_analytics:
     st.subheader("Performance Telemetry")
@@ -751,13 +739,13 @@ with tab_analytics:
         else:
             runs = df_all[df_all['sport_category'] == 'Run']
             if len(runs) >= 2:
-                st.markdown("#### Running Pace Progression (Minutes per km)")
+                st.markdown("#### Running Pace History (Minutes per km)")
                 runs['pace_min'] = runs['moving_time_sec'] / 60.0 / runs['distance_km']
                 st.line_chart(runs.set_index("date_clean")[["pace_min"]])
                 st.markdown("#### Running Heart Rate vs Distance")
                 st.line_chart(runs.set_index("date_clean")[["avg_hr", "distance_km"]])
             else:
-                st.info("Need at least 2 running/walking sessions logged to plot running charts.")
+                st.info("Need at least 2 running/walking sessions logged to plot charts.")
     else:
         st.info("Log or sync at least 2 sessions to populate graphs.")
 
@@ -788,22 +776,21 @@ with tab_compare:
         if w3_choice:
             selected.append(options[w3_choice])
 
-        comp_cols = ["exercise_code", "date", "sport_category", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m", "kilojoules"]
+        comp_cols = ["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "avg_power_w", "elevation_gain_m", "kilojoules"]
         st.dataframe(pd.DataFrame(selected)[comp_cols].set_index("exercise_code"), use_container_width=True)
 
         if st.button("Generate Comparative AI Breakdown", type="primary", use_container_width=True):
             with st.spinner("Analyzing comparative physiological deltas..."):
                 prompt = f"""
-You are an expert sports physiologist analyzing athlete Mustafa (190 cm, ~115 kg, Max HR 202 bpm, Est. FTP 220 W).
+You are an expert sports physiologist analyzing athlete Mustafa (190 cm, ~115 kg).
 Compare these specific training sessions side-by-side:
 
 {pd.DataFrame(selected)[comp_cols].to_string()}
 
 Provide a structured, elite coaching assessment:
-1. **Pacing & Aerobic Decoupling**: Speed/pace efficiency relative to heart rate drift and cardiovascular drift.
-2. **Mechanical Torque vs Cadence Profile**: Watt production or cadence sustainability across elevation gradients.
-3. **Metabolic Load & Fatigue**: Compare work done (kJ) and cardiac cost.
-4. **Concrete Training Takeaway**: Single most important adjustment for upcoming sessions.
+1. Pacing & Aerobic Decoupling: Speed/pace efficiency relative to heart rate drift.
+2. Mechanical Torque vs Cadence Profile under elevation.
+3. Concrete Training Takeaway for the next session.
 """
                 verdict = call_gemini(prompt)
                 if verdict:
@@ -811,26 +798,29 @@ Provide a structured, elite coaching assessment:
                     st.markdown(verdict)
 
 # ---------------------------------------------------------
-# TAB 4: PERIODIC REPORTS WITH SPORT CATEGORY FILTER
+# TAB 4: PROGRESS REPORTS
 # ---------------------------------------------------------
 with tab_progress:
     st.subheader("Periodic Progression Reviews")
-    
-    rep_col1, rep_col2 = st.columns(2)
-    with rep_col1:
+    c_cat, c_hor = st.columns(2)
+    with c_cat:
+        report_cat = st.selectbox("Category Filter", ["All Activities", "Rides Only", "Runs & Walks"])
+    with c_hor:
         horizon = st.selectbox("Review Window", ["Last 7 Days", "Last 30 Days", "All Time"])
-    with rep_col2:
-        report_category = st.selectbox("Sport Category", ["All Activities", "Rides Only", "Runs & Walks"])
     
     conn = get_db()
     p_df = pd.read_sql_query("SELECT * FROM workouts ORDER BY date DESC", conn)
     conn.close()
     
     if not p_df.empty:
+        if report_cat == "Rides Only":
+            p_df = p_df[p_df['sport_category'] == 'Ride']
+        elif report_cat == "Runs & Walks":
+            p_df = p_df[p_df['sport_category'] == 'Run']
+            
         p_df['dt'] = pd.to_datetime(p_df['date'])
         now = datetime.datetime.now()
         
-        # Apply time horizon filter
         if horizon == "Last 7 Days":
             filtered = p_df[p_df['dt'] >= (now - datetime.timedelta(days=7))]
         elif horizon == "Last 30 Days":
@@ -838,48 +828,53 @@ with tab_progress:
         else:
             filtered = p_df
             
-        # Apply sport category filter
-        if report_category == "Rides Only":
-            filtered = filtered[filtered['sport_category'] == 'Ride']
-        elif report_category == "Runs & Walks":
-            filtered = filtered[filtered['sport_category'] == 'Run']
-            
-        st.write(f"Total sessions in window ({report_category}): **{len(filtered)}**")
-        
-        if not filtered.empty and st.button(f"Generate {horizon} ({report_category}) Audit", type="primary", use_container_width=True):
-            with st.spinner(f"Compiling {horizon} audit..."):
-                summary_data = filtered[["exercise_code", "date", "sport_category", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m"]].to_string(index=False)
+        st.write(f"Total sessions in window: **{len(filtered)}**")
+        if not filtered.empty and st.button(f"Generate {horizon} ({report_cat}) Audit", type="primary", use_container_width=True):
+            with st.spinner(f"Compiling {horizon} report..."):
+                summary_data = filtered[["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m"]].to_string(index=False)
                 prompt = f"""
-You are an elite sports scientist evaluating athlete Mustafa's ({horizon}, {report_category}) training block.
-Athlete Profile: 190 cm, ~115 kg, Max HR 202 bpm, Est. FTP 220 W.
-
+You are an elite cycling and running coach reviewing athlete Mustafa's ({horizon} - {report_cat}) training progression.
 Session Data:
 {summary_data}
 
-Provide an executive, sports-science progression report:
-1. **Volume & Consistency Adherence**: Work done, distance accumulated, and mechanical load.
-2. **Aerobic Base Building vs Zone 5 Redline Fatigue**: Analyze cardiovascular drift and whether the sessions are consolidating Zone 2 fat-oxidation or burning high-glycolytic matches.
-3. **Mechanical Power & Speed Benchmarks**: Performance shifts across climbs and flat endurance segments.
-4. **Prescription & Adjustments**: Clear guidance on cadence targets, gearing, and recovery before the next cycle.
+Provide an executive, sports-science evaluation:
+1. Training Load & Volume Adherence.
+2. Zone 2 Aerobic Base building vs Zone 5 Redline Fatigue.
+3. Actionable adjustments for nutrition, recovery, and upcoming sessions.
 """
                 audit = call_gemini(prompt)
                 if audit:
                     conn = get_db()
                     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-                    conn.execute("INSERT INTO ai_reports (report_type, sport_scope, reference_info, created_at, analysis_text) VALUES (?, ?, ?, ?, ?)",
-                                 (horizon, report_category, f"{len(filtered)} workouts", now_str, audit))
+                    conn.execute("INSERT INTO ai_reports (report_type, reference_info, created_at, analysis_text) VALUES (?, ?, ?, ?)",
+                                 (f"{horizon} - {report_cat}", f"{len(filtered)} workouts", now_str, audit))
                     conn.commit()
                     conn.close()
                     st.markdown(audit)
-                    
-    # Display saved periodic audits
-    conn = get_db()
-    saved_reports = conn.execute("SELECT * FROM ai_reports ORDER BY id DESC LIMIT 5").fetchall()
-    conn.close()
-    if saved_reports:
-        st.markdown("---")
-        st.markdown("#### Historical Progression Audits")
-        for s_rep in saved_reports:
-            scope_tag = s_rep['sport_scope'] if 'sport_scope' in s_rep.keys() else 'All'
-            with st.expander(f"{s_rep['report_type']} ({scope_tag}) - {s_rep['created_at']}"):
-                st.markdown(s_rep['analysis_text'])
+
+# ---------------------------------------------------------
+# TAB 5: SETTINGS & VAULT UTILITIES
+# ---------------------------------------------------------
+with tab_settings:
+    st.subheader("System Credentials & Vault Utilities")
+    
+    st.markdown("#### Strava Authentication")
+    auth_url = f"https://www.strava.com/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri=https://share.streamlit.io&approval_prompt=force&scope=activity:read_all"
+    st.markdown(f"[Tap here to Authorize / Reconnect Strava Account]({auth_url})")
+    
+    st.markdown("---")
+    st.markdown("#### Gemini API Key Management")
+    st.caption("Enter your Gemini API key below to override Streamlit Secrets directly from your phone:")
+    saved_key = get_config("custom_gemini_key") or ""
+    new_gemini = st.text_input("Gemini API Key", value=saved_key, type="password")
+    if st.button("Save Gemini Key", type="secondary"):
+        set_config("custom_gemini_key", new_gemini.strip())
+        st.success("API Key updated.")
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### Vault Hygiene")
+    if st.button("Clean Duplicates & Renumber Workouts", type="secondary", use_container_width=True):
+        clean_and_renumber_vault()
+        st.success("Duplicates removed and chronological session codes refreshed!")
+        st.rerun()
