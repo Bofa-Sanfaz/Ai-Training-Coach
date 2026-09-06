@@ -4,29 +4,34 @@ import pandas as pd
 import datetime
 import requests
 import textwrap
+import io
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# ReportLab imports for A4 PDF generation
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+
 # ---------------------------------------------------------
-# 1. FUTURISTIC LIGHT THEME & BULLETPROOF MOBILE CSS
+# 1. FUTURISTIC LIGHT THEME & MOBILE UI STYLING
 # ---------------------------------------------------------
 st.set_page_config(page_title="AI Coach", layout="centered", page_icon="⚡")
 
 st.markdown("""
 <style>
-    /* Smooth Viewport Transition Animation */
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(6px); }
+        from { opacity: 0; transform: translateY(4px); }
         to { opacity: 1; transform: translateY(0); }
     }
     .stApp {
         background-color: #f8fafc;
         color: #0f172a;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: fadeIn 0.2s ease-out;
     }
     
-    /* Clean Header */
     .header-bar {
         display: flex;
         justify-content: space-between;
@@ -61,7 +66,7 @@ st.markdown("""
         border: 1px solid #fecaca;
     }
 
-    /* FORCED TAB FIX: Clean Box Pills, Zero Emojis, No Overflow */
+    /* FORCED TAB VISIBILITY: Clean Box Pills, Zero Emojis */
     .stTabs [data-baseweb="tab-list"] {
         display: flex !important;
         background-color: #e2e8f0 !important;
@@ -101,7 +106,6 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* Radio Button Text Fix: High Contrast */
     div[role="radiogroup"] label {
         background-color: #ffffff !important;
         padding: 6px 12px !important;
@@ -116,7 +120,6 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
 
-    /* Inputs & Select Boxes */
     .stTextArea textarea, .stTextInput input, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #0f172a !important;
@@ -129,7 +132,6 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* High-Contrast Action Buttons */
     div.stButton > button[kind="primary"] {
         background-color: #fc5200 !important;
         color: #ffffff !important;
@@ -145,7 +147,6 @@ st.markdown("""
         border-radius: 10px !important;
     }
 
-    /* Feed & Hero Cards */
     .workout-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -195,7 +196,6 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
 
-    /* Futuristic In-Session Hero Dashboard */
     .hero-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -223,7 +223,6 @@ st.markdown("""
         margin-top: 2px;
     }
 
-    /* Biometric Sub-Grid */
     .telemetry-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -250,7 +249,6 @@ st.markdown("""
         color: #0f172a;
     }
 
-    /* AI Debrief Card */
     .ai-card {
         background: #ffffff;
         border: 1px solid #fed7aa;
@@ -274,7 +272,7 @@ SVG_HEART = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#ef4444" st
 SVG_MOUNTAIN = """<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>"""
 
 # ---------------------------------------------------------
-# 3. DATABASE ENGINE & VAULT UTILITIES
+# 3. DATABASE ENGINE & UTILITIES
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
@@ -507,12 +505,11 @@ def sync_strava():
         cadence = round(act.get("average_cadence", 0.0), 1)
         suffer = int(act.get("suffer_score", 0)) if act.get("suffer_score") else 0
         
-        # Smart Biometric Fallbacks (If Strava returns 0/null without power meter)
         if kj == 0 and watts > 0 and m_time > 0:
             kj = round((watts * m_time) / 1000.0, 1)
         cal = int(act.get("calories", 0)) if act.get("calories") else int(kj * 1.05) if kj > 0 else 0
         if norm_watts == 0 and watts > 0:
-            norm_watts = round(watts * 1.05, 0) # Standard XC ride NP approximation
+            norm_watts = round(watts * 1.05, 0)
             
         title = act.get("name", "Training Session")
         
@@ -565,7 +562,176 @@ def call_gemini(prompt):
     return None
 
 # ---------------------------------------------------------
-# 6. HEADER & SESSION NAVIGATION
+# 6. PROFESSIONAL A4 PDF REPORT GENERATOR (REPORTLAB)
+# ---------------------------------------------------------
+def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=36, leftMargin=36,
+        topMargin=36, bottomMargin=36
+    )
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Custom Palette
+    primary_color = colors.HexColor('#fc5200') # Strava Orange
+    dark_slate = colors.HexColor('#0f172a')
+    light_bg = colors.HexColor('#f8fafc')
+    border_color = colors.HexColor('#cbd5e1')
+    
+    # Typography Styles
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontSize=22,
+        leading=26,
+        textColor=primary_color,
+        fontName='Helvetica-Bold'
+    )
+    sub_style = ParagraphStyle(
+        'DocSub',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#64748b'),
+        fontName='Helvetica'
+    )
+    section_heading = ParagraphStyle(
+        'SecHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        leading=18,
+        textColor=dark_slate,
+        fontName='Helvetica-Bold',
+        spaceBefore=12,
+        spaceAfter=6
+    )
+    body_style = ParagraphStyle(
+        'BodyDark',
+        parent=styles['Normal'],
+        fontSize=9,
+        leading=13,
+        textColor=dark_slate,
+        fontName='Helvetica'
+    )
+    table_cell = ParagraphStyle(
+        'TableCell',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=10,
+        textColor=dark_slate,
+        fontName='Helvetica'
+    )
+    table_header = ParagraphStyle(
+        'TableHeader',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=10,
+        textColor=colors.white,
+        fontName='Helvetica-Bold'
+    )
+
+    # Header Section
+    story.append(Paragraph("AI COACH — EXECUTIVE PROGRESSION REPORT", title_style))
+    story.append(Paragraph(f"Athlete: Mustafa (190 cm) | Window: {window_name} | Category: {cat_name} | Generated: {datetime.datetime.now().strftime('%d-%b-%Y %H:%M')}", sub_style))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
+
+    # Aggregated Summary Totals
+    total_dist = df_subset['distance_km'].sum()
+    total_ascent = df_subset['elevation_gain_m'].sum()
+    total_kj = df_subset['kilojoules'].sum()
+    avg_speed = df_subset['avg_speed_kmh'].mean() if not df_subset.empty else 0
+    avg_hr = df_subset['avg_hr'].mean() if not df_subset.empty else 0
+    
+    story.append(Paragraph("Executive Summary Metrics", section_heading))
+    summary_data = [
+        [
+            Paragraph("<b>Total Sessions</b>", table_header),
+            Paragraph("<b>Total Distance</b>", table_header),
+            Paragraph("<b>Total Ascent</b>", table_header),
+            Paragraph("<b>Total Work (kJ)</b>", table_header),
+            Paragraph("<b>Avg Speed</b>", table_header),
+            Paragraph("<b>Avg Heart Rate</b>", table_header)
+        ],
+        [
+            Paragraph(f"{len(df_subset)}", table_cell),
+            Paragraph(f"{total_dist:.1f} km", table_cell),
+            Paragraph(f"{total_ascent:.0f} m", table_cell),
+            Paragraph(f"{total_kj:.0f} kJ", table_cell),
+            Paragraph(f"{avg_speed:.1f} km/h", table_cell),
+            Paragraph(f"{avg_hr:.0f} bpm", table_cell)
+        ]
+    ]
+    t_summary = Table(summary_data, colWidths=[75, 80, 80, 85, 75, 85])
+    t_summary.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), primary_color),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('BACKGROUND', (0,1), (-1,1), light_bg),
+    ]))
+    story.append(t_summary)
+    story.append(Spacer(1, 12))
+
+    # AI Executive Review Text
+    story.append(Paragraph("Sports-Science AI Progression Audit", section_heading))
+    if ai_review_text:
+        # Format markdown line breaks for ReportLab
+        formatted_ai = ai_review_text.replace('\n', '<br/>')
+        story.append(Paragraph(formatted_ai, body_style))
+    else:
+        story.append(Paragraph("No AI audit generated for this window yet.", body_style))
+    story.append(Spacer(1, 12))
+
+    # Itemized Session Log Table
+    story.append(Paragraph("Itemized Session Log", section_heading))
+    log_data = [[
+        Paragraph("<b>Session Code</b>", table_header),
+        Paragraph("<b>Date</b>", table_header),
+        Paragraph("<b>Dist (km)</b>", table_header),
+        Paragraph("<b>Time</b>", table_header),
+        Paragraph("<b>Speed/Pace</b>", table_header),
+        Paragraph("<b>Power (W)</b>", table_header),
+        Paragraph("<b>HR (bpm)</b>", table_header),
+        Paragraph("<b>Asc (m)</b>", table_header)
+    ]]
+    
+    for _, r in df_subset.iterrows():
+        spd_or_pace = r['pace_str'] if r['sport_category'] == 'Run' else f"{r['avg_speed_kmh']:.1f} km/h"
+        log_data.append([
+            Paragraph(str(r['exercise_code']), table_cell),
+            Paragraph(str(r['date']), table_cell),
+            Paragraph(f"{r['distance_km']:.1f}", table_cell),
+            Paragraph(str(r['moving_time_str']), table_cell),
+            Paragraph(str(spd_or_pace), table_cell),
+            Paragraph(f"{r['avg_power_w']:.0f}" if r['avg_power_w'] > 0 else "--", table_cell),
+            Paragraph(f"{r['avg_hr']}" if r['avg_hr'] > 0 else "--", table_cell),
+            Paragraph(f"{r['elevation_gain_m']:.0f}", table_cell)
+        ])
+        
+    t_log = Table(log_data, colWidths=[110, 75, 55, 50, 70, 55, 50, 55])
+    t_log.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), dark_slate),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, light_bg]),
+    ]))
+    story.append(t_log)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+# ---------------------------------------------------------
+# 7. HEADER & SESSION NAVIGATION
 # ---------------------------------------------------------
 is_connected = bool(get_config("strava_refresh_token") or DEFAULT_REFRESH)
 status_html = '<span class="status-pill status-synced">● STRAVA CONNECTED</span>' if is_connected else '<span class="status-pill status-unlinked">● DISCONNECTED</span>'
@@ -597,7 +763,6 @@ if st.session_state.active_session_id is not None:
         st.markdown(f"## {w['exercise_code']}")
         st.caption(f"Sport Category: **{w['sport_category']}** | Logged: **{w['date']}**")
         
-        # 1. Primary Hero Telemetry Board
         speed_pace_val = w['pace_str'] if is_run else f"{w['avg_speed_kmh']:.1f} km/h"
         speed_pace_lbl = "Avg Pace" if is_run else "Avg Speed"
         pwr_val = f"{w['avg_power_w']:.0f} W" if w['avg_power_w'] > 0 else "--"
@@ -615,7 +780,6 @@ if st.session_state.active_session_id is not None:
         """)
         st.markdown(hero_html, unsafe_allow_html=True)
 
-        # 2. Secondary Telemetry Grid
         st.markdown("#### Secondary Telemetry & Biometrics")
         vam = round((w['elevation_gain_m'] / (w['moving_time_sec'] / 3600.0)), 0) if w['moving_time_sec'] > 0 else 0
         sec1 = f"{w['max_speed_kmh']:.1f} km/h" if w['max_speed_kmh'] > 0 else "--"
@@ -637,7 +801,6 @@ if st.session_state.active_session_id is not None:
         """)
         st.markdown(telemetry_html, unsafe_allow_html=True)
 
-        # 3. Heart Rate Zone Intensity Gauge
         if w['avg_hr'] > 0:
             pct_max = int((w['avg_hr'] / 202.0) * 100)
             zone_desc = (
@@ -652,7 +815,6 @@ if st.session_state.active_session_id is not None:
 
         st.markdown("---")
 
-        # 4. Futuristic Plotly Telemetry Studio (Dual-Axis Independent Scales)
         st.markdown("#### Interactive Telemetry Studio")
         conn = get_db()
         history_df = pd.read_sql_query(f"""
@@ -678,44 +840,34 @@ if st.session_state.active_session_id is not None:
             }
 
             fig = make_subplots(specs=[[{"secondary_y": True}]])
-            
-            # Left Trace (Orange Spline)
             fig.add_trace(
                 go.Scatter(
                     x=history_df['Session'], y=history_df[metric_left],
                     name=labels_map[metric_left],
                     line=dict(color="#fc5200", width=3, shape="spline"),
-                    mode="lines+markers",
-                    marker=dict(size=6, color="#fc5200")
+                    mode="lines+markers", marker=dict(size=6, color="#fc5200")
                 ),
                 secondary_y=False
             )
-            
-            # Right Trace (Blue Spline)
             fig.add_trace(
                 go.Scatter(
                     x=history_df['Session'], y=history_df[metric_right],
                     name=labels_map[metric_right],
                     line=dict(color="#2563eb", width=3, shape="spline"),
-                    mode="lines+markers",
-                    marker=dict(size=6, color="#2563eb")
+                    mode="lines+markers", marker=dict(size=6, color="#2563eb")
                 ),
                 secondary_y=True
             )
-
             fig.update_layout(
-                template="plotly_white",
-                height=320,
+                template="plotly_white", height=320,
                 margin=dict(l=10, r=10, t=25, b=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 hovermode="x unified"
             )
             fig.update_yaxes(title_text=labels_map[metric_left], title_font=dict(color="#fc5200"), secondary_y=False)
             fig.update_yaxes(title_text=labels_map[metric_right], title_font=dict(color="#2563eb"), secondary_y=True)
-            
             st.plotly_chart(fig, use_container_width=True)
 
-            # Benchmark Delta Table (Current Session vs Last 5 Sessions Average)
             last_5 = history_df.tail(6).iloc[:-1]
             if not last_5.empty:
                 avg_speed_l5 = last_5['avg_speed_kmh'].mean()
@@ -739,7 +891,6 @@ if st.session_state.active_session_id is not None:
 
         st.markdown("---")
 
-        # 5. Automatic In-Session AI Coach Review
         st.markdown("#### AI Coach Telemetry Debrief")
         conn = get_db()
         existing_rev = conn.execute("SELECT analysis_text FROM ai_reports WHERE reference_info=?", (w['exercise_code'],)).fetchone()
@@ -757,7 +908,7 @@ if st.session_state.active_session_id is not None:
             with st.spinner("AI Coach analyzing session telemetry against your last 5 workouts and all-time baseline..."):
                 conn = get_db()
                 prior_5 = conn.execute("""
-                    SELECT exercise_code, date, distance_km, avg_speed_kmh, avg_hr, avg_power_w, elevation_gain_m 
+                    SELECT exercise_code, date, distance_km, avg_speed_kmh, pace_str, avg_hr, max_hr, avg_power_w, elevation_gain_m 
                     FROM workouts 
                     WHERE date < ? AND sport_category=? 
                     ORDER BY date DESC LIMIT 5
@@ -808,7 +959,6 @@ Provide a structured, elite coaching analysis:
                     st.markdown(f'<div class="ai-card">{ai_text}</div>', unsafe_allow_html=True)
                     st.rerun()
 
-        # 6. Athlete Notes
         st.markdown("---")
         st.markdown("#### Athlete Field Notes")
         curr_note = st.text_area("Field observations, mechanical feel, nutrition:", value=w['notes'] or "", key=f"notes_{w['id']}")
@@ -823,7 +973,7 @@ Provide a structured, elite coaching analysis:
     st.stop()
 
 # =========================================================
-# MAIN APP NAVIGATION: CLEAN 5-TAB APP BAR (NO EMOJIS)
+# MAIN APP NAVIGATION: CLEAN 5-TAB APP BAR
 # =========================================================
 tab_feed, tab_analytics, tab_compare, tab_progress, tab_settings = st.tabs(["FEED", "GRAPHS", "COMPARE", "REPORTS", "SETTINGS"])
 
@@ -939,8 +1089,7 @@ with tab_analytics:
                 secondary_y=True
             )
             fig.update_layout(
-                template="plotly_white",
-                height=350,
+                template="plotly_white", height=350,
                 margin=dict(l=10, r=10, t=30, b=10),
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
@@ -1008,7 +1157,7 @@ Provide a structured, elite coaching assessment:
                     st.markdown(f'<div class="ai-card">{verdict}</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# TAB 4: PROGRESS REPORTS
+# TAB 4: PROGRESS REPORTS & A4 PDF EXPORT
 # ---------------------------------------------------------
 with tab_progress:
     st.subheader("Periodic Progression Reviews")
@@ -1024,25 +1173,46 @@ with tab_progress:
     
     if not p_df.empty:
         if report_cat == "Rides Only":
-            p_df = p_df[p_df['sport_category'] == 'Ride']
+            filtered_df = p_df[p_df['sport_category'] == 'Ride']
         elif report_cat == "Runs & Walks":
-            p_df = p_df[p_df['sport_category'] == 'Run']
+            filtered_df = p_df[p_df['sport_category'] == 'Run']
+        else:
+            filtered_df = p_df
             
-        p_df['dt'] = pd.to_datetime(p_df['date'])
+        filtered_df['dt'] = pd.to_datetime(filtered_df['date'])
         now = datetime.datetime.now()
         
         if horizon == "Last 7 Days":
-            filtered = p_df[p_df['dt'] >= (now - datetime.timedelta(days=7))]
+            filtered_df = filtered_df[filtered_df['dt'] >= (now - datetime.timedelta(days=7))]
         elif horizon == "Last 30 Days":
-            filtered = p_df[p_df['dt'] >= (now - datetime.timedelta(days=30))]
-        else:
-            filtered = p_df
+            filtered_df = filtered_df[filtered_df['dt'] >= (now - datetime.timedelta(days=30))]
             
-        st.write(f"Total sessions in window: **{len(filtered)}**")
-        if not filtered.empty and st.button(f"Generate {horizon} ({report_cat}) Audit", type="primary", use_container_width=True):
-            with st.spinner(f"Compiling {horizon} report..."):
-                summary_data = filtered[["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m"]].to_string(index=False)
-                prompt = f"""
+        st.write(f"Total sessions in window: **{len(filtered_df)}**")
+        
+        # All-Time Personal Records (PR) Tracker Card
+        if not p_df.empty:
+            max_dist_row = p_df.loc[p_df['distance_km'].idxmax()]
+            max_spd_row = p_df.loc[p_df['max_speed_kmh'].idxmax()]
+            max_pwr_row = p_df.loc[p_df['avg_power_w'].idxmax()] if p_df['avg_power_w'].max() > 0 else None
+            max_asc_row = p_df.loc[p_df['elevation_gain_m'].idxmax()]
+            
+            st.markdown("#### All-Time Personal Records (PR)")
+            pr_html = textwrap.dedent(f"""
+            <div class="telemetry-grid">
+                <div class="telemetry-row"><span class="telemetry-name">Longest Distance</span><span class="telemetry-val">{max_dist_row['distance_km']:.1f} km ({max_dist_row['exercise_code'].split('-')[0]})</span></div>
+                <div class="telemetry-row"><span class="telemetry-name">Peak Speed</span><span class="telemetry-val">{max_spd_row['max_speed_kmh']:.1f} km/h</span></div>
+                <div class="telemetry-row"><span class="telemetry-name">Peak Power Output</span><span class="telemetry-val">{f"{max_pwr_row['avg_power_w']:.0f} W" if max_pwr_row is not None else "--"}</span></div>
+                <div class="telemetry-row"><span class="telemetry-name">Highest Ascent</span><span class="telemetry-val">{max_asc_row['elevation_gain_m']:.0f} m</span></div>
+            </div>
+            """)
+            st.markdown(pr_html, unsafe_allow_html=True)
+            st.markdown("---")
+
+        if not filtered_df.empty:
+            if st.button(f"Generate {horizon} ({report_cat}) AI Audit", type="primary", use_container_width=True):
+                with st.spinner(f"Compiling {horizon} report..."):
+                    summary_data = filtered_df[["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m"]].to_string(index=False)
+                    prompt = f"""
 You are an elite cycling and running coach reviewing athlete Mustafa's ({horizon} - {report_cat}) training progression.
 Chronological Training Curve:
 {summary_data}
@@ -1052,15 +1222,31 @@ Provide an executive, sports-science evaluation:
 2. Volume & Mechanical Strain: Evaluate total climbing and watts under body mass.
 3. Next Actionable Target: Exact guidance for upcoming training blocks.
 """
-                audit = call_gemini(prompt)
-                if audit:
-                    conn = get_db()
-                    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-                    conn.execute("INSERT INTO ai_reports (report_type, reference_info, created_at, analysis_text) VALUES (?, ?, ?, ?)",
-                                 (f"{horizon} - {report_cat}", f"{len(filtered)} workouts", now_str, audit))
-                    conn.commit()
-                    conn.close()
-                    st.markdown(f'<div class="ai-card">{audit}</div>', unsafe_allow_html=True)
+                    audit = call_gemini(prompt)
+                    if audit:
+                        conn = get_db()
+                        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                        conn.execute("INSERT INTO ai_reports (report_type, reference_info, created_at, analysis_text) VALUES (?, ?, ?, ?)",
+                                     (f"{horizon} - {report_cat}", f"{len(filtered_df)} workouts", now_str, audit))
+                        conn.commit()
+                        conn.close()
+                        st.markdown(f'<div class="ai-card">{audit}</div>', unsafe_allow_html=True)
+
+            # Check for existing report to download PDF
+            conn = get_db()
+            last_report = conn.execute("SELECT analysis_text FROM ai_reports WHERE report_type=? ORDER BY id DESC LIMIT 1", (f"{horizon} - {report_cat}",)).fetchone()
+            conn.close()
+            
+            ai_text_for_pdf = last_report['analysis_text'] if last_report else "Generate AI audit above to include executive commentary in PDF."
+            
+            pdf_bytes = generate_pdf_report(horizon, report_cat, filtered_df, ai_text_for_pdf)
+            st.download_button(
+                label="Download Executive A4 PDF Report",
+                data=pdf_bytes,
+                file_name=f"ai_coach_report_{horizon.lower().replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
 # ---------------------------------------------------------
 # TAB 5: SETTINGS, API QUOTA MONITOR & LOCAL BACKUP
@@ -1068,7 +1254,6 @@ Provide an executive, sports-science evaluation:
 with tab_settings:
     st.subheader("System Credentials & Vault Utilities")
     
-    # 1. Live API Quota Monitor
     st.markdown("#### Live API Quota Monitor")
     today_str = datetime.date.today().isoformat()
     strava_calls = get_config(f"strava_calls_{today_str}") or 0
@@ -1080,9 +1265,8 @@ with tab_settings:
     
     st.markdown("---")
     
-    # 2. Local Database Backup & Restore
     st.markdown("#### Local Database Backup & Data Safety")
-    st.caption("Your database is stored locally as training_vault.db. Download it directly to your phone storage to ensure zero data loss:")
+    st.caption("Download your local training_vault.db file to ensure zero data loss:")
     
     with open(DB_FILE, "rb") as fp:
         db_bytes = fp.read()
@@ -1105,7 +1289,6 @@ with tab_settings:
 
     st.markdown("---")
     
-    # 3. Gemini Key & Strava Reconnect
     st.markdown("#### Credentials & Hygiene")
     saved_key = get_config("custom_gemini_key") or ""
     new_gemini = st.text_input("Gemini API Key", value=saved_key, type="password")
@@ -1121,3 +1304,4 @@ with tab_settings:
         clean_and_renumber_vault()
         st.success("Vault refreshed!")
         st.rerun()
+
