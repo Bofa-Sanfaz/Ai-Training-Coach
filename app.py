@@ -6,13 +6,13 @@ import requests
 import textwrap
 
 # ---------------------------------------------------------
-# 1. LIGHT CONSUMER THEME & HIGH-CONTRAST MOBILE STYLING
+# 1. LIGHT CONSUMER THEME & BULLETPROOF HIGH-CONTRAST CSS
 # ---------------------------------------------------------
 st.set_page_config(page_title="AI Coach", layout="centered", page_icon="⚡")
 
 st.markdown("""
 <style>
-    /* Clean Light Background */
+    /* Global Clean Light Surface */
     .stApp {
         background-color: #f8fafc;
         color: #0f172a;
@@ -24,7 +24,7 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding-bottom: 12px;
+        padding-bottom: 10px;
         border-bottom: 2px solid #e2e8f0;
         margin-bottom: 14px;
     }
@@ -54,12 +54,60 @@ st.markdown("""
         border: 1px solid #fecaca;
     }
 
-    /* High-Density Workout Card (~75px) */
+    /* FORCED TAB VISIBILITY FIX (Targets BaseWeb internal <p> tags) */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #e2e8f0 !important;
+        padding: 4px !important;
+        border-radius: 12px !important;
+        gap: 4px !important;
+        border: 1px solid #cbd5e1 !important;
+        margin-bottom: 14px !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 8px 14px !important;
+        height: auto !important;
+    }
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span,
+    .stTabs [data-baseweb="tab"] div {
+        color: #1e293b !important;
+        font-weight: 700 !important;
+        font-size: 0.88rem !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: #ffffff !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] p,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] span,
+    .stTabs [data-baseweb="tab"][aria-selected="true"] div {
+        color: #fc5200 !important;
+        font-weight: 800 !important;
+    }
+
+    /* High-Contrast Select Box Fix */
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 10px !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+    }
+
+    /* High-Density Workout Card */
     .workout-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 10px 12px;
+        padding: 10px 14px;
         margin-bottom: 4px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     }
@@ -91,7 +139,7 @@ st.markdown("""
         align-items: center;
         background-color: #f8fafc;
         border-radius: 8px;
-        padding: 5px 10px;
+        padding: 6px 12px;
         margin-top: 4px;
         border: 1px solid #f1f5f9;
     }
@@ -112,30 +160,7 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
 
-    /* High-Contrast Navigation Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: #f1f5f9;
-        padding: 4px;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 12px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 38px;
-        padding: 0 14px;
-        border-radius: 8px;
-        color: #475569 !important;
-        font-weight: 700 !important;
-        font-size: 0.86rem !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #fc5200 !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    
-    /* High-Contrast Action Buttons */
+    /* Primary & Secondary Action Buttons */
     div.stButton > button[kind="primary"] {
         background-color: #fc5200 !important;
         color: #ffffff !important;
@@ -159,11 +184,10 @@ st.markdown("""
 SVG_BIKE = """<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>"""
 SVG_RUN = """<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="5" r="1.5"/><path d="m14 11 2-2-3-3-4 3 2 4-3 5 2 2 3-4 3 3"/></svg>"""
 SVG_HEART = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" stroke-width="2" style="vertical-align: middle;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>"""
-SVG_BOLT = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#eab308" stroke="#ca8a04" stroke-width="1.5" style="vertical-align: middle;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>"""
 SVG_MOUNTAIN = """<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>"""
 
 # ---------------------------------------------------------
-# 3. DATABASE ENGINE & AUTOMATIC MIGRATION
+# 3. DATABASE ENGINE & AUTOMATIC GLOBAL RENUMBERING
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
@@ -171,6 +195,51 @@ def get_db():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
+
+def format_session_code(sport_prefix, seq_num, dt_obj, moving_sec):
+    day_str = dt_obj.strftime("%d/%b/%Y").lstrip("0")
+    start_time = dt_obj.strftime("%I:%M%p").lstrip("0")
+    end_dt = dt_obj + datetime.timedelta(seconds=int(moving_sec or 0))
+    end_time = end_dt.strftime("%I:%M%p").lstrip("0")
+    return f"{sport_prefix} {seq_num:03d} - {day_str} - {start_time} > {end_time}"
+
+def clean_and_renumber_vault():
+    conn = get_db()
+    c = conn.cursor()
+    
+    # 1. Deduplicate by exact timestamp and distance
+    c.execute("""
+    DELETE FROM workouts 
+    WHERE id NOT IN (
+        SELECT MIN(id) 
+        FROM workouts 
+        GROUP BY date, distance_km
+    )
+    """)
+    conn.commit()
+
+    # 2. Continuous Global Counter for RIDES (Never interrupted by runs or months)
+    rides = conn.execute("SELECT id, date, moving_time_sec FROM workouts WHERE sport_category='Ride' ORDER BY date ASC").fetchall()
+    for idx, r in enumerate(rides, 1):
+        try:
+            dt = datetime.datetime.strptime(r['date'], "%Y-%m-%d %H:%M")
+        except:
+            dt = datetime.datetime.now()
+        code = format_session_code("Ride", idx, dt, r['moving_time_sec'])
+        c.execute("UPDATE workouts SET exercise_code=? WHERE id=?", (code, r['id']))
+
+    # 3. Continuous Global Counter for RUNS & WALKS
+    runs = conn.execute("SELECT id, date, moving_time_sec FROM workouts WHERE sport_category='Run' ORDER BY date ASC").fetchall()
+    for idx, r in enumerate(runs, 1):
+        try:
+            dt = datetime.datetime.strptime(r['date'], "%Y-%m-%d %H:%M")
+        except:
+            dt = datetime.datetime.now()
+        code = format_session_code("Run", idx, dt, r['moving_time_sec'])
+        c.execute("UPDATE workouts SET exercise_code=? WHERE id=?", (code, r['id']))
+        
+    conn.commit()
+    conn.close()
 
 def init_db():
     conn = get_db()
@@ -236,7 +305,13 @@ def init_db():
     )
     """)
     conn.commit()
+    
+    # Auto-renumber on launch if legacy monthly codes exist
+    legacy_check = c.execute("SELECT id FROM workouts WHERE exercise_code LIKE 'Bike-%' OR exercise_code LIKE 'Run-%' LIMIT 1").fetchone()
     conn.close()
+    
+    if legacy_check:
+        clean_and_renumber_vault()
 
 init_db()
 
@@ -260,7 +335,6 @@ def set_config(key, val):
     conn.commit()
     conn.close()
 
-# Auto-handle Strava OAuth redirect
 if "code" in st.query_params:
     auth_code = st.query_params["code"]
     res = requests.post("https://www.strava.com/oauth/token", data={
@@ -301,58 +375,10 @@ def calc_pace(moving_sec, dist_km):
         return f"{pm}:{ps:02d} /km"
     return "--"
 
-def format_session_code(sport_prefix, seq_num, dt_obj, moving_sec):
-    day_str = dt_obj.strftime("%d/%b/%Y").lstrip("0")
-    start_time = dt_obj.strftime("%I:%M%p").lstrip("0")
-    end_dt = dt_obj + datetime.timedelta(seconds=int(moving_sec or 0))
-    end_time = end_dt.strftime("%I:%M%p").lstrip("0")
-    return f"{sport_prefix} {seq_num:03d} - {day_str} - {start_time} > {end_time}"
-
-def clean_and_renumber_vault():
-    conn = get_db()
-    c = conn.cursor()
-    
-    # Remove exact duplicate records from multiple re-syncs
-    c.execute("""
-    DELETE FROM workouts 
-    WHERE id NOT IN (
-        SELECT MIN(id) 
-        FROM workouts 
-        GROUP BY date, distance_km
-    )
-    """)
-    conn.commit()
-
-    # Re-order chronologically and assign clean codes
-    all_w = conn.execute("SELECT id, sport_category, date, moving_time_sec FROM workouts ORDER BY date ASC").fetchall()
-    ride_counter = 1
-    run_counter = 1
-    
-    for row in all_w:
-        w_id = row['id']
-        sport = row['sport_category'] or 'Ride'
-        m_sec = row['moving_time_sec'] or 0
-        try:
-            dt = datetime.datetime.strptime(row['date'], "%Y-%m-%d %H:%M")
-        except:
-            dt = datetime.datetime.now()
-            
-        if sport == 'Ride':
-            new_code = format_session_code("Ride", ride_counter, dt, m_sec)
-            ride_counter += 1
-        else:
-            new_code = format_session_code("Run", run_counter, dt, m_sec)
-            run_counter += 1
-            
-        c.execute("UPDATE workouts SET exercise_code=? WHERE id=?", (new_code, w_id))
-        
-    conn.commit()
-    conn.close()
-
 def sync_strava():
     token = get_valid_token()
     if not token:
-        st.error("Strava session not authenticated or expired. Connect in the Settings tab.")
+        st.error("Strava connection expired. Reconnect in the Settings tab.")
         return -1
         
     headers = {"Authorization": f"Bearer {token}"}
@@ -430,12 +456,12 @@ def sync_strava():
     return new_count
 
 # ---------------------------------------------------------
-# 5. GEMINI API CALL ENGINE (COMPATIBLE WITH ALL KEY FORMATS)
+# 5. GEMINI API CALL ENGINE
 # ---------------------------------------------------------
 def call_gemini(prompt):
     key = get_config("custom_gemini_key") or GEMINI_KEY
     if not key:
-        st.error("No Gemini Key found. Add your key in the Settings tab or Streamlit Secrets.")
+        st.error("No Gemini Key configured. Add your key in the Settings tab.")
         return None
         
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}"
@@ -444,16 +470,11 @@ def call_gemini(prompt):
         "x-goog-api-key": key
     }
     payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }
-        ]
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}]
     }
     
     try:
-        res = requests.post(url, json=payload, headers=headers, timeout=30)
+        res = requests.post(url, json=payload, headers=headers, timeout=35)
         if res.status_code == 200:
             return res.json()["candidates"][0]["content"]["parts"][0]["text"]
         else:
@@ -464,7 +485,7 @@ def call_gemini(prompt):
         return None
 
 # ---------------------------------------------------------
-# 6. APPLICATION HEADER & VIEW STATE
+# 6. APPLICATION HEADER & VIEW ROUTING
 # ---------------------------------------------------------
 is_connected = bool(get_config("strava_refresh_token") or DEFAULT_REFRESH)
 status_html = '<span class="status-pill status-synced">● STRAVA CONNECTED</span>' if is_connected else '<span class="status-pill status-unlinked">● DISCONNECTED</span>'
@@ -494,9 +515,9 @@ if st.session_state.active_session_id is not None:
     if w:
         is_run = (w['sport_category'] == 'Run')
         st.markdown(f"## {w['exercise_code']}")
-        st.caption(f"Activity Type: **{w['activity_type']}** | Logged: **{w['date']}**")
+        st.caption(f"Sport Category: **{w['sport_category']}** | Logged: **{w['date']}**")
         
-        # Telemetry Metrics Grid
+        # Telemetry Grid
         c1, c2, c3 = st.columns(3)
         c1.metric("Distance", f"{w['distance_km']:.2f} km")
         c2.metric("Moving Time", w['moving_time_str'])
@@ -552,7 +573,7 @@ if st.session_state.active_session_id is not None:
             st.success("Notes saved.")
             st.rerun()
 
-        # Dedicated In-Session AI Debrief
+        # Dedicated In-Session AI Debrief (Sport-Specific Complete Progression Context)
         st.markdown("---")
         st.markdown("#### AI Coach Telemetry Debrief")
         
@@ -570,23 +591,26 @@ if st.session_state.active_session_id is not None:
                 st.rerun()
         else:
             if st.button("Generate In-Depth AI Analysis", type="primary", use_container_width=True):
-                with st.spinner("AI evaluating biomechanics and cardiovascular response..."):
+                with st.spinner("Analyzing sport-specific historical curve..."):
                     conn = get_db()
+                    # Query ALL prior sessions of the EXACT same sport category across the whole timeline
                     prior = conn.execute("""
-                        SELECT exercise_code, date, distance_km, avg_speed_kmh, pace_str, avg_hr, max_hr, avg_power_w 
+                        SELECT exercise_code, date, distance_km, avg_speed_kmh, pace_str, avg_hr, max_hr, avg_power_w, elevation_gain_m 
                         FROM workouts 
                         WHERE date < ? AND sport_category=? 
-                        ORDER BY date DESC LIMIT 3
+                        ORDER BY date ASC
                     """, (w['date'], w['sport_category'])).fetchall()
                     conn.close()
                     
-                    prior_context = "PRIOR HISTORICAL BENCHMARKS (For Progress Comparison):\n"
+                    prior_context = f"ALL PRIOR HISTORICAL {w['sport_category'].upper()} SESSIONS (Chronological):\n"
                     for p in prior:
-                        prior_context += f"- {p['exercise_code']}: {p['distance_km']}km, Avg HR {p['avg_hr']}bpm, Spd/Pace {p['avg_speed_kmh']}km/h\n"
+                        prior_context += f"- {p['exercise_code']}: {p['distance_km']}km | Speed/Pace: {p['avg_speed_kmh']}km/h ({p['pace_str']}) | HR: {p['avg_hr']}bpm | Watts: {p['avg_power_w']}W | Ascent: {p['elevation_gain_m']}m\n"
                         
                     prompt = f"""
-You are an expert cycling and running sports scientist coaching athlete Mustafa (190 cm, ~115 kg, training on an XC MTB and road running).
-DEBRIEF THIS SPECIFIC TRAINING SESSION:
+You are an expert sports physiologist coaching athlete Mustafa (190 cm, ~115 kg, training on an XC MTB and road running).
+DEBRIEF THIS SPECIFIC TRAINING SESSION IN THE CONTEXT OF HIS FULL {w['sport_category'].upper()} TIMELINE:
+
+CURRENT SESSION TELEMETRY:
 - Code: {w['exercise_code']}
 - Sport: {w['activity_type']}
 - Distance & Duration: {w['distance_km']} km in {w['moving_time_str']}
@@ -598,9 +622,9 @@ DEBRIEF THIS SPECIFIC TRAINING SESSION:
 {prior_context}
 
 Provide a structured, rigorous sports-science breakdown:
-1. **Cardiovascular Drift & Pacing Efficiency**: Analyze average vs peak HR relative to speed/power.
-2. **Torque vs Cadence & Elevation**: Evaluate mechanical work done under body mass.
-3. **Delta vs Prior Sessions**: Is the athlete demonstrating improved aerobic base, or accumulating fatigue?
+1. **Cardiovascular Drift & Efficiency**: Compare current heart rate vs speed/power ratio against his earliest and recent rides. Is aerobic base expanding or decoupling?
+2. **Torque vs Cadence & Climbing**: Analyze mechanical load under body mass.
+3. **True Chronological Progression**: Assess adaptation across the full timeline of rides.
 4. **Prescription**: One concrete technical adjustment for the next session.
 """
                     analysis = call_gemini(prompt)
@@ -618,7 +642,7 @@ Provide a structured, rigorous sports-science breakdown:
 # =========================================================
 # MAIN APP TABS: FEED, GRAPHS, COMPARE, REPORTS, SETTINGS
 # =========================================================
-tab_feed, tab_analytics, tab_compare, tab_progress, tab_settings = st.tabs(["Feed", "Graphs", "Compare", "Reports", "Settings"])
+tab_feed, tab_analytics, tab_compare, tab_progress, tab_settings = st.tabs(["📋 Feed", "📊 Graphs", "⚖️ Compare", "📈 Reports", "⚙️ Settings"])
 
 # ---------------------------------------------------------
 # TAB 1: CONSUMER HIGH-DENSITY FEED
@@ -789,12 +813,12 @@ with tab_progress:
     st.subheader("Periodic Progression Reviews")
     c_cat, c_hor = st.columns(2)
     with c_cat:
-        report_cat = st.selectbox("Category Filter", ["All Activities", "Rides Only", "Runs & Walks"])
+        report_cat = st.selectbox("Category Filter", ["Rides Only", "Runs & Walks", "All Activities"])
     with c_hor:
-        horizon = st.selectbox("Review Window", ["Last 7 Days", "Last 30 Days", "All Time"])
+        horizon = st.selectbox("Review Window", ["All Time (Full Progression)", "Last 30 Days", "Last 7 Days"])
     
     conn = get_db()
-    p_df = pd.read_sql_query("SELECT * FROM workouts ORDER BY date DESC", conn)
+    p_df = pd.read_sql_query("SELECT * FROM workouts ORDER BY date ASC", conn)
     conn.close()
     
     if not p_df.empty:
@@ -819,13 +843,13 @@ with tab_progress:
                 summary_data = filtered[["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m"]].to_string(index=False)
                 prompt = f"""
 You are an elite cycling and running coach reviewing athlete Mustafa's ({horizon} - {report_cat}) training progression.
-Session Data:
+Chronological Training Curve:
 {summary_data}
 
 Provide an executive, sports-science evaluation:
-1. Training Load & Volume Adherence.
-2. Zone 2 Aerobic Base building vs Zone 5 Redline Fatigue.
-3. Actionable adjustments for nutrition, recovery, and upcoming sessions.
+1. Long-Term Adaptation: Compare baseline sessions against recent peaks in speed, power, and cardiovascular control.
+2. Volume & Mechanical Strain: Evaluate total climbing and watts under body mass.
+3. Next Actionable Target: Exact guidance for upcoming training blocks.
 """
                 audit = call_gemini(prompt)
                 if audit:
@@ -849,7 +873,6 @@ with tab_settings:
     
     st.markdown("---")
     st.markdown("#### Gemini API Key Management")
-    st.caption("You can set or update your Gemini API key here without editing files:")
     saved_key = get_config("custom_gemini_key") or ""
     new_gemini = st.text_input("Gemini API Key", value=saved_key, type="password")
     if st.button("Save Gemini Key", type="secondary"):
@@ -863,4 +886,3 @@ with tab_settings:
         clean_and_renumber_vault()
         st.success("Duplicates removed and chronological session codes refreshed!")
         st.rerun()
-
