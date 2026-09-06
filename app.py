@@ -9,7 +9,7 @@ import re
 import json
 import numpy as np
 
-# Interactive & Visualization Engines
+# Interactive Visualization Engines
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import matplotlib
@@ -115,7 +115,6 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* Radio Cards */
     div[role="radiogroup"] label {
         background-color: #ffffff !important;
         padding: 6px 12px !important;
@@ -130,8 +129,7 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
 
-    /* Inputs & Selects */
-    .stTextArea textarea, .stTextInput input, div[data-baseweb="select"] > div {
+    .stTextArea textarea, .stTextInput input, .stNumberInput input, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #0f172a !important;
         border: 1px solid #cbd5e1 !important;
@@ -143,7 +141,6 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* Action Buttons */
     div.stButton > button[kind="primary"] {
         background-color: #fc5200 !important;
         color: #ffffff !important;
@@ -159,7 +156,6 @@ st.markdown("""
         border-radius: 10px !important;
     }
 
-    /* Feed Card */
     .workout-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -209,7 +205,6 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
 
-    /* Hero Dashboard */
     .hero-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -237,7 +232,6 @@ st.markdown("""
         margin-top: 2px;
     }
 
-    /* Secondary Biometrics */
     .telemetry-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -264,7 +258,6 @@ st.markdown("""
         color: #0f172a;
     }
 
-    /* AI Debrief Card */
     .ai-card {
         background: #ffffff;
         border: 1px solid #fed7aa;
@@ -409,18 +402,18 @@ def init_db():
 init_db()
 
 # ---------------------------------------------------------
-# 4. CREDENTIALS & SECRETS (100% SANITIZED)
+# 4. CREDENTIALS, CONFIG & STRAVA GEAR API
 # ---------------------------------------------------------
 CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "").strip().strip('"')
 CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "").strip().strip('"')
 DEFAULT_REFRESH = st.secrets.get("STRAVA_REFRESH_TOKEN", "").strip().strip('"')
 GEMINI_KEY = st.secrets.get("GEMINI_API_KEY", "").strip().strip('"')
 
-def get_config(key):
+def get_config(key, default=""):
     conn = get_db()
     r = conn.execute("SELECT value FROM config WHERE key=?", (key,)).fetchone()
     conn.close()
-    return r["value"] if r else None
+    return r["value"] if r and r["value"] is not None else default
 
 def set_config(key, val):
     conn = get_db()
@@ -431,7 +424,7 @@ def set_config(key, val):
 def log_api_call(provider):
     today = datetime.date.today().isoformat()
     key = f"{provider}_calls_{today}"
-    current = int(get_config(key) or 0)
+    current = int(get_config(key, "0"))
     set_config(key, current + 1)
     return current + 1
 
@@ -453,8 +446,49 @@ def get_valid_token():
         return data.get("access_token")
     return None
 
-def fetch_activity_stream(strava_id):
-    """Pulls second-by-second workout stream and caches it permanently in SQLite"""
+def fetch_strava_athlete_gear():
+    """Queries Strava API to pull athlete's registered bikes, names, and frame weights"""
+    token = get_valid_token()
+    if not token:
+        return False, "Strava not authenticated."
+        
+    headers = {"Authorization": f"Bearer {token}"}
+    res = requests.get("https://www.strava.com/api/v3/athlete", headers=headers)
+    log_api_call("strava")
+    
+    if res.status_code != 200:
+        return False, f"Could not retrieve athlete profile: {res.text}"
+        
+    athlete = res.json()
+    bikes = athlete.get("bikes", [])
+    if not bikes:
+        return False, "No bikes found on your Strava account."
+        
+    # Find primary or first bike
+    primary_bike = next((b for b in bikes if b.get("primary")), bikes[0])
+    bike_id = primary_bike.get("id")
+    bike_name = primary_bike.get("name", "XC Mountain Bike")
+    
+    # Fetch gear details for exact weight
+    gear_res = requests.get(f"https://www.strava.com/api/v3/gear/{bike_id}", headers=headers)
+    log_api_call("strava")
+    
+    bike_weight = 13.5 # Standard default XC MTB weight if not specified on Strava
+    if gear_res.status_code == 200:
+        gear_data = gear_res.json()
+        if gear_data.get("weight"):
+            bike_weight = round(float(gear_data["weight"]), 1)
+            
+    set_config("bike_name", bike_name)
+    set_config("bike_weight_kg", str(bike_weight))
+    set_config("bike_id", bike_id)
+    return True, f"Successfully synced: {bike_name} ({bike_weight} kg)"
+
+def fetch_activity_stream(strava_id, athlete_weight=115.0, bike_weight=13.5, recorded_avg_watts=0.0):
+    """
+    Pulls high-resolution streams. If Strava omitted watts (due to lack of physical power meter),
+    synthesizes a high-fidelity physical power curve from gradient, speed, and total system mass.
+    """
     if not strava_id:
         return None
         
@@ -479,7 +513,6 @@ def fetch_activity_stream(strava_id):
     
     if res.status_code == 200:
         data = res.json()
-        # Normalize to dict keyed by stream type
         if isinstance(data, list):
             dict_data = {}
             for item in data:
@@ -488,6 +521,52 @@ def fetch_activity_stream(strava_id):
             data = dict_data
             
         if isinstance(data, dict) and data:
+            # Check if Strava omitted the second-by-second watts stream
+            raw_watts = data.get("watts", {}).get("data", [])
+            raw_vel = data.get("velocity_smooth", {}).get("data", [])
+            raw_alt = data.get("altitude", {}).get("data", [])
+            raw_dist = data.get("distance", {}).get("data", [])
+            
+            if (not raw_watts or len(raw_watts) == 0) and raw_vel and len(raw_vel) > 1:
+                # Physics Power Reconstruction Engine
+                total_mass = athlete_weight + bike_weight
+                calculated_watts = []
+                
+                for i in range(len(raw_vel)):
+                    v = max(0.0, raw_vel[i])
+                    if i > 0 and raw_dist and raw_alt:
+                        d_dist = max(1.0, raw_dist[i] - raw_dist[i-1])
+                        d_alt = raw_alt[i] - raw_alt[i-1]
+                        grade = d_alt / d_dist
+                    else:
+                        grade = 0.0
+                        
+                    # Power components: Gravity + Rolling Resistance + Aerodynamic Drag
+                    p_climb = total_mass * 9.81 * grade * v
+                    p_roll = total_mass * 9.81 * 0.0055 * v
+                    p_aero = 0.5 * 1.225 * 0.42 * (v ** 3)
+                    p_inst = max(0.0, p_climb + p_roll + p_aero)
+                    calculated_watts.append(p_inst)
+                    
+                # Smooth curve and scale to recorded average
+                if calculated_watts:
+                    calc_series = pd.Series(calculated_watts).rolling(window=7, min_periods=1, center=True).mean()
+                    mean_calc = calc_series.mean()
+                    
+                    if recorded_avg_watts > 0 and mean_calc > 0:
+                        scale_factor = recorded_avg_watts / mean_calc
+                        final_watts = [round(float(w * scale_factor), 1) for w in calc_series]
+                    else:
+                        final_watts = [round(float(w), 1) for w in calc_series]
+                        
+                    data["watts"] = {
+                        "type": "watts",
+                        "data": final_watts,
+                        "series_type": "distance",
+                        "original_size": len(final_watts),
+                        "resolution": "high"
+                    }
+
             conn = get_db()
             conn.execute("INSERT OR REPLACE INTO activity_streams (strava_id, stream_json) VALUES (?, ?)", (strava_id, json.dumps(data)))
             conn.commit()
@@ -623,7 +702,7 @@ def call_gemini(prompt):
     return None
 
 # ---------------------------------------------------------
-# 6. EXECUTIVE A4 PDF GENERATOR WITH EMBEDDED CHARTS & PRS
+# 6. EXECUTIVE A4 PDF GENERATOR
 # ---------------------------------------------------------
 def generate_pdf_chart_image(df_subset):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.2, 3.8), dpi=220)
@@ -689,7 +768,7 @@ def convert_markdown_to_pdf_story(md_text, styles, story):
         else:
             story.append(Paragraph(raw, style_body))
 
-def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
+def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text, athlete_h, athlete_w, b_name, b_w):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=32, leftMargin=32, topMargin=32, bottomMargin=32)
     story = []
@@ -707,7 +786,7 @@ def generate_pdf_report(window_name, cat_name, df_subset, ai_review_text):
     table_header = ParagraphStyle('TableHeader', parent=styles['Normal'], fontSize=7.5, leading=10, textColor=colors.white, fontName='Helvetica-Bold')
 
     story.append(Paragraph("AI COACH — EXECUTIVE PERFORMANCE REPORT", title_style))
-    story.append(Paragraph(f"Athlete: Mustafa (190 cm, ~115 kg) | Scope: {window_name} ({cat_name}) | Generated: {datetime.datetime.now().strftime('%d-%b-%Y %H:%M')}", sub_style))
+    story.append(Paragraph(f"Athlete: Mustafa ({athlete_h} cm, {athlete_w} kg) | Equipment: {b_name} ({b_w} kg) | Scope: {window_name} ({cat_name}) | Generated: {datetime.datetime.now().strftime('%d-%b-%Y %H:%M')}", sub_style))
     story.append(Spacer(1, 6))
     story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=10))
 
@@ -855,8 +934,14 @@ st.markdown(f"""
 if "active_session_id" not in st.session_state:
     st.session_state.active_session_id = None
 
+# Pull athlete biometrics from config
+user_height = float(get_config("athlete_height_cm", "190"))
+user_weight = float(get_config("athlete_weight_kg", "115"))
+bike_name = get_config("bike_name", "XC Mountain Bike")
+bike_weight = float(get_config("bike_weight_kg", "13.5"))
+
 # =========================================================
-# DETAIL VIEW: INDEPENDENT SESSION WITH IN-RIDE STREAM GRAPHS
+# DETAIL VIEW: INDEPENDENT SESSION WITH COMPLETE POWER STREAM
 # =========================================================
 if st.session_state.active_session_id is not None:
     conn = get_db()
@@ -870,12 +955,15 @@ if st.session_state.active_session_id is not None:
     if w:
         is_run = (w['sport_category'] == 'Run')
         st.markdown(f"## {w['exercise_code']}")
-        st.caption(f"Sport: **{w['sport_category']}** | Date: **{w['date']}**")
+        st.caption(f"Sport: **{w['sport_category']}** | Date: **{w['date']}** | Bike: **{bike_name}**")
         
         # 1. Primary Hero Telemetry Board
         speed_pace_val = w['pace_str'] if is_run else f"{w['avg_speed_kmh']:.1f} km/h"
         speed_pace_lbl = "Avg Pace" if is_run else "Avg Speed"
+        
+        wpk = round(w['avg_power_w'] / user_weight, 2) if (w['avg_power_w'] > 0 and user_weight > 0) else 0
         pwr_val = f"{w['avg_power_w']:.0f} W" if w['avg_power_w'] > 0 else "--"
+        pwr_sub = f"Power ({wpk:.1f} W/kg)" if wpk > 0 else "Power"
         hr_val = f"{w['avg_hr']} bpm" if w['avg_hr'] > 0 else "--"
         
         hero_html = textwrap.dedent(f"""
@@ -883,7 +971,7 @@ if st.session_state.active_session_id is not None:
             <div class="hero-box"><div class="hero-val">{w['distance_km']:.2f}k</div><div class="hero-sub">Distance</div></div>
             <div class="hero-box"><div class="hero-val">{w['moving_time_str']}</div><div class="hero-sub">Duration</div></div>
             <div class="hero-box"><div class="hero-val">{speed_pace_val}</div><div class="hero-sub">{speed_pace_lbl}</div></div>
-            <div class="hero-box"><div class="hero-val">{pwr_val}</div><div class="hero-sub">Power</div></div>
+            <div class="hero-box"><div class="hero-val">{pwr_val}</div><div class="hero-sub">{pwr_sub}</div></div>
             <div class="hero-box"><div class="hero-val">{hr_val}</div><div class="hero-sub">Avg HR</div></div>
             <div class="hero-box"><div class="hero-val">{w['elevation_gain_m']:.0f}m</div><div class="hero-sub">Ascent</div></div>
         </div>
@@ -928,15 +1016,19 @@ if st.session_state.active_session_id is not None:
 
         st.markdown("---")
 
-        # 3. IN-SESSION SELF TELEMETRY STUDIO (THIS WORKOUT AGAINST ITSELF)
+        # 3. IN-SESSION TELEMETRY STUDIO (WITH DYNAMIC POWER STREAM)
         st.markdown("#### In-Ride Telemetry Studio")
-        st.caption("Second-by-second sensor readings across the route of this specific workout.")
+        st.caption("Second-by-second sensor telemetry across the timeline of this specific session.")
         
         with st.spinner("Loading workout stream telemetry..."):
-            stream_data = fetch_activity_stream(w['strava_id'])
+            stream_data = fetch_activity_stream(
+                w['strava_id'],
+                athlete_weight=user_weight,
+                bike_weight=bike_weight,
+                recorded_avg_watts=w['avg_power_w']
+            )
             
         if stream_data and isinstance(stream_data, dict):
-            # Parse streams
             raw_dist = stream_data.get("distance", {}).get("data", [])
             raw_time = stream_data.get("time", {}).get("data", [])
             raw_alt = stream_data.get("altitude", {}).get("data", [])
@@ -945,7 +1037,6 @@ if st.session_state.active_session_id is not None:
             raw_watts = stream_data.get("watts", {}).get("data", [])
             raw_cad = stream_data.get("cadence", {}).get("data", [])
 
-            # Downsample if dense (>1200 points) to keep mobile rendering instantaneous
             total_points = len(raw_dist) if raw_dist else len(raw_time)
             step = max(1, total_points // 1000)
             
@@ -964,15 +1055,15 @@ if st.session_state.active_session_id is not None:
             x_vals = s_dist if x_axis_choice == "Distance (km)" and s_dist else s_time
             x_label = "Distance (km)" if x_axis_choice == "Distance (km)" else "Elapsed Time (min)"
 
-            # Available metrics in this stream
+            # Ensure Power (Watts) is ALWAYS an available option
             available_options = []
-            if s_alt: available_options.append("Elevation Profile (m)")
-            if s_spd: available_options.append("Speed (km/h)")
-            if s_hr: available_options.append("Heart Rate (bpm)")
             if s_watts: available_options.append("Power (Watts)")
+            if s_spd: available_options.append("Speed (km/h)")
+            if s_alt: available_options.append("Elevation Profile (m)")
+            if s_hr: available_options.append("Heart Rate (bpm)")
             if s_cad: available_options.append("Cadence (RPM)")
 
-            default_selected = [opt for opt in ["Elevation Profile (m)", "Speed (km/h)", "Heart Rate (bpm)"] if opt in available_options]
+            default_selected = [opt for opt in ["Power (Watts)", "Speed (km/h)", "Elevation Profile (m)"] if opt in available_options]
             if not default_selected and available_options:
                 default_selected = available_options[:2]
 
@@ -983,25 +1074,24 @@ if st.session_state.active_session_id is not None:
             )
 
             if selected_stream_metrics and x_vals:
-                # Primary axis: Power, Heart Rate, Elevation. Secondary axis: Speed, Cadence.
                 sec_needed = any(m in ["Speed (km/h)", "Cadence (RPM)"] for m in selected_stream_metrics) and any(m in ["Elevation Profile (m)", "Power (Watts)", "Heart Rate (bpm)"] for m in selected_stream_metrics)
                 fig_stream = make_subplots(specs=[[{"secondary_y": sec_needed}]])
 
-                # 1. Elevation Terrain Profile (Filled Area)
+                # 1. Elevation Terrain Area
                 if "Elevation Profile (m)" in selected_stream_metrics and s_alt:
                     fig_stream.add_trace(
                         go.Scatter(
                             x=x_vals[:len(s_alt)], y=s_alt,
                             name="Elevation (m)",
                             fill='tozeroy',
-                            fillcolor='rgba(100, 116, 139, 0.18)',
+                            fillcolor='rgba(100, 116, 139, 0.15)',
                             line=dict(color="#64748b", width=1.5),
                             hovertemplate=f"<b>%{{x:.2f}} {x_label}</b><br>Elevation: %{{y:.0f}} m<extra></extra>"
                         ),
                         secondary_y=False
                     )
 
-                # 2. Power Line
+                # 2. Power Output Line
                 if "Power (Watts)" in selected_stream_metrics and s_watts:
                     fig_stream.add_trace(
                         go.Scatter(
@@ -1025,7 +1115,7 @@ if st.session_state.active_session_id is not None:
                         secondary_y=False
                     )
 
-                # 4. Speed Line (Secondary Axis if paired)
+                # 4. Speed Line
                 if "Speed (km/h)" in selected_stream_metrics and s_spd:
                     fig_stream.add_trace(
                         go.Scatter(
@@ -1065,18 +1155,18 @@ if st.session_state.active_session_id is not None:
             else:
                 st.info("Select at least one metric above to plot.")
         else:
-            st.info("Second-by-second route streams are not available for this session. (Ensure activities are recorded with GPS/Smartwatch).")
+            st.info("Second-by-second route streams are not available for this session.")
 
         st.markdown("---")
 
-        # 4. Chronological AI Debrief (Autonomous on Open)
+        # 4. Chronological AI Debrief
         st.markdown("#### AI Coach Telemetry Debrief")
         conn = get_db()
         existing_rev = conn.execute("SELECT analysis_text FROM ai_reports WHERE reference_info=?", (w['exercise_code'],)).fetchone()
         conn.close()
 
         if existing_rev:
-            st.markdown(f'<div class="ai-card">{existing_rev["analysis_text"]}</div>', unsafe_allow_html=True)
+            st.markdown(existing_rev["analysis_text"])
             if st.button("Re-Analyze Session with AI", type="secondary"):
                 conn = get_db()
                 conn.execute("DELETE FROM ai_reports WHERE reference_info=?", (w['exercise_code'],))
@@ -1084,7 +1174,7 @@ if st.session_state.active_session_id is not None:
                 conn.close()
                 st.rerun()
         else:
-            with st.spinner("AI Coach analyzing session telemetry against your last 5 workouts and all-time baseline..."):
+            with st.spinner("AI Coach evaluating biomechanics and cardiac strain..."):
                 conn = get_db()
                 prior_5 = conn.execute("""
                     SELECT exercise_code, date, distance_km, avg_speed_kmh, pace_str, avg_hr, max_hr, avg_power_w, elevation_gain_m 
@@ -1107,15 +1197,20 @@ if st.session_state.active_session_id is not None:
                 baseline_str = f"ALL-TIME BENCHMARK ({all_prior['count']} prior sessions): Avg Speed {all_prior['avg_spd'] or 0:.1f} km/h | Avg Watts {all_prior['avg_pwr'] or 0:.0f} W | Avg HR {all_prior['avg_hr'] or 0:.0f} bpm\n"
 
                 prompt = f"""
-You are an expert cycling & running sports scientist coaching athlete Mustafa (190 cm, ~115 kg, training on an XC MTB and road running).
-DEBRIEF THIS SPECIFIC TRAINING SESSION CHRONOLOGICALLY:
+You are an expert cycling & running sports scientist coaching athlete Mustafa.
+ATHLETE & EQUIPMENT PROFILE:
+- Height: {user_height} cm
+- Body Mass: {user_weight} kg
+- Bike Model: {bike_name} ({bike_weight} kg)
+- Total System Mass: {user_weight + bike_weight} kg
+- Power-to-Weight Ratio: {wpk:.2f} W/kg
 
-CURRENT SESSION:
+DEBRIEF THIS SPECIFIC TRAINING SESSION CHRONOLOGICALLY:
 - Session: {w['exercise_code']} ({w['activity_type']})
 - Distance & Duration: {w['distance_km']} km in {w['moving_time_str']}
 - Speed & Pace: Avg {w['avg_speed_kmh']} km/h, Max {w['max_speed_kmh']} km/h
-- Heart Rate: Avg {w['avg_hr']} bpm, Peak {w['max_hr']} bpm (Max HR benchmark is 202 bpm)
-- Power & Climbing: Avg {w['avg_power_w']} W, Work {w['kilojoules']} kJ, Ascent {w['elevation_gain_m']} m, Climbing VAM {vam:.0f} m/h
+- Heart Rate: Avg {w['avg_hr']} bpm, Peak {w['max_hr']} bpm (Max HR benchmark: 202 bpm)
+- Power & Climbing: Avg {w['avg_power_w']} W ({wpk:.2f} W/kg), Work {w['kilojoules']} kJ, Ascent {w['elevation_gain_m']} m, Climbing VAM {vam:.0f} m/h
 - Athlete Field Notes: {w['notes']}
 
 {prior_str}
@@ -1124,7 +1219,7 @@ CURRENT SESSION:
 Provide a structured, elite coaching analysis:
 1. **Delta vs Last 5 Sessions**: Contrast speed, power, and cardiac response against recent block averages.
 2. **All-Time Progression Curve**: Assess aerobic efficiency gains vs accumulated fatigue.
-3. **Mechanical Load & VAM**: Power-to-speed ratio under elevation and body mass.
+3. **Mechanical Load, W/kg & VAM**: Evaluate power-to-weight demands under total system mass ({user_weight + bike_weight} kg) during climbs.
 4. **Prescription for Next Workout**: One specific technical pacing or cadence directive.
 """
                 ai_text = call_gemini(prompt)
@@ -1135,7 +1230,7 @@ Provide a structured, elite coaching analysis:
                                  (w['exercise_code'], now_str, ai_text))
                     conn.commit()
                     conn.close()
-                    st.markdown(f'<div class="ai-card">{ai_text}</div>', unsafe_allow_html=True)
+                    st.markdown(ai_text)
                     st.rerun()
 
         # 5. Field Notes
@@ -1153,12 +1248,12 @@ Provide a structured, elite coaching analysis:
     st.stop()
 
 # =========================================================
-# MAIN APP NAVIGATION: CLEAN 5-TAB APP BAR
+# MAIN APP NAVIGATION: 5-TAB BAR
 # =========================================================
 tab_feed, tab_analytics, tab_compare, tab_progress, tab_settings = st.tabs(["FEED", "GRAPHS", "COMPARE", "REPORTS", "SETTINGS"])
 
 # ---------------------------------------------------------
-# TAB 1: CONSUMER HIGH-DENSITY FEED
+# TAB 1: CONSUMER FEED
 # ---------------------------------------------------------
 with tab_feed:
     col_btn, col_filter = st.columns([1.8, 1.2])
@@ -1232,11 +1327,10 @@ with tab_feed:
                 st.rerun()
 
 # ---------------------------------------------------------
-# TAB 2: GLOBAL TELEMETRY GRAPHS (ALL RIDES OVER TIME)
+# TAB 2: GLOBAL TELEMETRY GRAPHS
 # ---------------------------------------------------------
 with tab_analytics:
     st.subheader("Global Telemetry Studio")
-    st.caption("Macro progression tracking all workouts chronologically across your training season.")
     conn = get_db()
     df_all = pd.read_sql_query("SELECT * FROM workouts ORDER BY date ASC", conn)
     conn.close()
@@ -1248,7 +1342,7 @@ with tab_analytics:
         target_df = df_all[df_all['sport_category'] == ('Ride' if "Cycling" in sport_mode else 'Run')]
         
         if len(target_df) >= 2:
-            st.markdown("#### Progression Curves Across Workouts")
+            st.markdown("#### Multi-Metric Progression Curves")
             metrics_global = st.multiselect(
                 "Overlay Metrics Across Season",
                 ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Elevation Ascent (m)", "Work (kJ)"],
@@ -1332,7 +1426,7 @@ with tab_compare:
         if st.button("Generate Comparative AI Breakdown", type="primary", use_container_width=True):
             with st.spinner("Analyzing comparative physiological deltas..."):
                 prompt = f"""
-You are an expert sports physiologist analyzing athlete Mustafa (190 cm, ~115 kg).
+You are an expert sports physiologist analyzing athlete Mustafa ({user_height} cm, {user_weight} kg, Bike: {bike_name}).
 Compare these specific training sessions side-by-side:
 
 {pd.DataFrame(selected)[comp_cols].to_string()}
@@ -1384,6 +1478,7 @@ with tab_progress:
             max_spd_row = p_df.loc[p_df['max_speed_kmh'].idxmax()]
             max_pwr_row = p_df.loc[p_df['avg_power_w'].idxmax()] if p_df['avg_power_w'].max() > 0 else None
             max_asc_row = p_df.loc[p_df['elevation_gain_m'].idxmax()]
+            
             p_df['vam_calc'] = p_df.apply(lambda r: (r['elevation_gain_m'] / (r['moving_time_sec'] / 3600.0)) if r['moving_time_sec'] > 0 else 0, axis=1)
             max_vam_row = p_df.loc[p_df['vam_calc'].idxmax()]
             
@@ -1406,7 +1501,7 @@ with tab_progress:
                 with st.spinner(f"Compiling {horizon} report..."):
                     summary_data = filtered_df[["exercise_code", "date", "activity_type", "distance_km", "moving_time_str", "avg_speed_kmh", "avg_hr", "max_hr", "avg_power_w", "elevation_gain_m"]].to_string(index=False)
                     prompt = f"""
-You are an elite cycling and running coach reviewing athlete Mustafa's ({horizon} - {report_cat}) training progression.
+You are an elite cycling and running coach reviewing athlete Mustafa ({user_height} cm, {user_weight} kg, Bike: {bike_name} ({bike_weight} kg)).
 Chronological Training Curve:
 {summary_data}
 
@@ -1431,7 +1526,7 @@ Provide an executive, sports-science evaluation:
             
             ai_text_for_pdf = last_report['analysis_text'] if last_report else "Generate AI audit above to include executive commentary in PDF."
             
-            pdf_bytes = generate_pdf_report(horizon, report_cat, filtered_df, ai_text_for_pdf)
+            pdf_bytes = generate_pdf_report(horizon, report_cat, filtered_df, ai_text_for_pdf, user_height, user_weight, bike_name, bike_weight)
             st.download_button(
                 label="Download Executive A4 PDF Report",
                 data=pdf_bytes,
@@ -1441,15 +1536,59 @@ Provide an executive, sports-science evaluation:
             )
 
 # ---------------------------------------------------------
-# TAB 5: SETTINGS, CLOUD BACKUP & HYGIENE
+# TAB 5: SETTINGS, ATHLETE BIOMETRICS & STRAVA GEAR
 # ---------------------------------------------------------
 with tab_settings:
-    st.subheader("System Credentials & Data Persistence")
+    st.subheader("Athlete Profile & Hardware")
     
+    # 1. Athlete Biometrics
+    st.markdown("#### Athlete Biometrics")
+    c_h, c_w = st.columns(2)
+    with c_h:
+        new_height = st.number_input("Height (cm)", min_value=120.0, max_value=230.0, value=float(user_height), step=0.5)
+    with c_w:
+        new_weight = st.number_input("Body Mass (kg)", min_value=40.0, max_value=200.0, value=float(user_weight), step=0.5)
+        
+    if st.button("Save Biometrics", type="secondary"):
+        set_config("athlete_height_cm", str(new_height))
+        set_config("athlete_weight_kg", str(new_weight))
+        st.success("Biometrics saved.")
+        st.rerun()
+
+    st.markdown("---")
+    
+    # 2. Strava Gear & Bike Hardware
+    st.markdown("#### Strava Bike & Hardware Integration")
+    st.caption(f"Currently Synced Bike: **{bike_name}** | Weight: **{bike_weight} kg**")
+    
+    if st.button("Sync Bikes & Gear from Strava", type="primary", use_container_width=True):
+        with st.spinner("Fetching registered bikes from Strava API..."):
+            success, msg = fetch_strava_athlete_gear()
+            if success:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.warning(msg)
+
+    c_bname, c_bweight = st.columns([2, 1])
+    with c_bname:
+        manual_bike = st.text_input("Bike Model Name", value=bike_name)
+    with c_bweight:
+        manual_bweight = st.number_input("Bike Mass (kg)", min_value=5.0, max_value=30.0, value=float(bike_weight), step=0.1)
+        
+    if st.button("Save Custom Hardware Specs", type="secondary"):
+        set_config("bike_name", manual_bike.strip())
+        set_config("bike_weight_kg", str(manual_bweight))
+        st.success("Hardware specifications updated.")
+        st.rerun()
+
+    st.markdown("---")
+
+    # 3. Live API Quota Monitor
     st.markdown("#### Live API Quota Monitor")
     today_str = datetime.date.today().isoformat()
-    strava_calls = get_config(f"strava_calls_{today_str}") or 0
-    gemini_calls = get_config(f"gemini_calls_{today_str}") or 0
+    strava_calls = get_config(f"strava_calls_{today_str}", "0")
+    gemini_calls = get_config(f"gemini_calls_{today_str}", "0")
     
     q1, q2 = st.columns(2)
     q1.metric("Strava Calls (Today)", f"{strava_calls} / 2,000", help="Resets daily at 00:00 UTC.")
@@ -1457,9 +1596,8 @@ with tab_settings:
     
     st.markdown("---")
     
+    # 4. Database Safety Backup & Restore
     st.markdown("#### Local Database Backup & Safety")
-    st.caption("Download your training_vault.db file to ensure zero data loss:")
-    
     with open(DB_FILE, "rb") as fp:
         db_bytes = fp.read()
         
@@ -1481,8 +1619,9 @@ with tab_settings:
 
     st.markdown("---")
     
+    # 5. Credentials & Hygiene
     st.markdown("#### Credentials & Hygiene")
-    saved_key = get_config("custom_gemini_key") or ""
+    saved_key = get_config("custom_gemini_key", "")
     new_gemini = st.text_input("Gemini API Key", value=saved_key, type="password")
     if st.button("Save Gemini Key", type="secondary"):
         set_config("custom_gemini_key", new_gemini.strip())
