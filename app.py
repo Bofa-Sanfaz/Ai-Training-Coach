@@ -6,13 +6,13 @@ import requests
 import textwrap
 
 # ---------------------------------------------------------
-# 1. LIGHT-THEME CONSUMER UI (SAMSUNG HEALTH & STRAVA STYLE)
+# 1. LIGHT CONSUMER THEME & HIGH-CONTRAST MOBILE STYLING
 # ---------------------------------------------------------
 st.set_page_config(page_title="AI Coach", layout="centered", page_icon="⚡")
 
 st.markdown("""
 <style>
-    /* Clean Light Theme */
+    /* Clean Light Background */
     .stApp {
         background-color: #f8fafc;
         color: #0f172a;
@@ -26,12 +26,12 @@ st.markdown("""
         align-items: center;
         padding-bottom: 12px;
         border-bottom: 2px solid #e2e8f0;
-        margin-bottom: 16px;
+        margin-bottom: 14px;
     }
     .brand-title {
-        font-size: 1.5rem;
+        font-size: 1.45rem;
         font-weight: 800;
-        color: #fc5200; /* Strava Orange */
+        color: #fc5200; /* Strava Brand Orange */
         letter-spacing: -0.5px;
     }
     .status-pill {
@@ -54,20 +54,20 @@ st.markdown("""
         border: 1px solid #fecaca;
     }
 
-    /* High-Density Card (~75px height) */
+    /* High-Density Workout Card (~75px) */
     .workout-card {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
-        padding: 10px 14px;
-        margin-bottom: 8px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        padding: 10px 12px;
+        margin-bottom: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     }
     .card-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
     }
     .card-left {
         display: flex;
@@ -76,28 +76,12 @@ st.markdown("""
         overflow: hidden;
     }
     .card-title {
-        font-size: 0.90rem;
+        font-size: 0.88rem;
         font-weight: 700;
         color: #1e293b;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-    }
-    .tag-badge {
-        font-size: 0.68rem;
-        font-weight: 700;
-        padding: 2px 6px;
-        border-radius: 6px;
-    }
-    .tag-ride {
-        background-color: #eff6ff;
-        color: #2563eb;
-        border: 1px solid #dbeafe;
-    }
-    .tag-run {
-        background-color: #f0fdf4;
-        color: #16a34a;
-        border: 1px solid #dcfce7;
     }
 
     /* Stat Strip */
@@ -107,7 +91,7 @@ st.markdown("""
         align-items: center;
         background-color: #f8fafc;
         border-radius: 8px;
-        padding: 6px 12px;
+        padding: 5px 10px;
         margin-top: 4px;
         border: 1px solid #f1f5f9;
     }
@@ -128,21 +112,22 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
 
-    /* Contrast Fixes for Buttons & Tabs */
+    /* High-Contrast Navigation Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #f1f5f9;
         padding: 4px;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
+        margin-bottom: 12px;
     }
     .stTabs [data-baseweb="tab"] {
         height: 38px;
-        padding: 0 16px;
+        padding: 0 14px;
         border-radius: 8px;
         color: #475569 !important;
         font-weight: 700 !important;
-        font-size: 0.88rem !important;
+        font-size: 0.86rem !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
@@ -150,6 +135,7 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
     
+    /* High-Contrast Action Buttons */
     div.stButton > button[kind="primary"] {
         background-color: #fc5200 !important;
         color: #ffffff !important;
@@ -168,7 +154,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. VECTOR SVG ICONS (NO EMOJIS)
+# 2. VECTOR SVG FIGURES (NO EMOJIS)
 # ---------------------------------------------------------
 SVG_BIKE = """<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>"""
 SVG_RUN = """<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="5" r="1.5"/><path d="m14 11 2-2-3-3-4 3 2 4-3 5 2 2 3-4 3 3"/></svg>"""
@@ -177,7 +163,7 @@ SVG_BOLT = """<svg width="12" height="12" viewBox="0 0 24 24" fill="#eab308" str
 SVG_MOUNTAIN = """<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>"""
 
 # ---------------------------------------------------------
-# 3. DATABASE ENGINE
+# 3. DATABASE ENGINE & AUTOMATIC MIGRATION
 # ---------------------------------------------------------
 DB_FILE = "training_vault.db"
 
@@ -255,9 +241,8 @@ def init_db():
 init_db()
 
 # ---------------------------------------------------------
-# 4. CREDENTIALS & SECRETS (100% SANITIZED - ZERO SECRETS IN CODE)
+# 4. CREDENTIALS & SECRETS (ZERO HARDCODED TOKENS)
 # ---------------------------------------------------------
-# All values are loaded dynamically from Streamlit Secrets or database only.
 CLIENT_ID = st.secrets.get("STRAVA_CLIENT_ID", "").strip().strip('"')
 CLIENT_SECRET = st.secrets.get("STRAVA_CLIENT_SECRET", "").strip().strip('"')
 DEFAULT_REFRESH = st.secrets.get("STRAVA_REFRESH_TOKEN", "").strip().strip('"')
@@ -275,7 +260,7 @@ def set_config(key, val):
     conn.commit()
     conn.close()
 
-# Auto-handle Strava OAuth code exchange if redirected
+# Auto-handle Strava OAuth redirect
 if "code" in st.query_params:
     auth_code = st.query_params["code"]
     res = requests.post("https://www.strava.com/oauth/token", data={
@@ -326,6 +311,8 @@ def format_session_code(sport_prefix, seq_num, dt_obj, moving_sec):
 def clean_and_renumber_vault():
     conn = get_db()
     c = conn.cursor()
+    
+    # Remove exact duplicate records from multiple re-syncs
     c.execute("""
     DELETE FROM workouts 
     WHERE id NOT IN (
@@ -336,6 +323,7 @@ def clean_and_renumber_vault():
     """)
     conn.commit()
 
+    # Re-order chronologically and assign clean codes
     all_w = conn.execute("SELECT id, sport_category, date, moving_time_sec FROM workouts ORDER BY date ASC").fetchall()
     ride_counter = 1
     run_counter = 1
@@ -364,7 +352,7 @@ def clean_and_renumber_vault():
 def sync_strava():
     token = get_valid_token()
     if not token:
-        st.error("Strava credentials missing or expired. Connect in the Settings tab.")
+        st.error("Strava session not authenticated or expired. Connect in the Settings tab.")
         return -1
         
     headers = {"Authorization": f"Bearer {token}"}
@@ -442,40 +430,41 @@ def sync_strava():
     return new_count
 
 # ---------------------------------------------------------
-# 5. GEMINI API CALL ENGINE (SUPPORTS BOTH API KEYS & OAUTH)
+# 5. GEMINI API CALL ENGINE (COMPATIBLE WITH ALL KEY FORMATS)
 # ---------------------------------------------------------
 def call_gemini(prompt):
     key = get_config("custom_gemini_key") or GEMINI_KEY
     if not key:
-        st.error("No Gemini Key configured. Add your key in the Settings tab.")
+        st.error("No Gemini Key found. Add your key in the Settings tab or Streamlit Secrets.")
         return None
         
-    payload = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}"
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key
+    }
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}]
+            }
+        ]
+    }
     
-    # Check if OAuth Token (starts with AQ.) or API Key (starts with AIzaSy)
-    if key.startswith("AQ."):
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-    else:
-        headers = {"Content-Type": "application/json"}
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}"
-        
-    res = requests.post(url, json=payload, headers=headers)
-    if res.status_code == 200:
-        return res.json()["candidates"][0]["content"]["parts"][0]["text"]
-    else:
-        # Fallback trial
-        if not key.startswith("AQ."):
-            fb_headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-            fb_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-            res2 = requests.post(fb_url, json=payload, headers=fb_headers)
-            if res2.status_code == 200:
-                return res2.json()["candidates"][0]["content"]["parts"][0]["text"]
-        st.error(f"Gemini API Error ({res.status_code}): {res.text}")
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=30)
+        if res.status_code == 200:
+            return res.json()["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            st.error(f"Gemini API Error ({res.status_code}): {res.text}")
+            return None
+    except Exception as e:
+        st.error(f"Connection Error: {e}")
         return None
 
 # ---------------------------------------------------------
-# 6. APPLICATION HEADER & NAVIGATION
+# 6. APPLICATION HEADER & VIEW STATE
 # ---------------------------------------------------------
 is_connected = bool(get_config("strava_refresh_token") or DEFAULT_REFRESH)
 status_html = '<span class="status-pill status-synced">● STRAVA CONNECTED</span>' if is_connected else '<span class="status-pill status-unlinked">● DISCONNECTED</span>'
@@ -487,7 +476,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Session state check for independent detail screen
 if "active_session_id" not in st.session_state:
     st.session_state.active_session_id = None
 
@@ -534,7 +522,7 @@ if st.session_state.active_session_id is not None:
 
         st.markdown("---")
 
-        # Heart Rate Zone Telemetry
+        # Heart Rate Intensity Gauge
         if w['avg_hr'] > 0:
             st.markdown("#### Heart Rate Intensity")
             pct_max = int((w['avg_hr'] / 202.0) * 100)
@@ -568,7 +556,6 @@ if st.session_state.active_session_id is not None:
         st.markdown("---")
         st.markdown("#### AI Coach Telemetry Debrief")
         
-        # Check if an existing review exists
         conn = get_db()
         existing_rev = conn.execute("SELECT analysis_text FROM ai_reports WHERE reference_info=?", (w['exercise_code'],)).fetchone()
         conn.close()
@@ -584,7 +571,6 @@ if st.session_state.active_session_id is not None:
         else:
             if st.button("Generate In-Depth AI Analysis", type="primary", use_container_width=True):
                 with st.spinner("AI evaluating biomechanics and cardiovascular response..."):
-                    # Pull prior sessions for chronological context
                     conn = get_db()
                     prior = conn.execute("""
                         SELECT exercise_code, date, distance_km, avg_speed_kmh, pace_str, avg_hr, max_hr, avg_power_w 
@@ -667,7 +653,6 @@ with tab_feed:
         for _, r in df.iterrows():
             is_run = (r['sport_category'] == 'Run')
             icon_svg = SVG_RUN if is_run else SVG_BIKE
-            tag_class = "tag-run" if is_run else "tag-ride"
             
             hr_val = f"{int(r['avg_hr'])}" if pd.notna(r['avg_hr']) and r['avg_hr'] > 0 else "--"
             elev_val = f"{int(r['elevation_gain_m'])}m" if pd.notna(r['elevation_gain_m']) else "--"
@@ -705,7 +690,7 @@ with tab_feed:
             """)
             st.markdown(card_html, unsafe_allow_html=True)
             
-            if st.button(f"Open Telemetry & Debrief →", key=f"btn_open_{r['id']}", use_container_width=True):
+            if st.button("Open Telemetry & Debrief →", key=f"btn_open_{r['id']}", use_container_width=True):
                 st.session_state.active_session_id = r['id']
                 st.rerun()
 
@@ -864,12 +849,12 @@ with tab_settings:
     
     st.markdown("---")
     st.markdown("#### Gemini API Key Management")
-    st.caption("Enter your Gemini API key below to override Streamlit Secrets directly from your phone:")
+    st.caption("You can set or update your Gemini API key here without editing files:")
     saved_key = get_config("custom_gemini_key") or ""
     new_gemini = st.text_input("Gemini API Key", value=saved_key, type="password")
     if st.button("Save Gemini Key", type="secondary"):
         set_config("custom_gemini_key", new_gemini.strip())
-        st.success("API Key updated.")
+        st.success("API Key updated successfully.")
         st.rerun()
 
     st.markdown("---")
@@ -878,3 +863,4 @@ with tab_settings:
         clean_and_renumber_vault()
         st.success("Duplicates removed and chronological session codes refreshed!")
         st.rerun()
+
