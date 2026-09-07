@@ -468,7 +468,7 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* WhatsApp-Style Chats Screen Layout */
+    /* WhatsApp Style Messaging Hub */
     .whatsapp-wrap {
       display: flex;
       flex-direction: column;
@@ -522,7 +522,7 @@
       text-overflow: ellipsis;
     }
 
-    /* Modal Sheet for A4 Document View */
+    /* In-App Direct PDF Auto-Viewer Modal */
     .report-modal {
       display: none;
       position: fixed;
@@ -530,18 +530,18 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(15, 23, 42, 0.85);
-      z-index: 100;
-      padding: 10px;
+      background: rgba(15, 23, 42, 0.90);
+      z-index: 1000;
+      padding: 8px;
       overflow-y: auto;
     }
     .report-sheet {
       background: #ffffff;
       border-radius: 12px;
-      max-width: 680px;
+      max-width: 720px;
       margin: 0 auto;
-      padding: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      padding: 14px;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.4);
     }
   </style>
 </head>
@@ -598,7 +598,6 @@
     <div class="pill-rack" id="metricPills"></div>
     <div id="plotlyDetailChart" style="width:100%; height:320px;"></div>
 
-    <!-- Dual In-Ride Status Bars -->
     <div class="stream-telemetry-banner" id="det_stream_banner">
       <div class="stream-line">
         <span id="banner_line1_l">⏱ Time: -- min</span>
@@ -623,7 +622,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (HORIZONTAL SWIPE SUPPORT) -->
   <div id="tab_graphs" style="display: none;">
     <div class="filter-strip">
       <div class="filter-btn active" onclick="setGraphSportFilter('All', this)">All Activities</div>
@@ -631,7 +630,11 @@
       <div class="filter-btn" onclick="setGraphSportFilter('Run', this)">Runs Only</div>
     </div>
     <div class="pill-rack" id="globalMetricPills"></div>
-    <div id="plotlyGlobalChart" style="width:100%; height:340px;"></div>
+
+    <!-- Scrollable container so 12+ rides are never cut off -->
+    <div style="width:100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 10px; background:#fff; margin-bottom:8px;">
+      <div id="plotlyGlobalChart" style="min-height:330px;"></div>
+    </div>
 
     <div class="stream-telemetry-banner" id="global_summary_banner">
       <div class="stream-line">
@@ -639,7 +642,7 @@
         <span id="global_banner_r">Volume: --</span>
       </div>
       <div class="stream-line" style="margin-top: 4px; color: #94a3b8;">
-        <span id="global_banner_sub">Touch and scrub across chart to inspect point telemetry.</span>
+        <span id="global_banner_sub">Swipe left/right on graph to view all rides. Touch to scrub numbers.</span>
       </div>
     </div>
 
@@ -706,7 +709,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS & PDF EXPORT -->
+  <!-- TAB 5: REPORTS & PDF GENERATOR -->
   <div id="tab_reports" style="display: none;">
     <h4 style="margin-bottom: 8px;">Report Filtering Parameters</h4>
     
@@ -734,17 +737,16 @@
 
     <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
     
-    <button class="btn btn-secondary" onclick="openReportModal()">View Full Styled Report</button>
-    <button class="btn btn-primary" onclick="downloadActualPdfFile()">📥 Download Official PDF File</button>
+    <button class="btn btn-primary" style="background:#0f172a; margin-top:8px;" onclick="generateAndAutoOpenPdf()">📄 Generate & Auto-Open PDF Report</button>
     <div id="pdfDownloadStatus" style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-top:4px;"></div>
   </div>
 
-  <!-- FULL A4 REPORT MODAL -->
+  <!-- FULL-SCREEN INTERACTIVE PDF MODAL -->
   <div id="reportModal" class="report-modal">
     <div class="report-sheet">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <button class="btn btn-secondary btn-small" onclick="closeReportModal()">✕ Close</button>
-        <button class="btn btn-primary btn-small" onclick="downloadActualPdfFile()">📥 Save PDF File</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <button class="btn btn-secondary btn-small" onclick="closeReportModal()">✕ Close Viewer</button>
+        <button class="btn btn-primary btn-small" onclick="downloadActualPdfFile()">📥 Save PDF to Phone</button>
       </div>
       <div id="modalReportContent"></div>
     </div>
@@ -795,10 +797,10 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS) - VERSION 6
+    // 1. DATABASE SCHEMA (DEXIE.JS) - VERSION 7
     // --------------------------------------------------------
     const db = new Dexie("AICoachVault");
-    db.version(6).stores({
+    db.version(7).stores({
       workouts: "++id, &strava_id, exercise_code, date, sport_category, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
       streams: "strava_id, stream_data",
       threads: "++id, workout_code, role, message, created_at",
@@ -833,9 +835,7 @@
     window.addEventListener('offline', checkNetwork);
     checkNetwork();
 
-    // --------------------------------------------------------
-    // 2. TEXT FORMATTER (CLEANS OUT LATEX / RAW CODE ARTIFACTS)
-    // --------------------------------------------------------
+    // Clean conversational English filter (Bans raw LaTeX/formulas)
     function cleanAiText(raw) {
       if (!raw) return "";
       let clean = raw
@@ -858,7 +858,7 @@
     }
 
     // --------------------------------------------------------
-    // 3. CAPACITOR DEEP-LINK INTERCEPTOR
+    // 2. CAPACITOR DEEP-LINK INTERCEPTOR
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -976,7 +976,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. FEED TAB
+    // 3. FEED TAB
     // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
@@ -1009,7 +1009,7 @@
     }
 
     // --------------------------------------------------------
-    // 5. IN-SESSION DETAIL (DUAL BARS + SEQUENTIAL AUTO-DEBRIEF)
+    // 4. IN-SESSION DETAIL (CLEAN TICKS, ZERO TOKEN RE-OPENS)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1103,8 +1103,15 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // Sequential Analysis Execution
-      await ensureSequentialChainDebriefed(currentWorkout);
+      // Check IndexedDB first: 0 tokens if already analyzed
+      const existing = await db.threads.where("workout_code").equals(currentWorkout.exercise_code).toArray();
+      const hasCoach = existing.some(t => t.role === 'coach');
+
+      if (!hasCoach || currentWorkout.debrief_stale) {
+        if (currentWorkout.sport_category === 'Ride') {
+          await runSequentialRideDebrief(currentWorkout);
+        }
+      }
       renderChatThread();
     }
 
@@ -1129,7 +1136,6 @@
       renderStreamPlotly();
     }
 
-    // 5-Point Rolling Average Smoother for Jagged Speed Streams
     function smoothStreamArray(arr, windowSize = 5) {
       if (!arr || arr.length < windowSize) return arr;
       const res = [];
@@ -1161,34 +1167,29 @@
       const traces = [];
       let hasSecondary = false;
 
-      // Elevation as subtle shaded topographical baseline
       if (selectedMetrics.includes("Elevation (m)") && alts.length) {
-        const minAlt = Math.min(...alts);
-        const maxAlt = Math.max(...alts);
         traces.push({ 
           x: times, 
           y: alts, 
           name: 'Elevation (m)', 
           type: 'scatter', 
           fill: 'tozeroy', 
-          fillcolor: 'rgba(148, 163, 184, 0.18)', 
+          fillcolor: 'rgba(148, 163, 184, 0.16)', 
           line: { color: '#94a3b8', width: 1.5 },
           yaxis: 'y3'
         });
       }
 
-      // Heart Rate bounded to human cardiac physiological zone
       if (selectedMetrics.includes("Heart Rate (bpm)") && hrs.length) {
         traces.push({ 
           x: times, 
           y: hrs, 
-          name: 'Heart Rate (bpm)', 
+          name: 'Heart Rate', 
           type: 'scatter', 
           line: { color: '#ef4444', width: 2 } 
         });
       }
 
-      // Power Output
       if (selectedMetrics.includes("Power (Watts)") && (watts.length || currentWorkout.avg_power_w > 0)) {
         traces.push({ 
           x: times, 
@@ -1199,7 +1200,6 @@
         });
       }
 
-      // Smoothed Speed
       if (selectedMetrics.includes("Speed (km/h)") && speeds.length) {
         hasSecondary = true;
         traces.push({ 
@@ -1213,14 +1213,14 @@
       }
 
       const layout = {
-        margin: { l: 30, r: 30, t: 10, b: 25 },
+        margin: { l: 25, r: 25, t: 10, b: 25 },
         template: 'plotly_white',
         legend: { orientation: 'h', y: 1.15, x: 0 },
         dragmode: false,
         hovermode: 'x unified',
-        xaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: 'Time (min)' },
-        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', range: [100, 205], title: 'HR (bpm)' },
-        yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, range: [0, 45], title: 'Speed (km/h)' } : undefined,
+        xaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '' },
+        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', range: [100, 205], dtick: 20 },
+        yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', range: [0, 42], dtick: 5 } : undefined,
         yaxis3: { overlaying: 'y', showgrid: false, showticklabels: false, range: [0, Math.max(...alts, 50) * 3] }
       };
 
@@ -1253,7 +1253,7 @@
         container.innerHTML = `
           <div class="chat-bubble chat-coach">
             <div class="chat-sender">AI Coach</div>
-            Analyzing telemetry and sequential strain...
+            Tap reply below to discuss this workout.
           </div>
         `;
         return;
@@ -1268,9 +1268,9 @@
     }
 
     // --------------------------------------------------------
-    // SEQUENTIAL CHAIN ENGINE (001 -> 002 -> 003 -> CURRENT)
+    // STRICT CHRONOLOGICAL RIDE-BY-RIDE COMPARATIVE ENGINE
     // --------------------------------------------------------
-    async function ensureSequentialChainDebriefed(targetWorkout) {
+    async function runSequentialRideDebrief(targetRide) {
       if (!navigator.onLine) return;
       const key = await getConfig("gemini_api_key");
       if (!key) return;
@@ -1278,67 +1278,54 @@
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      // Fetch all workouts of the SAME sport in chronological order up to targetWorkout
-      const chain = await db.workouts
-        .where('sport_category').equals(targetWorkout.sport_category)
-        .filter(w => w.date <= targetWorkout.date)
+      // Fetch all prior rides in chronological order to build comparative continuum
+      const priorRides = await db.workouts
+        .where('sport_category').equals('Ride')
+        .filter(w => w.date < targetRide.date)
         .sortBy('date');
 
-      let priorTakeawayContext = "";
+      const priorSummaryLedger = priorRides.map(p => 
+        `• ${p.exercise_code.split('-')[0].trim()} (${p.date.slice(5,10)}): ${p.distance_km} km, ${p.avg_speed_kmh} km/h, ${p.avg_hr || '--'} bpm, ${p.avg_power_w || '--'} W, ${p.elevation_gain_m} m asc`
+      ).join('\n');
 
-      for (let i = 0; i < chain.length; i++) {
-        const item = chain[i];
-        const existing = await db.threads.where("workout_code").equals(item.exercise_code).toArray();
+      // Grab user's specific notes on this ride
+      const athleteNotes = (await db.threads.where("workout_code").equals(targetRide.exercise_code).toArray())
+        .filter(t => t.role === "athlete")
+        .map(t => t.message)
+        .join(" | ");
 
-        // If not analyzed or invalidated by previous user notes
-        if (existing.length === 0 || item.debrief_stale) {
-          document.getElementById("sessionLoadingBanner").style.display = "flex";
-          document.getElementById("sessionLoadingBanner").querySelector("span").textContent = `Analyzing ${item.exercise_code} (${i + 1}/${chain.length})...`;
+      const prompt = `
+You are an expert sports scientist analyzing athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
+WORKOUT UNDER EVALUATION:
+- Session: ${targetRide.exercise_code}
+- Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
+- Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
+- Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
 
-          // Grab any athlete feedback left on this specific item
-          const athleteNotes = existing.filter(t => t.role === "athlete").map(t => t.message).join(" | ");
+FULL CHRONOLOGICAL CONTINUUM OF PRIOR RIDES:
+${priorSummaryLedger || "First ride recorded in series."}
 
-          const prompt = `
-You are an elite sports scientist coaching athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
-CHRONOLOGICAL SEQUENTIAL DEBRIEF:
-- Sport: ${item.sport_category}
-- Session: ${item.exercise_code}
-- Distance: ${item.distance_km} km | Time: ${item.duration_str} | Speed: Avg ${item.avg_speed_kmh} km/h, Max ${item.max_speed_kmh} km/h
-- Heart Rate: Avg ${item.avg_hr} bpm, Peak ${item.max_hr} bpm (Max HR benchmark is 202 bpm)
-- Power & Climbing: Avg ${item.avg_power_w} W, Work ${item.kilojoules} kJ, Ascent ${item.elevation_gain_m} m
+ATHLETE SENSATIONS/NOTES:
+${athleteNotes || "None recorded."}
 
-PRIOR SESSIONS CONTEXT IN THIS SERIES:
-${priorTakeawayContext || "First session in this series."}
-
-ATHLETE'S REPORTED SENSATIONS ON THIS SESSION:
-${athleteNotes || "None reported."}
-
-RULES:
-- DO NOT use LaTeX, dollar signs, or formulas like $\\text{...}$.
-- Write clean, concise conversational English with standard units (km/h, W, bpm).
-- Structure:
-  1. Performance & Cardiac Cost under mass
-  2. Sequential Shift (Delta from previous session)
-  3. Actionable Directive for next session
+CRITICAL INSTRUCTIONS:
+- DO NOT provide generic training suggestions, tips, or unsolicited advice.
+- Focus strictly on deep comparative analysis, cardiovascular drift, aerobic decoupling, and torque vs cadence under athlete mass.
+- Compare this session directly against baseline rides and recent workloads across the timeline.
+- DO NOT use LaTeX, math symbols, dollar signs, or formulas like $\\text{...}$. Use clean conversational English with units (km/h, W, bpm, m).
 `;
-          const reply = await callGeminiAPI(key, prompt);
-          if (reply) {
-            await db.threads.where({ workout_code: item.exercise_code, role: 'coach' }).delete();
-            await db.threads.add({ workout_code: item.exercise_code, role: 'coach', message: reply, created_at: new Date().toISOString() });
-            await db.workouts.update(item.id, { debrief_stale: false });
-            item.debrief_stale = false;
-            priorTakeawayContext = `Previous Session (${item.exercise_code}): ${reply.slice(0, 200)}...`;
-          }
-        } else {
-          // Pull existing debrief as context for the next
-          const coachMsg = existing.find(t => t.role === 'coach');
-          if (coachMsg) {
-            priorTakeawayContext = `Previous Session (${item.exercise_code}): ${coachMsg.message.slice(0, 200)}...`;
-          }
-        }
-      }
 
+      document.getElementById("sessionLoadingBanner").style.display = "flex";
+      const reply = await callGeminiAPI(key, prompt);
       document.getElementById("sessionLoadingBanner").style.display = "none";
+
+      if (reply) {
+        await db.threads.where({ workout_code: targetRide.exercise_code, role: 'coach' }).delete();
+        await db.threads.add({ workout_code: targetRide.exercise_code, role: 'coach', message: reply, created_at: new Date().toISOString() });
+        await db.workouts.update(targetRide.id, { debrief_stale: false });
+        targetRide.debrief_stale = false;
+        renderChatThread();
+      }
     }
 
     async function sendAthleteReply() {
@@ -1350,7 +1337,6 @@ RULES:
       input.value = "";
       renderChatThread();
 
-      // Cascade: mark downstream sessions of this sport as stale
       const downstreamWorkouts = await db.workouts
         .where('sport_category').equals(currentWorkout.sport_category)
         .filter(w => w.date > currentWorkout.date)
@@ -1372,7 +1358,7 @@ WORKOUT: ${currentWorkout.exercise_code} (${currentWorkout.distance_km} km, ${cu
 CONVERSATION:
 ${dialogueContext}
 
-RULES: Clean plain English. NO LaTeX formulas.
+RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic tips.
 `;
           document.getElementById("sessionLoadingBanner").style.display = "flex";
           const aiResponse = await callGeminiAPI(key, prompt);
@@ -1392,7 +1378,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // 6. GLOBAL TELEMETRY GRAPHS (FIXED LABELS & CLEAN TICKS)
+    // 5. GLOBAL TELEMETRY GRAPHS (HORIZONTAL SWIPE SUPPORT)
     // --------------------------------------------------------
     function setupGlobalMetricPills() {
       const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Elevation Ascent (m)", "Work (kJ)"];
@@ -1419,15 +1405,13 @@ RULES: Clean plain English. NO LaTeX formulas.
       }
 
       if (workouts.length < 2) {
-        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 workouts in this filter.</div>";
+        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 workouts to plot progression.</div>";
         return;
       }
 
-      // Formatted concise label e.g., "R012"
       const xLabels = workouts.map(w => {
         const parts = w.exercise_code.split('-');
-        const tag = parts[0].trim().replace("Ride ", "R").replace("Run ", "Run");
-        return tag;
+        return parts[0].trim().replace("Ride ", "R").replace("Run ", "Run");
       });
 
       const traces = [];
@@ -1460,18 +1444,22 @@ RULES: Clean plain English. NO LaTeX formulas.
       document.getElementById("global_banner_l").textContent = `Macro Trajectory: ${workouts.length} Sessions`;
       document.getElementById("global_banner_r").textContent = `Volume: ${totalDist} km | ${totalAsc} m Asc`;
 
+      // Dynamic width ensures no compression; swipe to view all rides
+      const dynamicWidth = Math.max(window.innerWidth - 24, workouts.length * 52);
+
       const layout = {
-        margin: { l: 30, r: 30, t: 10, b: 40 },
+        width: dynamicWidth,
+        margin: { l: 30, r: 30, t: 10, b: 35 },
         template: 'plotly_white',
         legend: { orientation: 'h', y: 1.15 },
         dragmode: false,
         hovermode: 'x unified',
-        xaxis: { fixedrange: true, tickangle: 0, showgrid: true, gridcolor: '#f1f5f9', nticks: Math.min(10, workouts.length) },
-        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9' },
-        yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false } : undefined
+        xaxis: { fixedrange: true, tickangle: 0, showgrid: true, gridcolor: '#f1f5f9', title: '' },
+        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', dtick: 20 },
+        yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', dtick: 5, range: [0, 42] } : undefined
       };
 
-      const config = { responsive: true, displayModeBar: false, scrollZoom: false, staticPlot: false };
+      const config = { responsive: false, displayModeBar: false, scrollZoom: false, staticPlot: false };
       const chartDiv = document.getElementById('plotlyGlobalChart');
       Plotly.newPlot('plotlyGlobalChart', traces, layout, config);
 
@@ -1526,10 +1514,7 @@ Analyze macro progression trends across: ${globalSelectedMetrics.join(', ')}.
 WORKOUT LOG:
 ${summaryLogs}
 
-RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (km/h, W, bpm).
-1. Aerobic Efficiency & Cardiovascular Drift across season
-2. Speed vs Power scaling under athlete weight
-3. Concrete macro directive
+RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (km/h, W, bpm). Focus on comparison across timeline.
 `;
       document.getElementById("graphLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt);
@@ -1578,7 +1563,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // 7. COMPARE LAB
+    // 6. COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('date').reverse().toArray();
@@ -1671,7 +1656,7 @@ You are an expert sports physiologist analyzing athlete Mustafa (190 cm, 114.8 k
 Compare these sessions:
 ${sessions.map(s => `${s.exercise_code}: ${s.distance_km} km | Speed: ${s.avg_speed_kmh} km/h | HR: ${s.avg_hr} bpm | Power: ${s.avg_power_w} W | Ascent: ${s.elevation_gain_m} m`).join('\n')}
 
-RULES: NO LaTeX. NO math formulas. Use plain conversational English with simple units.
+RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual performance differences.
 `;
       document.getElementById("compareLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt);
@@ -1685,7 +1670,7 @@ RULES: NO LaTeX. NO math formulas. Use plain conversational English with simple 
     }
 
     // --------------------------------------------------------
-    // 8. WHATSAPP-STYLE CHATS HUB
+    // 7. WHATSAPP-STYLE CHATS HUB
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -1701,9 +1686,9 @@ RULES: NO LaTeX. NO math formulas. Use plain conversational English with simple 
           <div class="chat-row-body">
             <div class="chat-row-top">
               <span class="chat-contact-name">Master Season AI Coach</span>
-              <span class="chat-timestamp">${lastMaster ? lastMaster.created_at.slice(5, 10) : 'Full Bio'}</span>
+              <span class="chat-timestamp">${lastMaster ? lastMaster.created_at.slice(5, 10) : 'Active'}</span>
             </div>
-            <div class="chat-snippet">${lastMaster ? lastMaster.message.slice(0, 55) : 'Season-wide macro analysis & long-term planning...'}</div>
+            <div class="chat-snippet">${lastMaster ? lastMaster.message.slice(0, 60) : 'Full season history & long-term macro analysis...'}</div>
           </div>
         </div>
       `;
@@ -1719,7 +1704,7 @@ RULES: NO LaTeX. NO math formulas. Use plain conversational English with simple 
                 <span class="chat-contact-name">${w.exercise_code.split('-')[0].trim()}</span>
                 <span class="chat-timestamp">${w.date.slice(5, 10)}</span>
               </div>
-              <div class="chat-snippet">${lastMsg ? lastMsg.message.slice(0, 55) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_power_w} W`}</div>
+              <div class="chat-snippet">${lastMsg ? lastMsg.message.slice(0, 60) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_power_w} W`}</div>
             </div>
           </div>
         `;
@@ -1765,7 +1750,7 @@ RULES: NO LaTeX. NO math formulas. Use plain conversational English with simple 
       } else {
         const messages = await db.threads.where("workout_code").equals(activeChatStreamKey).toArray();
         if (messages.length === 0) {
-          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for ${activeChatStreamKey}. Type below to ask coach.</div>`;
+          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for ${activeChatStreamKey}. Type below to message coach.</div>`;
           return;
         }
         container.innerHTML = messages.map(m => `
@@ -1856,7 +1841,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 9. REPORTS & COMPLETE A4 PDF FILE DOWNLOAD
+    // 8. REPORTS & AUTO-OPENING FULL A4 PDF
     // --------------------------------------------------------
     async function renderReports() {
       let workouts = await db.workouts.orderBy('date').toArray();
@@ -1924,7 +1909,7 @@ ${qualitativeNotes || "No specific complaints."}
 RULES:
 - Clean English only.
 - DO NOT use LaTeX, dollar signs, or formulas like $\\text{...}$.
-- Use simple units (km/h, W, bpm).
+- Use simple units (km/h, W, bpm). Focus strictly on comparative evaluation.
 `;
       document.getElementById("reportLoadingBanner").style.display = "flex";
       const report = await callGeminiAPI(key, prompt);
@@ -1936,6 +1921,26 @@ RULES:
         box.style.display = "block";
         box.innerHTML = `<b>Executive Progression Review (${reportTimeFilter.toUpperCase()} - ${reportSportFilter})</b><br/><br/>` + cleanAiText(report);
       }
+    }
+
+    // Direct auto-opening A4 PDF previewer
+    async function generateAndAutoOpenPdf() {
+      let workouts = await db.workouts.orderBy('date').toArray();
+      if (reportSportFilter !== 'All') workouts = workouts.filter(w => w.sport_category === reportSportFilter);
+      if (reportTimeFilter !== 'all') {
+        const days = reportTimeFilter === '7d' ? 7 : 30;
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        workouts = workouts.filter(w => w.date >= cutoff.toISOString().slice(0, 10));
+      }
+
+      let latestReport = await db.reports.get(1);
+      if (!latestReport && navigator.onLine) {
+        await generateExecutiveReport();
+        latestReport = await db.reports.get(1);
+      }
+
+      openReportModal();
     }
 
     async function openReportModal() {
@@ -2006,9 +2011,7 @@ RULES:
       document.getElementById("reportModal").style.display = "none";
     }
 
-    // --------------------------------------------------------
-    // ROBUST CLIENT-SIDE PDF FILE DOWNLOAD (FOR ANDROID)
-    // --------------------------------------------------------
+    // Direct Base64 Anchor download for saving official PDF files to Android storage
     async function downloadActualPdfFile() {
       const statusDiv = document.getElementById("pdfDownloadStatus");
       statusDiv.textContent = "Generating official PDF...";
@@ -2028,7 +2031,6 @@ RULES:
 
         const latestReport = await db.reports.get(1);
 
-        // Header Title
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(252, 82, 0);
@@ -2041,7 +2043,6 @@ RULES:
 
         let startY = 30;
 
-        // Executive Narrative
         if (latestReport && latestReport.analysis_text) {
           doc.setFont("helvetica", "bold");
           doc.setFontSize(10.5);
@@ -2058,7 +2059,6 @@ RULES:
           startY += (splitText.length * 3.4) + 6;
         }
 
-        // Ledger Table
         const tableData = workouts.map(w => [
           w.exercise_code.split('-')[0].trim(),
           w.date.split(' ')[0],
@@ -2080,8 +2080,6 @@ RULES:
         });
 
         const fileName = `Mustafa_AI_Coach_${reportTimeFilter}_${reportSportFilter}.pdf`;
-
-        // Direct Data-URI download trigger for Android WebView
         const pdfDataUri = doc.output('datauristring');
         const dlLink = document.createElement('a');
         dlLink.href = pdfDataUri;
@@ -2090,14 +2088,14 @@ RULES:
         dlLink.click();
         document.body.removeChild(dlLink);
 
-        statusDiv.innerHTML = `✓ Download initiated! Saved as <b>${fileName}</b>.`;
+        statusDiv.innerHTML = `✓ Download complete: <b>${fileName}</b>.`;
       } catch (err) {
         statusDiv.textContent = "Download failed: " + err.message;
       }
     }
 
     // --------------------------------------------------------
-    // 10. MODERN GEMINI 3.X API CLIENT
+    // 9. MODERN GEMINI 3.X API CLIENT
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
       const models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
@@ -2298,4 +2296,3 @@ RULES:
   </script>
 </body>
 </html>
-
