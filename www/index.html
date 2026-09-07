@@ -244,7 +244,6 @@
       color: var(--text-main); 
     }
 
-    /* 5-Zone Cardiac Distribution Chart */
     .zone-chart-box {
       background: #ffffff;
       border: 1px solid var(--border);
@@ -456,7 +455,6 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* Chronological WhatsApp-Style Hub */
     .whatsapp-wrap {
       display: flex;
       flex-direction: column;
@@ -558,7 +556,6 @@
     <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Biometrics & Power Ratios</h4>
     <div class="telemetry-grid" id="det_secondary"></div>
 
-    <!-- 5-Zone Cardiac Distribution Bar Graph -->
     <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Heart Rate Zone Distribution (202 bpm Max)</h4>
     <div class="zone-chart-box" id="det_zone_bars"></div>
 
@@ -569,7 +566,6 @@
     <div class="pill-rack" id="metricPills"></div>
     <div id="plotlyDetailChart" style="width:100%; height:320px;"></div>
 
-    <!-- Dual Readout Lines: Time & Distance on Line 1, Speed/HR/Power/Elev on Line 2 -->
     <div class="stream-telemetry-banner" id="det_stream_banner">
       <div class="stream-line">
         <span id="banner_line1_l">⏱ Time: -- min</span>
@@ -700,7 +696,7 @@
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">2. Official A4 PDF Document Download</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        Generates a complete multi-section A4 performance audit and triggers an immediate download notification to your phone.
+        Generates a complete multi-section A4 performance audit and saves it to your phone.
       </p>
       <button id="btnDownloadPdf" class="btn btn-primary" style="background:#0f172a;" onclick="triggerOfficialPdfDownload()">📥 Download Official A4 PDF Report</button>
       <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
@@ -752,7 +748,7 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS) - BIKES ONLY WITH ride_number
+    // 1. DATABASE SCHEMA (DEXIE.JS)
     // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
     db.version(1).stores({
@@ -927,7 +923,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (5-ZONE DISTRIBUTION + NO RE-CALLS)
+    // 4. IN-SESSION DETAIL (0 TOKENS ON RE-OPEN)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -963,7 +959,6 @@
         <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency (EF)</span><span class="telemetry-val">${efVal} W/bpm</span></div>
       `;
 
-      // 5-Zone Cardiac Distribution Bar Calculation (Max HR 202 bpm)
       const cached = await db.streams.get(currentWorkout.strava_id);
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
@@ -1010,7 +1005,8 @@
       const hasCoach = existing.some(t => t.role === 'coach');
 
       if (!hasCoach || currentWorkout.debrief_stale) {
-        await runComparativeRideDebrief(currentWorkout);
+        // Debrief ONLY this specific ride
+        await runSingleRideDebrief(currentWorkout);
       }
       renderChatThread();
     }
@@ -1091,6 +1087,7 @@
       return res;
     }
 
+    // In-Ride Plotly: Full touch hover numbers enabled
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
@@ -1114,12 +1111,13 @@
         traces.push({ 
           x: times, 
           y: normAlt, 
-          name: 'Elevation (m)', 
+          name: 'Elevation', 
+          text: alts.map(a => `${Math.round(a)} m`),
+          hovertemplate: '%{text}<extra></extra>',
           type: 'scatter', 
           fill: 'tozeroy', 
           fillcolor: 'rgba(148, 163, 184, 0.18)', 
-          line: { color: '#94a3b8', width: 1.5 },
-          hoverinfo: 'none'
+          line: { color: '#94a3b8', width: 1.5 }
         });
       }
 
@@ -1129,9 +1127,10 @@
           x: times, 
           y: normHR, 
           name: 'Heart Rate', 
+          text: hrs.map(h => `${h} bpm`),
+          hovertemplate: '%{text}<extra></extra>',
           type: 'scatter', 
-          line: { color: '#ef4444', width: 2 },
-          hoverinfo: 'none'
+          line: { color: '#ef4444', width: 2 }
         });
       }
 
@@ -1141,10 +1140,11 @@
         traces.push({ 
           x: times, 
           y: normWatts, 
-          name: 'Power (W)', 
+          name: 'Power', 
+          text: srcW.map(w => `${w} W`),
+          hovertemplate: '%{text}<extra></extra>',
           type: 'scatter', 
-          line: { color: '#fc5200', width: 2 },
-          hoverinfo: 'none'
+          line: { color: '#fc5200', width: 2 }
         });
       }
 
@@ -1153,10 +1153,11 @@
         traces.push({ 
           x: times, 
           y: normSpd, 
-          name: 'Speed (km/h)', 
+          name: 'Speed', 
+          text: speeds.map(s => `${s} km/h`),
+          hovertemplate: '%{text}<extra></extra>',
           type: 'scatter', 
-          line: { color: '#2563eb', width: 2 },
-          hoverinfo: 'none'
+          line: { color: '#2563eb', width: 2 }
         });
       }
 
@@ -1214,9 +1215,9 @@
     }
 
     // --------------------------------------------------------
-    // STRICT CHRONOLOGICAL SEQUENTIAL CHAIN DEBRIEF ENGINE
+    // SINGLE RIDE DEBRIEF (ZERO LOOPS, PREVENTS BURST FLOODING)
     // --------------------------------------------------------
-    async function runComparativeRideDebrief(targetRide) {
+    async function runSingleRideDebrief(targetRide) {
       if (!navigator.onLine) return;
       const key = await getConfig("gemini_api_key");
       if (!key) return;
@@ -1224,32 +1225,29 @@
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      // Ensure all prior rides up to targetRide are debriefed in order (1 -> 2 -> 3)
-      const allRidesUpToTarget = await db.workouts
-        .where('ride_number').belowOrEqual(targetRide.ride_number)
+      // Get prior rides up to this ride to provide comparative context
+      const priorRides = await db.workouts
+        .where('ride_number').below(targetRide.ride_number)
         .sortBy('ride_number');
 
-      let priorContinuum = "";
+      const priorContinuum = priorRides.map(p => 
+        `• Ride ${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km} km, ${p.avg_speed_kmh} km/h, ${p.avg_hr || '--'} bpm, ${p.avg_power_w || '--'} W, ${p.elevation_gain_m} m asc`
+      ).join('\n');
 
-      for (const r of allRidesUpToTarget) {
-        const existing = await db.threads.where("ride_number").equals(r.ride_number).toArray();
-        const hasCoach = existing.some(t => t.role === 'coach');
+      const athleteNotes = (await db.threads.where("ride_number").equals(targetRide.ride_number).toArray())
+        .filter(t => t.role === "athlete")
+        .map(t => t.message)
+        .join(" | ");
 
-        if (!hasCoach || r.debrief_stale) {
-          document.getElementById("sessionLoadingBanner").style.display = "flex";
-          document.getElementById("sessionLoadingBanner").querySelector("span").textContent = `Analyzing Ride ${r.ride_number} in chronological sequence...`;
-
-          const athleteNotes = existing.filter(t => t.role === "athlete").map(t => t.message).join(" | ");
-
-          const prompt = `
+      const prompt = `
 You are an expert cycling sports scientist coaching athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
 WORKOUT UNDER EVALUATION:
-- Session: ${r.exercise_code}
-- Distance: ${r.distance_km} km | Duration: ${r.duration_str} | Speed: Avg ${r.avg_speed_kmh} km/h, Max ${r.max_speed_kmh} km/h
-- Heart Rate: Avg ${r.avg_hr} bpm, Peak ${r.max_hr} bpm (Max HR benchmark: 202 bpm)
-- Mechanical Output: Avg ${r.avg_power_w} W, Work ${r.kilojoules} kJ, Ascent ${r.elevation_gain_m} m
+- Session: ${targetRide.exercise_code}
+- Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
+- Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
+- Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
 
-PRIOR SESSIONS IN THIS SERIES:
+PRIOR RIDES IN THIS SERIES (COMPARE DIRECTLY AGAINST THESE):
 ${priorContinuum || "First baseline ride recorded."}
 
 ATHLETE SENSATIONS/NOTES ON THIS RIDE:
@@ -1260,24 +1258,18 @@ RULES:
 - NO generic advice or tips.
 - NO LaTeX, formulas, or dollar signs. Use clean conversational English with units (km/h, W, bpm, m).
 `;
-          const reply = await callGeminiAPI(key, prompt);
-          if (reply) {
-            await db.threads.where({ ride_number: r.ride_number, role: 'coach' }).delete();
-            await db.threads.add({ ride_number: r.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
-            await db.workouts.update(r.id, { debrief_stale: false });
-            r.debrief_stale = false;
-            priorContinuum += `\n• Ride ${r.ride_number}: ${r.distance_km}km, ${r.avg_speed_kmh}km/h, ${r.avg_hr}bpm, ${r.avg_power_w}W. Takeaway: ${reply.slice(0, 160)}...`;
-          }
-        } else {
-          const coachMsg = existing.find(t => t.role === 'coach');
-          if (coachMsg) {
-            priorContinuum += `\n• Ride ${r.ride_number}: ${r.distance_km}km, ${r.avg_speed_kmh}km/h, ${r.avg_hr}bpm, ${r.avg_power_w}W. Takeaway: ${coachMsg.message.slice(0, 160)}...`;
-          }
-        }
-      }
 
+      document.getElementById("sessionLoadingBanner").style.display = "flex";
+      const reply = await callGeminiAPI(key, prompt);
       document.getElementById("sessionLoadingBanner").style.display = "none";
-      renderChatThread();
+
+      if (reply) {
+        await db.threads.where({ ride_number: targetRide.ride_number, role: 'coach' }).delete();
+        await db.threads.add({ ride_number: targetRide.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
+        await db.workouts.update(targetRide.id, { debrief_stale: false });
+        targetRide.debrief_stale = false;
+        renderChatThread();
+      }
     }
 
     async function sendAthleteReply() {
@@ -1634,7 +1626,6 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       document.getElementById("chatsThreadView").style.display = "none";
 
       const container = document.getElementById("chatsListContainer");
-      // STRICT CHRONOLOGICAL ORDER: Ride 1 -> Ride 12
       const workouts = await db.workouts.orderBy('ride_number').toArray();
       const lastMaster = await db.master_chat.reverse().first();
 
@@ -1825,7 +1816,6 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Total Season Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
 
-      // Render cached review if present
       const cachedReport = await db.reports.get(1);
       if (cachedReport && cachedReport.analysis_text) {
         const box = document.getElementById("reportSummaryBox");
@@ -1854,11 +1844,11 @@ ${qualitativeNotes || "No specific complaints."}
 
 RULES:
 - Clean English only.
-- DO NOT use LaTeX, dollar signs, or formulas.
+- DO NOT provide generic tips or future advice. Focus strictly on a comparative review and longitudinal trend synthesis across the logged rides.
 - Structure:
   1. Aerobic Base & Decoupling Shift
   2. Absolute Mechanical Demands under Body Mass
-  3. Actionable Progression Focus
+  3. Factual Season Progression Summary
 `;
       document.getElementById("reportLoadingBanner").style.display = "flex";
       const report = await callGeminiAPI(key, prompt);
@@ -1872,7 +1862,6 @@ RULES:
       }
     }
 
-    // Direct Native PDF Download with File Write & Notification Trigger
     async function triggerOfficialPdfDownload() {
       const statusDiv = document.getElementById("pdfDownloadStatus");
       const latestReport = await db.reports.get(1);
@@ -1889,9 +1878,8 @@ RULES:
         const doc = new jsPDF({ format: 'a4', unit: 'mm' });
 
         let workouts = await db.workouts.orderBy('ride_number').toArray();
-        const athleteNotes = await db.threads.where("role").equals("athlete").toArray();
 
-        // 1. Header Banner
+        // 1. Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(252, 82, 0);
@@ -1904,7 +1892,7 @@ RULES:
 
         let startY = 30;
 
-        // 2. Personal Records Scorecard Box
+        // 2. PR Box
         const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
         const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
         const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
@@ -1926,7 +1914,7 @@ RULES:
         });
         startY = doc.lastAutoTable.finalY + 8;
 
-        // 3. Executive AI Progression Audit
+        // 3. Executive Assessment
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
@@ -1941,7 +1929,7 @@ RULES:
         doc.text(splitText, 14, startY);
         startY += (splitText.length * 3.4) + 6;
 
-        // 4. Itemized Training Session Ledger Table
+        // 4. Ledger Table
         const tableData = workouts.map(w => [
           `Ride ${w.ride_number}`,
           w.date.split(' ')[0],
@@ -1965,7 +1953,6 @@ RULES:
         const fileName = `Mustafa_Ride_Partner_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
         const base64Data = doc.output('datauristring').split(',')[1];
 
-        // 1. Native Capacitor Filesystem Download
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
           await window.Capacitor.Plugins.Filesystem.writeFile({
             path: `Download/${fileName}`,
@@ -1979,12 +1966,11 @@ RULES:
             });
           });
 
-          statusDiv.innerHTML = `✓ Downloaded: <b>${fileName}</b> in your Downloads folder!`;
+          statusDiv.innerHTML = `✓ Downloaded: <b>${fileName}</b> in Downloads folder!`;
           alert(`PDF Report downloaded successfully:\n${fileName}`);
           return;
         }
 
-        // 2. Direct Anchor Fallback
         const pdfDataUri = `data:application/pdf;base64,${base64Data}`;
         const dlLink = document.createElement('a');
         dlLink.href = pdfDataUri;
@@ -2000,38 +1986,65 @@ RULES:
     }
 
     // --------------------------------------------------------
-    // 9. MODERN GEMINI 3.X API CLIENT
+    // 9. EXPONENTIAL BACKOFF & 3.8-PRIORITY API CLIENT
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
-      const models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
-      let diagLog = [];
+      const models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"];
 
-      for (const model of models) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "x-goog-api-key": key
-            },
-            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
-          });
+      for (let mIdx = 0; mIdx < models.length; mIdx++) {
+        const model = models[mIdx];
+        let attempts = 0;
 
-          if (res.ok) {
-            const data = await res.json();
-            if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-              return data.candidates[0].content.parts[0].text;
+        while (attempts < 2) {
+          attempts++;
+          try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                "x-goog-api-key": key
+              },
+              body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                return data.candidates[0].content.parts[0].text;
+              }
             }
-          } else {
-            const errData = await res.json().catch(() => ({}));
-            diagLog.push(`${model} (HTTP ${res.status}): ${errData.error?.message || res.statusText}`);
+
+            // If Overloaded/Busy (503 / 500) -> Wait 5s and retry 3.8
+            if (res.status === 503 || res.status === 500) {
+              console.warn(`${model} busy. Waiting 5 seconds before retry...`);
+              await new Promise(r => setTimeout(r, 5000));
+              continue;
+            }
+
+            // If Quota Exceeded (429) -> Parse retry delay, wait, and retry 3.8
+            if (res.status === 429) {
+              const errData = await res.json().catch(() => ({}));
+              const msg = errData.error?.message || "";
+              
+              // Extract exact retry seconds if Google provides it (e.g. "retry in 13.34s")
+              const match = msg.match(/retry in (\d+(\.\d+)?)s/);
+              let waitSec = match ? Math.ceil(parseFloat(match[1])) + 2 : 15;
+              
+              alert(`API Cooldown: Rate limit reached.\nPausing for ${waitSec}s to protect quota before retrying ${model}...`);
+              await new Promise(r => setTimeout(r, waitSec * 1000));
+              continue; // Retry same model (3.8)
+            }
+
+            // Other unrecoverable errors (e.g., 400 Bad Request)
+            break;
+          } catch (e) {
+            console.warn(`${model} connection error:`, e.message);
+            await new Promise(r => setTimeout(r, 4000));
           }
-        } catch (e) {
-          diagLog.push(`${model}: ${e.message}`);
         }
       }
 
-      alert("Gemini API Diagnostic Error:\n" + diagLog.join("\n"));
+      alert("Could not reach Gemini API after retries. Please check your internet or API key.");
       return null;
     }
 
@@ -2096,9 +2109,6 @@ RULES:
       }
     }
 
-    // --------------------------------------------------------
-    // STRAVA SYNC (STRICTLY BIKES ONLY WITH ride_number)
-    // --------------------------------------------------------
     async function syncStrava() {
       if (!navigator.onLine) { alert("Connect to internet to sync with Strava."); return; }
       const clientId = (await getConfig("strava_client_id") || "277202").trim();
@@ -2134,9 +2144,7 @@ RULES:
           return;
         }
 
-        // Strict bike filter: ignore runs, walks, and hikes
         const rideActs = acts.filter(a => ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide'].includes(a.type || 'Ride'));
-
         let existingRidesCount = await db.workouts.count();
         let addedCount = 0;
 
