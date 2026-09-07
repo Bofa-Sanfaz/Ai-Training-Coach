@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>AI Coach</title>
+  <title>Apex Velo — AI MTB Coach</title>
   
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -13,7 +13,8 @@
   <style>
     :root {
       --primary: #fc5200;
-      --primary-dark: #e04800;
+      --primary-dark: #cc4200;
+      --accent-cyan: #06b6d4;
       --bg: #f8fafc;
       --card-bg: #ffffff;
       --text-main: #0f172a;
@@ -21,7 +22,7 @@
       --border: #e2e8f0;
       --border-subtle: #f1f5f9;
       --success: #16a34a;
-      --bubble-coach: #f1f5f9;
+      --bubble-coach: #f8fafc;
       --bubble-athlete: #fff7ed;
     }
     * { 
@@ -49,28 +50,30 @@
     .brand-wrap { 
       display: flex; 
       align-items: center; 
-      gap: 8px; 
+      gap: 10px; 
     }
+    /* Sporty, Clean Aerodynamic Crest Logo */
     .brand-logo { 
-      width: 32px; 
-      height: 32px; 
-      background: linear-gradient(135deg, #fc5200, #ff7a38); 
-      border-radius: 9px; 
+      width: 36px; 
+      height: 36px; 
+      background: linear-gradient(135deg, #fc5200, #ff8c42); 
+      border-radius: 10px; 
       display: flex; 
       align-items: center; 
       justify-content: center; 
-      box-shadow: 0 2px 6px rgba(252, 82, 0, 0.35); 
+      box-shadow: 0 2px 8px rgba(252, 82, 0, 0.4); 
     }
     .brand-logo svg { 
       fill: #ffffff; 
-      width: 18px; 
-      height: 18px; 
+      width: 20px; 
+      height: 20px; 
     }
     .brand-title { 
-      font-size: 1.35rem; 
-      font-weight: 800; 
+      font-size: 1.30rem; 
+      font-weight: 900; 
       color: var(--primary); 
       letter-spacing: -0.5px; 
+      text-transform: uppercase;
     }
     .network-pill { 
       font-size: 0.68rem; 
@@ -102,7 +105,7 @@
       flex: 1; 
       border: none; 
       background: transparent; 
-      padding: 7px 1px; 
+      padding: 8px 1px; 
       font-size: 0.68rem; 
       font-weight: 800; 
       color: #475569; 
@@ -115,29 +118,6 @@
       background: #ffffff; 
       color: var(--primary); 
       box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
-    }
-
-    .filter-strip {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-    .filter-btn {
-      flex: 1;
-      padding: 6px 0;
-      border: 1px solid var(--border);
-      background: #ffffff;
-      border-radius: 8px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      cursor: pointer;
-      text-align: center;
-    }
-    .filter-btn.active {
-      background: #0f172a;
-      color: #ffffff;
-      border-color: #0f172a;
     }
 
     .workout-card { 
@@ -228,7 +208,7 @@
       text-align: center; 
     }
     .hero-val { 
-      font-size: 1.12rem; 
+      font-size: 1.10rem; 
       font-weight: 800; 
       color: var(--text-main); 
     }
@@ -467,6 +447,7 @@
       100% { transform: rotate(360deg); }
     }
 
+    /* WhatsApp-Style Chats Screen Layout */
     .whatsapp-wrap {
       display: flex;
       flex-direction: column;
@@ -489,7 +470,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       background: #f1f5f9;
       border: 1px solid #e2e8f0;
       flex-shrink: 0;
@@ -519,62 +500,80 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    /* In-App Direct Document Viewer Modal */
+    .report-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.88);
+      z-index: 1000;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    .report-sheet {
+      background: #ffffff;
+      border-radius: 12px;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 18px;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.4);
+    }
   </style>
 </head>
 <body>
 
   <div class="app-header">
     <div class="brand-wrap">
+      <!-- Sporty, Clean Aerodynamic Bike Crest Logo -->
       <div class="brand-logo">
-        <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1V9c-1.5 0-2.9-.6-4-1.6l-1.8-1.8c-.4-.4-.9-.6-1.4-.6-.6 0-1.1.2-1.5.6L6.5 9.4c-.4.4-.5.9-.5 1.4 0 .6.2 1.1.6 1.5l3.4 3.4v4.3h2v-5.1l-2.2-2.2 1-2.9zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
       </div>
-      <div class="brand-title">AI Coach</div>
+      <div class="brand-title">Apex Velo</div>
     </div>
     <div id="networkStatus" class="network-pill status-online">● ONLINE</div>
   </div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('feed', this)">Feed</button>
-    <button class="tab-btn" onclick="switchTab('graphs', this)">Graphs</button>
+    <button class="tab-btn active" onclick="switchTab('feed', this)">Rides</button>
+    <button class="tab-btn" onclick="switchTab('graphs', this)">Telemetry</button>
     <button class="tab-btn" onclick="switchTab('compare', this)">Compare</button>
     <button class="tab-btn" onclick="switchTab('chats', this)">Chats</button>
     <button class="tab-btn" onclick="switchTab('reports', this)">Reports</button>
-    <button class="tab-btn" onclick="switchTab('settings', this)">Settings</button>
+    <button class="tab-btn" onclick="switchTab('settings', this)">Profile</button>
   </div>
 
-  <!-- TAB 1: FEED -->
+  <!-- TAB 1: FEED (RIDES ONLY) -->
   <div id="tab_feed">
-    <div class="filter-strip">
-      <div class="filter-btn active" onclick="setFeedFilter('All', this)">All Activities</div>
-      <div class="filter-btn" onclick="setFeedFilter('Ride', this)">Rides Only</div>
-      <div class="filter-btn" onclick="setFeedFilter('Run', this)">Runs & Walks</div>
-    </div>
-    <button class="btn btn-primary" onclick="syncStrava()">Sync Strava</button>
+    <button class="btn btn-primary" onclick="syncStrava()">Sync Rides from Strava</button>
     <div id="feedList"></div>
   </div>
 
   <!-- IN-SESSION DETAIL VIEW -->
   <div id="sessionDetail" style="display: none;">
     <div class="sticky-back">
-      <button class="btn btn-secondary" onclick="closeSessionDetail()">← Back to Feed</button>
+      <button class="btn btn-secondary" onclick="closeSessionDetail()">← Back to Rides</button>
     </div>
     <h3 id="det_title" style="margin: 4px 0 8px 0; font-size: 1.15rem;"></h3>
     
     <div class="hero-grid" id="det_hero"></div>
 
-    <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Secondary Telemetry & Biometrics</h4>
+    <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Secondary Biometrics & Torque</h4>
     <div class="telemetry-grid" id="det_secondary"></div>
 
     <div class="cardiac-card" id="det_cardiac"></div>
 
-    <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Delta vs Last 5 Workouts</h4>
+    <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Delta vs Last 5 Rides</h4>
     <div id="det_delta"></div>
 
-    <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">In-Ride Telemetry Studio</h4>
+    <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">In-Ride Route Stream Studio</h4>
     <div class="pill-rack" id="metricPills"></div>
     <div id="plotlyDetailChart" style="width:100%; height:320px;"></div>
 
-    <!-- Dual In-Ride Status Bars -->
+    <!-- Dual Readout Lines: Time & Distance on Line 1, Speed/HR/Power/Elev on Line 2 -->
     <div class="stream-telemetry-banner" id="det_stream_banner">
       <div class="stream-line">
         <span id="banner_line1_l">⏱ Time: -- min</span>
@@ -586,29 +585,25 @@
       </div>
     </div>
 
-    <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Coach & Athlete Debrief</h4>
+    <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Coach Debrief</h4>
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>Analyzing ride against seasonal history...</span>
+      <span>Analyzing ride comparative biometrics...</span>
     </div>
     <div class="chat-container" id="chatThread"></div>
 
     <div class="reply-box">
-      <input type="text" id="replyInput" class="reply-input" placeholder="Reply to coach (e.g., quads tight at km 30)..." onkeydown="if(event.key==='Enter') sendAthleteReply()" />
+      <input type="text" id="replyInput" class="reply-input" placeholder="Message coach (e.g., quads tight at km 30)..." onkeydown="if(event.key==='Enter') sendAthleteReply()" />
       <button class="btn btn-primary btn-small" onclick="sendAthleteReply()">Send</button>
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (HORIZONTAL SWIPE) -->
   <div id="tab_graphs" style="display: none;">
-    <div class="filter-strip">
-      <div class="filter-btn" onclick="setGraphSportFilter('All', this)">All Activities</div>
-      <div class="filter-btn active" onclick="setGraphSportFilter('Ride', this)">Rides Only</div>
-      <div class="filter-btn" onclick="setGraphSportFilter('Run', this)">Runs Only</div>
-    </div>
+    <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
 
-    <!-- Scrollable container so all rides are reachable via swipe -->
+    <!-- Scrollable container so all 12+ rides are visible via swipe -->
     <div style="width:100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 10px; background:#fff; margin-bottom:8px;">
       <div id="plotlyGlobalChart" style="min-height:330px;"></div>
     </div>
@@ -619,28 +614,28 @@
         <span id="global_banner_r">Volume: --</span>
       </div>
       <div class="stream-line" style="margin-top: 4px; color: #94a3b8;">
-        <span id="global_banner_sub">Swipe left/right on graph to view all sessions. Touch to scrub numbers.</span>
+        <span id="global_banner_sub">Swipe horizontally to view all rides. Touch points to inspect values.</span>
       </div>
     </div>
 
-    <h4 style="margin: 14px 0 6px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Macro Trajectory Debrief</h4>
-    <button class="btn btn-primary" onclick="generateGraphDebrief()">Analyze Selected Progression Curves</button>
+    <h4 style="margin: 14px 0 6px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Season Progression Audit</h4>
+    <button class="btn btn-primary" onclick="generateGraphDebrief()">Analyze Macro Trends</button>
     
     <div id="graphLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>AI Coach is synthesizing macro season trends...</span>
+      <span>AI Coach is auditing season curves...</span>
     </div>
 
     <div class="chat-container" id="graphChatThread"></div>
     <div class="reply-box" id="graphReplyBox" style="display:none;">
-      <input type="text" id="graphReplyInput" class="reply-input" placeholder="Reply to progression analysis..." onkeydown="if(event.key==='Enter') sendGraphAthleteReply()" />
+      <input type="text" id="graphReplyInput" class="reply-input" placeholder="Reply to macro progression analysis..." onkeydown="if(event.key==='Enter') sendGraphAthleteReply()" />
       <button class="btn btn-primary btn-small" onclick="sendGraphAthleteReply()">Send</button>
     </div>
   </div>
 
   <!-- TAB 3: COMPARE LAB -->
   <div id="tab_compare" style="display: none;">
-    <h4 style="margin-bottom: 8px;">Session Comparison Lab</h4>
+    <h4 style="margin-bottom: 8px;">Ride Comparison Lab</h4>
     <div style="display: flex; gap: 6px; margin-bottom: 8px;">
       <select id="comp_s1" class="input-box" onchange="renderComparison()"></select>
       <select id="comp_s2" class="input-box" onchange="renderComparison()"></select>
@@ -659,16 +654,16 @@
     <div id="compareAIBox" class="chat-bubble chat-coach" style="display: none; margin-top: 8px;"></div>
   </div>
 
-  <!-- TAB 4: WHATSAPP-STYLE CHATS HUB -->
+  <!-- TAB 4: CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB -->
   <div id="tab_chats" style="display: none;">
     <div id="chatsListView">
-      <h4 style="margin-bottom: 8px;">Coach Conversations</h4>
+      <h4 style="margin-bottom: 8px;">Coaching Communications</h4>
       <div class="whatsapp-wrap" id="chatsListContainer"></div>
     </div>
 
     <div id="chatsThreadView" style="display: none;">
       <div class="sticky-back" style="display:flex; justify-content:space-between; align-items:center;">
-        <button class="btn btn-secondary btn-small" onclick="closeChatThreadView()">← Back to Chats</button>
+        <button class="btn btn-secondary btn-small" onclick="closeChatThreadView()">← All Chats</button>
         <span id="activeChatHeaderTitle" style="font-size:0.84rem; font-weight:800; color:var(--primary);"></span>
       </div>
 
@@ -686,26 +681,14 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS & PDF GENERATOR -->
+  <!-- TAB 5: REPORTS & IN-APP DOCUMENT VIEWER -->
   <div id="tab_reports" style="display: none;">
-    <h4 style="margin-bottom: 8px;">Report Filtering Parameters</h4>
+    <h4 style="margin-bottom: 8px;">Executive Season Review</h4>
     
-    <div class="filter-strip" style="margin-bottom:6px;">
-      <div class="filter-btn active" onclick="setReportTimeFilter('7d', this)">Last 7 Days</div>
-      <div class="filter-btn" onclick="setReportTimeFilter('30d', this)">Last 30 Days</div>
-      <div class="filter-btn" onclick="setReportTimeFilter('all', this)">All Time</div>
-    </div>
-
-    <div class="filter-strip" style="margin-bottom:12px;">
-      <div class="filter-btn active" onclick="setReportSportFilter('All', this)">All Sports</div>
-      <div class="filter-btn" onclick="setReportSportFilter('Ride', this)">Rides Only</div>
-      <div class="filter-btn" onclick="setReportSportFilter('Run', this)">Runs Only</div>
-    </div>
-
-    <h4 style="margin-bottom: 8px;">All-Time Personal Records (PR)</h4>
+    <h4 style="margin-bottom: 8px;">All-Time Cycling Records (PR)</h4>
     <div class="telemetry-grid" id="pr_grid"></div>
     
-    <button class="btn btn-primary" style="margin-top: 12px;" onclick="generateExecutiveReport()">Synthesize Progression Review</button>
+    <button class="btn btn-primary" style="margin-top: 12px;" onclick="generateExecutiveReport()">Synthesize Executive Review</button>
     
     <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
@@ -714,11 +697,21 @@
 
     <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
     
-    <button class="btn btn-primary" style="background:#0f172a; margin-top:8px;" onclick="downloadRealPdfToDevice()">📥 Download PDF File</button>
-    <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
+    <button class="btn btn-primary" style="background:#0f172a; margin-top:8px;" onclick="openReportModal()">📄 View & Print Executive A4 Report</button>
   </div>
 
-  <!-- TAB 6: SETTINGS -->
+  <!-- FULL A4 DOCUMENT VIEWER MODAL -->
+  <div id="reportModal" class="report-modal">
+    <div class="report-sheet">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <button class="btn btn-secondary btn-small" onclick="closeReportModal()">✕ Close</button>
+        <button class="btn btn-primary btn-small" onclick="window.print()">🖨 Print / Export PDF</button>
+      </div>
+      <div id="modalReportContent"></div>
+    </div>
+  </div>
+
+  <!-- TAB 6: PROFILE & CONFIGURATION -->
   <div id="tab_settings" style="display: none;">
     <h4 style="margin-bottom: 10px;">Athlete Profile & Credentials</h4>
     
@@ -763,11 +756,11 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS) - VERSION 8
+    // 1. DATABASE SCHEMA (DEXIE.JS) - BIKES ONLY
     // --------------------------------------------------------
-    const db = new Dexie("AICoachVault");
-    db.version(8).stores({
-      workouts: "++id, &strava_id, exercise_code, date, sport_category, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
+    const db = new Dexie("ApexVeloDB");
+    db.version(1).stores({
+      workouts: "++id, &strava_id, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
       streams: "strava_id, stream_data",
       threads: "++id, workout_code, role, message, created_at",
       master_chat: "++id, role, message, created_at",
@@ -778,14 +771,10 @@
 
     let currentWorkout = null;
     let activeStream = null;
-    let activeFilter = 'All';
-    let activeGraphSportFilter = 'Ride'; // Default to Rides Only for clean view
-    let reportTimeFilter = '7d';
-    let reportSportFilter = 'All';
     let activeChatStreamKey = 'MASTER';
 
-    let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Elevation (m)"];
-    let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)"];
+    let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
+    let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)"];
 
     function checkNetwork() {
       const pill = document.getElementById("networkStatus");
@@ -852,7 +841,7 @@
         const data = await res.json();
         if (data.refresh_token) {
           await setConfig("strava_refresh_token", data.refresh_token);
-          alert("Account authenticated! Syncing workouts now...");
+          alert("Strava authenticated! Syncing rides now...");
           switchTab('feed');
           syncStrava();
         } else {
@@ -912,47 +901,15 @@
       if (tabId === 'settings') loadSettings();
     }
 
-    function setFeedFilter(filter, el) {
-      activeFilter = filter;
-      document.querySelectorAll('#tab_feed .filter-btn').forEach(b => b.classList.remove('active'));
-      el.classList.add('active');
-      renderFeed();
-    }
-
-    function setGraphSportFilter(filter, el) {
-      activeGraphSportFilter = filter;
-      document.querySelectorAll('#tab_graphs .filter-btn').forEach(b => b.classList.remove('active'));
-      el.classList.add('active');
-      renderGlobalGraphs();
-    }
-
-    function setReportTimeFilter(tf, el) {
-      reportTimeFilter = tf;
-      document.querySelectorAll('#tab_reports .filter-strip:nth-of-type(1) .filter-btn').forEach(b => b.classList.remove('active'));
-      el.classList.add('active');
-      renderReports();
-    }
-
-    function setReportSportFilter(sf, el) {
-      reportSportFilter = sf;
-      document.querySelectorAll('#tab_reports .filter-strip:nth-of-type(2) .filter-btn').forEach(b => b.classList.remove('active'));
-      el.classList.add('active');
-      renderReports();
-    }
-
     // --------------------------------------------------------
-    // 3. FEED TAB
+    // 3. FEED TAB (RIDES ONLY)
     // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
       let items = await db.workouts.orderBy('date').reverse().toArray();
-      
-      if (activeFilter !== 'All') {
-        items = items.filter(r => r.sport_category === activeFilter);
-      }
 
       if (items.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding: 35px 20px; color: var(--text-muted); font-size:0.9rem;">No workouts matching this filter.<br/><br/>Tap <b>Sync Strava</b> to refresh.</div>`;
+        list.innerHTML = `<div style="text-align:center; padding: 35px 20px; color: var(--text-muted); font-size:0.9rem;">No rides stored locally.<br/><br/>Tap <b>Sync Rides from Strava</b>.</div>`;
         return;
       }
 
@@ -974,7 +931,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (FAST, 0 TOKENS ON REOPEN)
+    // 4. IN-SESSION DETAIL (0 TOKENS ON RE-OPEN)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -999,6 +956,7 @@
 
       const vam = currentWorkout.moving_sec > 0 ? Math.round(currentWorkout.elevation_gain_m / (currentWorkout.moving_sec / 3600)) : 0;
       const npVal = currentWorkout.norm_power_w > 0 ? currentWorkout.norm_power_w + ' W' : (currentWorkout.avg_power_w > 0 ? `~${Math.round(currentWorkout.avg_power_w * 1.05)} W (Est)` : '--');
+      const efVal = (currentWorkout.avg_power_w > 0 && currentWorkout.avg_hr > 0) ? (currentWorkout.avg_power_w / currentWorkout.avg_hr).toFixed(2) : '--';
 
       document.getElementById("det_secondary").innerHTML = `
         <div class="telemetry-row"><span class="telemetry-name">Max Speed</span><span class="telemetry-val">${currentWorkout.max_speed_kmh || '--'} km/h</span></div>
@@ -1006,7 +964,7 @@
         <div class="telemetry-row"><span class="telemetry-name">Normalized Power</span><span class="telemetry-val">${npVal}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Mechanical Work</span><span class="telemetry-val">${currentWorkout.kilojoules > 0 ? currentWorkout.kilojoules + ' kJ' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Climbing VAM</span><span class="telemetry-val">${vam > 0 ? vam + ' m/h' : '--'}</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Estimated Burn</span><span class="telemetry-val">${currentWorkout.calories || Math.round(currentWorkout.kilojoules * 1.05) || '--'} kcal</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency (EF)</span><span class="telemetry-val">${efVal} W/bpm</span></div>
       `;
 
       if (currentWorkout.avg_hr > 0) {
@@ -1029,7 +987,7 @@
         document.getElementById("det_cardiac").style.display = "none";
       }
 
-      const allPrior = await db.workouts.where('date').below(currentWorkout.date).filter(w => w.sport_category === currentWorkout.sport_category).reverse().limit(5).toArray();
+      const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgSpdPrior = (allPrior.reduce((a, b) => a + b.avg_speed_kmh, 0) / allPrior.length).toFixed(1);
         const validHRPrior = allPrior.filter(x => x.avg_hr > 0);
@@ -1045,7 +1003,7 @@
 
         document.getElementById("det_delta").innerHTML = `
           <table class="delta-table">
-            <thead><tr><th>Metric</th><th>This Session</th><th>Prior 5 ${currentWorkout.sport_category} Avg</th><th>Delta</th></tr></thead>
+            <thead><tr><th>Metric</th><th>This Ride</th><th>Prior 5 Avg</th><th>Delta</th></tr></thead>
             <tbody>
               <tr><td>Average Speed</td><td>${currentWorkout.avg_speed_kmh} km/h</td><td>${avgSpdPrior} km/h</td><td class="${dSpd >= 0 ? 'delta-pos' : 'delta-neg'}">${dSpd >= 0 ? '+' : ''}${dSpd} km/h</td></tr>
               <tr><td>Average HR</td><td>${currentWorkout.avg_hr || '--'} bpm</td><td>${avgHRPrior || '--'} bpm</td><td class="${dHR <= 0 ? 'delta-pos' : 'delta-neg'}">${dHR >= 0 ? '+' : ''}${dHR} bpm</td></tr>
@@ -1055,11 +1013,11 @@
           </table>
         `;
       } else {
-        document.getElementById("det_delta").innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); padding:6px 0;">First recorded ${currentWorkout.sport_category} in this series.</div>`;
+        document.getElementById("det_delta").innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); padding:6px 0;">Baseline ride recorded.</div>`;
       }
 
       document.getElementById("banner_line1_l").textContent = `⏱ Time: ${currentWorkout.duration_str}`;
-      document.getElementById("banner_line1_r").textContent = `📏 Total: ${currentWorkout.distance_km} km`;
+      document.getElementById("banner_line1_r").textContent = `📏 Distance: ${currentWorkout.distance_km} km`;
       document.getElementById("banner_line2_l").textContent = `⚡ Avg: ${currentWorkout.avg_speed_kmh} km/h`;
       document.getElementById("banner_line2_r").textContent = `❤️ HR: ${currentWorkout.avg_hr || '--'} bpm | ⚡ Power: ${currentWorkout.avg_power_w || '--'} W | ⛰ Elev: ${currentWorkout.elevation_gain_m} m`;
 
@@ -1068,23 +1026,20 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // Check IndexedDB first: 0 tokens if already analyzed
+      // Check local storage: 0 tokens if already analyzed
       const existing = await db.threads.where("workout_code").equals(currentWorkout.exercise_code).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
       if (!hasCoach || currentWorkout.debrief_stale) {
-        if (currentWorkout.sport_category === 'Ride') {
-          await runComparativeRideDebrief(currentWorkout);
-        }
+        await runComparativeRideDebrief(currentWorkout);
       }
       renderChatThread();
     }
 
     function setupMetricPills() {
       const container = document.getElementById("metricPills");
-      const available = ["Speed (km/h)", "Heart Rate (bpm)", "Elevation (m)"];
+      const available = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
       if (activeStream && activeStream.cadence) available.push("Cadence (RPM)");
-      if (activeStream && (activeStream.watts || currentWorkout.avg_power_w > 0)) available.push("Power (Watts)");
 
       container.innerHTML = available.map(m => `
         <div class="metric-pill ${selectedMetrics.includes(m) ? 'active' : ''}" onclick="toggleMetric('${m}')">${m}</div>
@@ -1115,11 +1070,11 @@
       return res;
     }
 
-    // Dynamic Axis-Safe Plotly Rendering: Never delete chart on metric toggle
+    // 0-100% Normalized Clean Scale: Eliminates multi-axis collisions
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
-        chartDiv.innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;'>Route stream data not cached. Tap Sync Strava while online.</div>";
+        chartDiv.innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;'>Route stream data not cached. Tap Sync Rides while online.</div>";
         return;
       }
       const times = activeStream.time ? activeStream.time.data.map(t => +(t / 60).toFixed(1)) : [];
@@ -1132,70 +1087,71 @@
 
       const traces = [];
 
-      // Always assign axes based on what's currently active so Plotly never breaks
-      let primaryUnit = null;
-      let secondaryUnit = null;
-
+      // Elevation Area
       if (selectedMetrics.includes("Elevation (m)") && alts.length) {
+        const minA = Math.min(...alts);
+        const maxA = Math.max(...alts) || 1;
+        const normAlt = alts.map(a => Math.round(((a - minA) / (maxA - minA || 1)) * 40));
         traces.push({ 
           x: times, 
-          y: alts, 
+          y: normAlt, 
           name: 'Elevation (m)', 
           type: 'scatter', 
           fill: 'tozeroy', 
-          fillcolor: 'rgba(148, 163, 184, 0.16)', 
+          fillcolor: 'rgba(148, 163, 184, 0.18)', 
           line: { color: '#94a3b8', width: 1.5 },
-          yaxis: 'y3'
+          hoverinfo: 'none'
         });
       }
 
+      // Heart Rate: Normalized 100-202 bpm -> 0-100%
       if (selectedMetrics.includes("Heart Rate (bpm)") && hrs.length) {
+        const normHR = hrs.map(h => Math.max(0, Math.min(100, Math.round(((h - 100) / (202 - 100)) * 100))));
         traces.push({ 
           x: times, 
-          y: hrs, 
+          y: normHR, 
           name: 'Heart Rate', 
           type: 'scatter', 
-          yaxis: 'y',
-          line: { color: '#ef4444', width: 2 } 
+          line: { color: '#ef4444', width: 2 },
+          hoverinfo: 'none'
         });
-        primaryUnit = 'bpm';
       }
 
+      // Power Output: Normalized 0-400W -> 0-100%
       if (selectedMetrics.includes("Power (Watts)") && (watts.length || currentWorkout.avg_power_w > 0)) {
+        const srcW = watts.length ? watts : times.map(() => currentWorkout.avg_power_w);
+        const normWatts = srcW.map(w => Math.min(100, Math.round((w / 400) * 100)));
         traces.push({ 
           x: times, 
-          y: watts.length ? watts : times.map(() => currentWorkout.avg_power_w), 
+          y: normWatts, 
           name: 'Power (W)', 
           type: 'scatter', 
-          yaxis: primaryUnit ? 'y' : 'y',
-          line: { color: '#fc5200', width: 2 } 
+          line: { color: '#fc5200', width: 2 },
+          hoverinfo: 'none'
         });
-        if (!primaryUnit) primaryUnit = 'W';
       }
 
+      // Speed: Normalized 0-45 km/h -> 0-100%
       if (selectedMetrics.includes("Speed (km/h)") && speeds.length) {
-        const useY2 = (primaryUnit !== null);
+        const normSpd = speeds.map(s => Math.min(100, Math.round((s / 45) * 100)));
         traces.push({ 
           x: times, 
-          y: speeds, 
+          y: normSpd, 
           name: 'Speed (km/h)', 
-          yaxis: useY2 ? 'y2' : 'y', 
           type: 'scatter', 
-          line: { color: '#2563eb', width: 2 } 
+          line: { color: '#2563eb', width: 2 },
+          hoverinfo: 'none'
         });
-        if (useY2) secondaryUnit = 'km/h';
       }
 
       const layout = {
-        margin: { l: 30, r: 30, t: 10, b: 25 },
+        margin: { l: 25, r: 20, t: 10, b: 25 },
         template: 'plotly_white',
         legend: { orientation: 'h', y: 1.15, x: 0 },
         dragmode: false,
         hovermode: 'x unified',
         xaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '' },
-        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', dtick: 20 },
-        yaxis2: secondaryUnit ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', dtick: 5, range: [0, 42] } : undefined,
-        yaxis3: { overlaying: 'y', showgrid: false, showticklabels: false, range: [0, Math.max(...alts, 50) * 3] }
+        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', range: [0, 105], dtick: 20 }
       };
 
       const config = { responsive: true, displayModeBar: false, scrollZoom: false, staticPlot: false };
@@ -1227,7 +1183,7 @@
         container.innerHTML = `
           <div class="chat-bubble chat-coach">
             <div class="chat-sender">AI Coach</div>
-            Tap reply below to analyze this workout.
+            Tap reply below to message coach.
           </div>
         `;
         return;
@@ -1242,7 +1198,7 @@
     }
 
     // --------------------------------------------------------
-    // FAST DIRECT COMPARATIVE DEBRIEF (1 CALL ONLY, FULL PRIOR DATA)
+    // FAST DIRECT COMPARATIVE DEBRIEF (1 CALL ONLY)
     // --------------------------------------------------------
     async function runComparativeRideDebrief(targetRide) {
       if (!navigator.onLine) return;
@@ -1252,10 +1208,8 @@
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      // Fetch prior rides only (ignoring runs completely)
       const priorRides = await db.workouts
-        .where('sport_category').equals('Ride')
-        .filter(w => w.date < targetRide.date)
+        .where('date').below(targetRide.date)
         .sortBy('date');
 
       const priorSummaryLedger = priorRides.map(p => 
@@ -1268,24 +1222,23 @@
         .join(" | ");
 
       const prompt = `
-You are an expert sports scientist analyzing athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
+You are an expert cycling physiologist analyzing athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
 WORKOUT UNDER EVALUATION:
-- Session: ${targetRide.exercise_code}
-- Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
+- Ride: ${targetRide.exercise_code}
+- Distance: ${targetRide.distance_km} km | Time: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
 - Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
 - Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
 
-FULL CHRONOLOGICAL CONTINUUM OF PRIOR RIDES (MUST COMPARE DIRECTLY AGAINST THESE):
-${priorSummaryLedger || "First ride recorded in series."}
+CHRONOLOGICAL TIMELINE OF ALL PRIOR RIDES:
+${priorSummaryLedger || "First ride recorded."}
 
 ATHLETE SENSATIONS/NOTES:
 ${athleteNotes || "None recorded."}
 
-CRITICAL RULES:
-- DO NOT provide generic tips, coaching suggestions, or unsolicited recovery advice.
-- Focus purely on deep comparative analysis, cardiovascular drift, aerobic decoupling, and torque vs cadence under athlete mass.
-- Directly contrast metrics of this session against key earlier rides (e.g. Ride 002 baseline, Ride 010 high power, etc.).
-- DO NOT use LaTeX, formulas, or dollar signs ($). Use clean conversational English with units (km/h, W, bpm, m).
+RULES:
+- Strictly comparative analysis: contrast efficiency, cardiac cost, and decoupling against earlier rides.
+- NO generic advice or tips. Factual sports-science analysis only.
+- NO LaTeX, dollar signs, or formulas. Use standard units (km/h, W, bpm, m).
 `;
 
       document.getElementById("sessionLoadingBanner").style.display = "flex";
@@ -1311,8 +1264,7 @@ CRITICAL RULES:
       renderChatThread();
 
       const downstreamWorkouts = await db.workouts
-        .where('sport_category').equals(currentWorkout.sport_category)
-        .filter(w => w.date > currentWorkout.date)
+        .where('date').above(currentWorkout.date)
         .toArray();
       for (const dw of downstreamWorkouts) {
         await db.workouts.update(dw.id, { debrief_stale: true });
@@ -1325,13 +1277,13 @@ CRITICAL RULES:
           const dialogueContext = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
           const prompt = `
-You are Mustafa's personal sports coach.
+You are Mustafa's personal cycling coach.
 ATHLETE: 190 cm, 114.8 kg, XC Mountain Bike.
 WORKOUT: ${currentWorkout.exercise_code} (${currentWorkout.distance_km} km, ${currentWorkout.avg_speed_kmh} km/h, ${currentWorkout.avg_hr} bpm, ${currentWorkout.avg_power_w} W).
 CONVERSATION:
 ${dialogueContext}
 
-RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic tips.
+RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
 `;
           document.getElementById("sessionLoadingBanner").style.display = "flex";
           const aiResponse = await callGeminiAPI(key, prompt);
@@ -1373,65 +1325,74 @@ RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic
     async function renderGlobalGraphs() {
       setupGlobalMetricPills();
       let workouts = await db.workouts.orderBy('date').toArray();
-      if (activeGraphSportFilter !== 'All') {
-        workouts = workouts.filter(w => w.sport_category === activeGraphSportFilter);
-      }
 
       if (workouts.length < 2) {
-        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 workouts to plot progression.</div>";
+        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 rides to plot macro progression.</div>";
         return;
       }
 
-      const xLabels = workouts.map(w => {
-        const parts = w.exercise_code.split('-');
-        return parts[0].trim().replace("Ride ", "R").replace("Run ", "Run");
-      });
-
+      const xLabels = workouts.map(w => w.exercise_code.split('-')[0].trim().replace("Ride ", "R"));
       const traces = [];
-      let primaryUnit = null;
-      let secondaryUnit = null;
 
-      const configs = {
-        "Power Output (Watts)": { y: workouts.map(w => w.avg_power_w || null), color: "#fc5200", unit: "W" },
-        "Speed (km/h)": { y: workouts.map(w => w.avg_speed_kmh), color: "#2563eb", unit: "km/h" },
-        "Heart Rate (bpm)": { y: workouts.map(w => w.avg_hr || null), color: "#ef4444", unit: "bpm" },
-        "Elevation Ascent (m)": { y: workouts.map(w => w.elevation_gain_m), color: "#64748b", unit: "m" },
-        "Work (kJ)": { y: workouts.map(w => w.kilojoules || null), color: "#10b981", unit: "kJ" }
+      // Normalized 0-100% relative Effort values with exact hover text
+      const metricConfigs = {
+        "Power Output (Watts)": { 
+          y: workouts.map(w => w.avg_power_w ? Math.min(100, Math.round((w.avg_power_w / 350) * 100)) : null), 
+          color: "#fc5200",
+          text: workouts.map(w => `${w.avg_power_w || '--'} W`)
+        },
+        "Speed (km/h)": { 
+          y: workouts.map(w => Math.min(100, Math.round((w.avg_speed_kmh / 35) * 100))), 
+          color: "#2563eb",
+          text: workouts.map(w => `${w.avg_speed_kmh} km/h`)
+        },
+        "Heart Rate (bpm)": { 
+          y: workouts.map(w => w.avg_hr ? Math.max(0, Math.min(100, Math.round(((w.avg_hr - 100) / (202 - 100)) * 100))) : null), 
+          color: "#ef4444",
+          text: workouts.map(w => `${w.avg_hr || '--'} bpm`)
+        },
+        "Elevation Ascent (m)": { 
+          y: workouts.map(w => Math.min(100, Math.round((w.elevation_gain_m / 200) * 100))), 
+          color: "#64748b",
+          text: workouts.map(w => `${w.elevation_gain_m} m`)
+        },
+        "Work (kJ)": { 
+          y: workouts.map(w => w.kilojoules ? Math.min(100, Math.round((w.kilojoules / 1500) * 100)) : null), 
+          color: "#10b981",
+          text: workouts.map(w => `${w.kilojoules || '--'} kJ`)
+        }
       };
 
       for (const m of globalSelectedMetrics) {
-        const cfg = configs[m];
-        const isSecondary = (primaryUnit !== null);
+        const cfg = metricConfigs[m];
         traces.push({
           x: xLabels,
           y: cfg.y,
           name: m,
-          yaxis: isSecondary ? 'y2' : 'y',
+          text: cfg.text,
+          hovertemplate: '<b>%{text}</b><extra></extra>',
           type: 'scatter',
           mode: 'lines+markers',
           line: { color: cfg.color, width: 2.5 }
         });
-        if (!primaryUnit) primaryUnit = cfg.unit;
-        else if (isSecondary) secondaryUnit = cfg.unit;
       }
 
       const totalDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
       const totalAsc = workouts.reduce((a, b) => a + b.elevation_gain_m, 0);
-      document.getElementById("global_banner_l").textContent = `Macro Trajectory: ${workouts.length} Sessions`;
+      document.getElementById("global_banner_l").textContent = `Season: ${workouts.length} Rides Recorded`;
       document.getElementById("global_banner_r").textContent = `Volume: ${totalDist} km | ${totalAsc} m Asc`;
 
-      const dynamicWidth = Math.max(window.innerWidth - 24, workouts.length * 52);
+      const dynamicWidth = Math.max(window.innerWidth - 24, workouts.length * 55);
 
       const layout = {
         width: dynamicWidth,
-        margin: { l: 30, r: 30, t: 10, b: 35 },
+        margin: { l: 25, r: 20, t: 10, b: 35 },
         template: 'plotly_white',
         legend: { orientation: 'h', y: 1.15 },
         dragmode: false,
         hovermode: 'x unified',
         xaxis: { fixedrange: true, tickangle: 0, showgrid: true, gridcolor: '#f1f5f9', title: '' },
-        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', dtick: 20 },
-        yaxis2: secondaryUnit ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', dtick: 5, range: [0, 42] } : undefined
+        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', range: [0, 105], dtick: 20 }
       };
 
       const config = { responsive: false, displayModeBar: false, scrollZoom: false, staticPlot: false };
@@ -1478,18 +1439,16 @@ RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
       let workouts = await db.workouts.orderBy('date').toArray();
-      if (activeGraphSportFilter !== 'All') workouts = workouts.filter(w => w.sport_category === activeGraphSportFilter);
-
       const summaryLogs = workouts.map(w => `${w.exercise_code}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join('\n');
 
       const prompt = `
-You are an executive sports scientist reviewing athlete Mustafa (190 cm, 114.8 kg).
+You are an executive sports scientist reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
 Analyze macro progression trends across: ${globalSelectedMetrics.join(', ')}.
 
 WORKOUT LOG:
 ${summaryLogs}
 
-RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (km/h, W, bpm). Focus on comparison across timeline.
+RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (km/h, W, bpm). Focus strictly on comparative shift across the season.
 `;
       document.getElementById("graphLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt);
@@ -1547,7 +1506,7 @@ RULES: Clean plain English. NO LaTeX formulas.
       const s3 = document.getElementById("comp_s3");
 
       if (workouts.length < 2) {
-        document.getElementById("compareTableContainer").innerHTML = "<div style='color:var(--text-muted);padding:20px;text-align:center;'>Need at least 2 sessions to compare.</div>";
+        document.getElementById("compareTableContainer").innerHTML = "<div style='color:var(--text-muted);padding:20px;text-align:center;'>Need at least 2 rides to compare.</div>";
         return;
       }
       const opts = workouts.map(w => `<option value="${w.id}">${w.exercise_code.split('-')[0].trim()} (${w.distance_km} km)</option>`).join('');
@@ -1628,7 +1587,7 @@ RULES: Clean plain English. NO LaTeX formulas.
 
       const prompt = `
 You are an expert sports physiologist analyzing athlete Mustafa (190 cm, 114.8 kg).
-Compare these sessions:
+Compare these rides:
 ${sessions.map(s => `${s.exercise_code}: ${s.distance_km} km | Speed: ${s.avg_speed_kmh} km/h | HR: ${s.avg_hr} bpm | Power: ${s.avg_power_w} W | Ascent: ${s.elevation_gain_m} m`).join('\n')}
 
 RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual performance differences.
@@ -1645,14 +1604,15 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 7. WHATSAPP-STYLE CHATS HUB
+    // 7. CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
       document.getElementById("chatsThreadView").style.display = "none";
 
       const container = document.getElementById("chatsListContainer");
-      const workouts = await db.workouts.orderBy('date').reverse().toArray();
+      // Sort in strict chronological order (Ride 001 -> Ride 012)
+      const workouts = await db.workouts.orderBy('date').toArray();
       const lastMaster = await db.master_chat.reverse().first();
 
       let html = `
@@ -1670,10 +1630,9 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
 
       for (const w of workouts) {
         const lastMsg = await db.threads.where("workout_code").equals(w.exercise_code).reverse().first();
-        const icon = w.sport_category === 'Ride' ? '🚴' : '🏃';
         html += `
           <div class="chat-row" onclick="openChatThread('${w.exercise_code}')">
-            <div class="chat-avatar">${icon}</div>
+            <div class="chat-avatar">🚴</div>
             <div class="chat-row-body">
               <div class="chat-row-top">
                 <span class="chat-contact-name">${w.exercise_code.split('-')[0].trim()}</span>
@@ -1760,9 +1719,9 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
             const dialogue = pastMessages.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
             const prompt = `
-You are Mustafa's head athletic sports director.
+You are Mustafa's head cycling sports director.
 ATHLETE BIO: ${athleteH} cm, ${athleteW} kg, XC Mountain Bike.
-SEASON WORKOUTS (${workouts.length} total):
+SEASON RIDES (${workouts.length} total):
 ${summaryLogs}
 
 CONVERSATION:
@@ -1770,7 +1729,7 @@ ${dialogue}
 
 RULES:
 - Answer directly and conversationally.
-- DO NOT use LaTeX, dollar signs, or formulas like $\\text{...}$.
+- DO NOT use LaTeX, dollar signs, or formulas.
 - Use simple units (km, km/h, W, bpm).
 `;
             document.getElementById("hubLoadingBanner").style.display = "flex";
@@ -1795,7 +1754,7 @@ RULES:
             const dialogue = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
             const prompt = `
-You are Mustafa's personal coach.
+You are Mustafa's personal cycling coach.
 WORKOUT: ${activeChatStreamKey} (${w ? w.distance_km + 'km, ' + w.avg_speed_kmh + 'km/h' : ''})
 CONVERSATION:
 ${dialogue}
@@ -1816,24 +1775,13 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS & REAL ANDROID PDF FILE WRITING
+    // 8. REPORTS & IN-APP FULL A4 VIEWER
     // --------------------------------------------------------
     async function renderReports() {
       let workouts = await db.workouts.orderBy('date').toArray();
 
-      if (reportSportFilter !== 'All') {
-        workouts = workouts.filter(w => w.sport_category === reportSportFilter);
-      }
-      if (reportTimeFilter !== 'all') {
-        const days = reportTimeFilter === '7d' ? 7 : 30;
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        const cutoffStr = cutoff.toISOString().slice(0, 10);
-        workouts = workouts.filter(w => w.date >= cutoffStr);
-      }
-
       if (workouts.length === 0) {
-        document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No workouts in selected timeframe.</div>`;
+        document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored.</div>`;
         return;
       }
 
@@ -1850,8 +1798,16 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Peak Power</span><span class="telemetry-val">${maxPwr.avg_power_w > 0 ? maxPwr.avg_power_w + ' W' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Highest Ascent</span><span class="telemetry-val">${maxAsc.elevation_gain_m} m</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Best Climbing VAM</span><span class="telemetry-val">${calcVAM(maxVAM)} m/h</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Total Period Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Total Season Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
+
+      // Render cached review if it exists in local storage
+      const cachedReport = await db.reports.get(1);
+      if (cachedReport && cachedReport.analysis_text) {
+        const box = document.getElementById("reportSummaryBox");
+        box.style.display = "block";
+        box.innerHTML = `<b>Executive Season Progression Audit</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
+      }
     }
 
     async function generateExecutiveReport() {
@@ -1860,167 +1816,104 @@ RULES: NO LaTeX. Plain English only.
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
       let workouts = await db.workouts.orderBy('date').toArray();
-      if (reportSportFilter !== 'All') workouts = workouts.filter(w => w.sport_category === reportSportFilter);
-      if (reportTimeFilter !== 'all') {
-        const days = reportTimeFilter === '7d' ? 7 : 30;
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        workouts = workouts.filter(w => w.date >= cutoff.toISOString().slice(0, 10));
-      }
-
       const athleteReplies = await db.threads.where("role").equals("athlete").toArray();
       const qualitativeNotes = athleteReplies.map(r => `- ${r.workout_code}: "${r.message}"`).join("\n");
       const telemetryTable = workouts.map(w => `${w.exercise_code}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join("\n");
 
       const prompt = `
-You are an executive sports science director reviewing athlete Mustafa (190 cm, 114.8 kg).
-SCOPE: ${reportTimeFilter.toUpperCase()} | SPORT: ${reportSportFilter}
-LOG:
+You are an executive sports science director reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
+SEASON RIDES LOG:
 ${telemetryTable}
 
-ATHLETE FEEDBACK:
+ATHLETE QUALITATIVE IN-RIDE FEEDBACK:
 ${qualitativeNotes || "No specific complaints."}
 
 RULES:
 - Clean English only.
-- DO NOT use LaTeX, dollar signs, or formulas like $\\text{...}$.
-- Use simple units (km/h, W, bpm). Focus strictly on comparative evaluation across sessions.
+- DO NOT use LaTeX, dollar signs, or formulas.
+- Use simple units (km/h, W, bpm, m). Focus strictly on comparative evaluation across sessions.
 `;
       document.getElementById("reportLoadingBanner").style.display = "flex";
       const report = await callGeminiAPI(key, prompt);
       document.getElementById("reportLoadingBanner").style.display = "none";
 
       if (report) {
-        await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeFilter}_${reportSportFilter}`, created_at: new Date().toISOString(), analysis_text: report });
+        // Persist permanently in IndexedDB
+        await db.reports.put({ id: 1, ref_code: `REPORT_CACHE`, created_at: new Date().toISOString(), analysis_text: report });
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
-        box.innerHTML = `<b>Executive Progression Review (${reportTimeFilter.toUpperCase()} - ${reportSportFilter})</b><br/><br/>` + cleanAiText(report);
+        box.innerHTML = `<b>Executive Season Progression Audit</b><br/><br/>` + cleanAiText(report);
       }
     }
 
-    // Direct Native PDF Generation & File Save (Android Native Filesystem Supported)
-    async function downloadRealPdfToDevice() {
-      const statusDiv = document.getElementById("pdfDownloadStatus");
-      statusDiv.textContent = "Compiling official PDF file...";
+    async function openReportModal() {
+      let workouts = await db.workouts.orderBy('date').toArray();
+      const latestReport = await db.reports.get(1);
+      const athleteNotes = await db.threads.where("role").equals("athlete").toArray();
+      const container = document.getElementById("modalReportContent");
 
-      try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+      const maxDist = workouts.length ? workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km : 0;
+      const maxSpd = workouts.length ? workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh : 0;
+      const maxPwr = workouts.length ? workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w : 0;
+      const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
 
-        let workouts = await db.workouts.orderBy('date').toArray();
-        if (reportSportFilter !== 'All') workouts = workouts.filter(w => w.sport_category === reportSportFilter);
-        if (reportTimeFilter !== 'all') {
-          const days = reportTimeFilter === '7d' ? 7 : 30;
-          const cutoff = new Date();
-          cutoff.setDate(cutoff.getDate() - days);
-          workouts = workouts.filter(w => w.date >= cutoff.toISOString().slice(0, 10));
-        }
+      container.innerHTML = `
+        <div style="border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 12px;">
+          <h2 style="color:var(--primary); font-size:1.25rem;">APEX VELO — EXECUTIVE PERFORMANCE AUDIT</h2>
+          <p style="font-size:0.75rem; color:var(--text-muted);">Athlete: Mustafa (190 cm, 114.8 kg) | Discipline: XC Mountain Bike | Date: ${new Date().toLocaleDateString()}</p>
+        </div>
 
-        const latestReport = await db.reports.get(1);
+        <h4 style="font-size:0.85rem; margin-bottom:6px; color:#1e293b;">Personal Record (PR) Scorecard</h4>
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:12px; font-size:0.75rem; text-align:center;">
+          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxDist} km</b><br/><span style="color:#64748b; font-size:0.6rem;">MAX DIST</span></div>
+          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxSpd} km/h</b><br/><span style="color:#64748b; font-size:0.6rem;">TOP SPEED</span></div>
+          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxPwr} W</b><br/><span style="color:#64748b; font-size:0.6rem;">PEAK POWER</span></div>
+          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${Math.round(totWork)} kJ</b><br/><span style="color:#64748b; font-size:0.6rem;">TOTAL WORK</span></div>
+        </div>
 
-        // Header Title
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.setTextColor(252, 82, 0);
-        doc.text("AI COACH — EXECUTIVE PERFORMANCE REPORT", 14, 18);
+        ${latestReport ? `
+          <div style="background:#f8fafc; border:1px solid var(--border); border-left:4px solid var(--primary); padding:12px; border-radius:8px; margin-bottom:14px; font-size:0.84rem; line-height:1.55;">
+            <h3 style="color:#0f172a; margin-bottom:6px; font-size:0.92rem;">Executive Coaching Assessment</h3>
+            ${cleanAiText(latestReport.analysis_text)}
+          </div>
+        ` : ''}
 
-        doc.setFontSize(8.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Scope: ${reportTimeFilter.toUpperCase()} (${reportSportFilter}) | Exported: ${new Date().toLocaleDateString()}`, 14, 24);
+        ${athleteNotes.length ? `
+          <div style="background:#fff7ed; border:1px solid #fed7aa; padding:10px 12px; border-radius:8px; margin-bottom:14px; font-size:0.78rem;">
+            <b style="color:#9a3412;">Recorded Athlete Session Feedback:</b>
+            <ul style="margin-top:4px; padding-left:16px;">
+              ${athleteNotes.map(n => `<li><b>${n.workout_code}:</b> "${n.message}"</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
 
-        let startY = 30;
+        <h3 style="font-size:0.90rem; margin:10px 0 6px 0;">Itemized Session Ledger</h3>
+        <table class="delta-table" style="font-size:0.74rem;">
+          <thead>
+            <tr><th>Session</th><th>Date</th><th>Dist</th><th>Time</th><th>Speed</th><th>Power</th><th>HR</th><th>Asc</th></tr>
+          </thead>
+          <tbody>
+            ${workouts.map(w => `
+              <tr>
+                <td><b>${w.exercise_code.split('-')[0].trim()}</b></td>
+                <td>${w.date.split(' ')[0]}</td>
+                <td>${w.distance_km} km</td>
+                <td>${w.duration_str}</td>
+                <td>${w.avg_speed_kmh} km/h</td>
+                <td>${w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--'}</td>
+                <td>${w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--'}</td>
+                <td>${w.elevation_gain_m} m</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
 
-        // Personal Records Box
-        if (workouts.length) {
-          const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
-          const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
-          const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
-          const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
+      document.getElementById("reportModal").style.display = "block";
+    }
 
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(9.5);
-          doc.setTextColor(15, 23, 42);
-          doc.text("Personal Records & Period Volume Scorecard", 14, startY);
-          startY += 4;
-
-          doc.autoTable({
-            head: [['Peak Distance', 'Top Speed', 'Peak Power', 'Total Work Done']],
-            body: [[`${maxDist} km`, `${maxSpd} km/h`, `${maxPwr} W`, `${Math.round(totWork)} kJ`]],
-            startY: startY,
-            theme: 'plain',
-            styles: { fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [241, 245, 249], textColor: [100, 116, 139], fontStyle: 'bold' }
-          });
-          startY = doc.lastAutoTable.finalY + 8;
-        }
-
-        // Executive Narrative
-        if (latestReport && latestReport.analysis_text) {
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10.5);
-          doc.setTextColor(15, 23, 42);
-          doc.text("Executive Coaching Assessment", 14, startY);
-          startY += 5;
-
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(8);
-          doc.setTextColor(30, 41, 59);
-          const rawClean = latestReport.analysis_text.replace(/[*#$]/g, '');
-          const splitText = doc.splitTextToSize(rawClean, 180);
-          doc.text(splitText, 14, startY);
-          startY += (splitText.length * 3.4) + 6;
-        }
-
-        // Ledger Table
-        const tableData = workouts.map(w => [
-          w.exercise_code.split('-')[0].trim(),
-          w.date.split(' ')[0],
-          w.distance_km + ' km',
-          w.duration_str || '--',
-          w.avg_speed_kmh + ' km/h',
-          w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--',
-          w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--',
-          w.elevation_gain_m + ' m'
-        ]);
-
-        doc.autoTable({
-          head: [['Session', 'Date', 'Dist', 'Time', 'Speed', 'Power', 'HR', 'Asc']],
-          body: tableData,
-          startY: startY,
-          theme: 'grid',
-          headStyles: { fillColor: [15, 23, 42], fontSize: 8 },
-          styles: { fontSize: 7.5, cellPadding: 2 }
-        });
-
-        const fileName = `Mustafa_AI_Coach_${reportTimeFilter}_${reportSportFilter}.pdf`;
-        const base64Data = doc.output('datauristring').split(',')[1];
-
-        // 1. Try Native Capacitor Filesystem Write to Documents directory
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-          await window.Capacitor.Plugins.Filesystem.writeFile({
-            path: fileName,
-            data: base64Data,
-            directory: 'DOCUMENTS'
-          });
-          statusDiv.innerHTML = `✓ Saved directly to phone: <b>Documents/${fileName}</b>`;
-          alert(`PDF successfully saved to your phone's Documents folder:\n${fileName}`);
-          return;
-        }
-
-        // 2. Fallback Direct Data-URI Anchor
-        const pdfDataUri = `data:application/pdf;base64,${base64Data}`;
-        const dlLink = document.createElement('a');
-        dlLink.href = pdfDataUri;
-        dlLink.download = fileName;
-        document.body.appendChild(dlLink);
-        dlLink.click();
-        document.body.removeChild(dlLink);
-
-        statusDiv.innerHTML = `✓ Download initiated: <b>${fileName}</b>`;
-      } catch (err) {
-        statusDiv.textContent = "Download error: " + err.message;
-      }
+    function closeReportModal() {
+      document.getElementById("reportModal").style.display = "none";
     }
 
     // --------------------------------------------------------
@@ -2068,7 +1961,7 @@ RULES:
       await setConfig("strava_client_id", document.getElementById("cfg_client_id").value.trim());
       await setConfig("strava_client_secret", document.getElementById("cfg_client_secret").value.trim());
       await setConfig("gemini_api_key", document.getElementById("cfg_gemini_key").value.trim());
-      alert("Configuration saved to phone storage.");
+      alert("Configuration saved.");
     }
 
     async function loadSettings() {
@@ -2120,6 +2013,9 @@ RULES:
       }
     }
 
+    // --------------------------------------------------------
+    // STRAVA SYNC (STRICTLY BIKES ONLY)
+    // --------------------------------------------------------
     async function syncStrava() {
       if (!navigator.onLine) { alert("Connect to internet to sync with Strava."); return; }
       const clientId = (await getConfig("strava_client_id") || "277202").trim();
@@ -2127,7 +2023,7 @@ RULES:
       let refreshToken = (await getConfig("strava_refresh_token")).trim();
 
       if (!clientId || !clientSecret || !refreshToken) {
-        alert("Please tap Settings and sign in to Strava first.");
+        alert("Please go to Profile and sign in to Strava first.");
         switchTab('settings');
         return;
       }
@@ -2155,30 +2051,23 @@ RULES:
           return;
         }
 
-        const existingRides = await db.workouts.where("sport_category").equals("Ride").count();
-        const existingRuns = await db.workouts.where("sport_category").equals("Run").count();
-        let rideSeq = existingRides;
-        let runSeq = existingRuns;
+        // Filter: Keep ONLY Rides (VirtualRide, MountainBikeRide, GravelRide, Ride)
+        const rideActs = acts.filter(a => ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide'].includes(a.type || 'Ride'));
+
+        let existingRidesCount = await db.workouts.count();
         let addedCount = 0;
 
-        for (let i = acts.length - 1; i >= 0; i--) {
-          const a = acts[i];
+        for (let i = rideActs.length - 1; i >= 0; i--) {
+          const a = rideActs[i];
           const exists = await db.workouts.where("strava_id").equals(a.id).first();
           if (!exists) {
+            existingRidesCount++;
             addedCount++;
-            const rawType = a.type || 'Ride';
-            const isRun = ['Run', 'TrailRun', 'VirtualRun', 'Walk', 'Hike'].includes(rawType);
-            const sportCat = isRun ? 'Run' : 'Ride';
 
-            if (sportCat === 'Ride') rideSeq++;
-            else runSeq++;
-
-            const currentSeq = sportCat === 'Ride' ? rideSeq : runSeq;
-            const seqStr = String(currentSeq).padStart(3, '0');
-
+            const seqStr = String(existingRidesCount).padStart(3, '0');
             const dt = new Date(a.start_date_local.replace('Z', ''));
             const dateStr = dt.toISOString().slice(0, 10);
-            const code = `${sportCat} ${seqStr} - ${dateStr}`;
+            const code = `Ride ${seqStr} - ${dateStr}`;
 
             const m = Math.floor(a.moving_time / 60);
             const s = a.moving_time % 60;
@@ -2188,7 +2077,6 @@ RULES:
               strava_id: a.id,
               exercise_code: code,
               date: a.start_date_local.replace('T', ' ').slice(0, 16),
-              sport_category: sportCat,
               distance_km: +(a.distance / 1000).toFixed(2),
               duration_str: durStr,
               moving_sec: a.moving_time || 0,
@@ -2216,7 +2104,7 @@ RULES:
             } catch (e) {}
           }
         }
-        alert(`Success! Stored ${addedCount} new workouts permanently on your phone.`);
+        alert(`Stored ${addedCount} new bike sessions.`);
         renderFeed();
       } catch (err) { alert("Sync failed: " + err.message); }
     }
@@ -2225,3 +2113,4 @@ RULES:
   </script>
 </body>
 </html>
+
