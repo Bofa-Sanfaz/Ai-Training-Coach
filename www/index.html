@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>AI Coach</title>
   
-  <!-- Standalone High-Performance Engines -->
+  <!-- Bundled Standalone High-Performance Engines -->
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -39,6 +39,7 @@
       padding-bottom: 95px; 
     }
 
+    /* Top Status Bar */
     .app-header { 
       display: flex; 
       justify-content: space-between; 
@@ -90,6 +91,7 @@
       border: 1px solid #fecaca; 
     }
 
+    /* Primary Navigation */
     .tab-bar { 
       display: flex; 
       background: #e2e8f0; 
@@ -118,6 +120,7 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.08); 
     }
 
+    /* Filter Strip */
     .filter-strip {
       display: flex;
       gap: 6px;
@@ -141,6 +144,7 @@
       border-color: #0f172a;
     }
 
+    /* Activity Feed Cards */
     .workout-card { 
       background: var(--card-bg); 
       border: 1px solid var(--border); 
@@ -184,6 +188,7 @@
       font-weight: 700; 
     }
 
+    /* Action Buttons */
     .btn { 
       width: 100%; 
       border: none; 
@@ -215,6 +220,7 @@
       border-radius: 8px; 
     }
 
+    /* Hero Metrics Grid */
     .hero-grid { 
       display: grid; 
       grid-template-columns: repeat(3, 1fr); 
@@ -241,6 +247,7 @@
       margin-top: 2px; 
     }
 
+    /* Secondary Telemetry Grid */
     .telemetry-grid { 
       display: grid; 
       grid-template-columns: repeat(2, 1fr); 
@@ -267,6 +274,7 @@
       color: var(--text-main); 
     }
 
+    /* Cardiac Load Progress Indicator */
     .cardiac-card { 
       background: #ffffff; 
       border: 1px solid var(--border); 
@@ -294,6 +302,7 @@
       border-radius: 9999px; 
     }
 
+    /* Delta Benchmark Table */
     .delta-table { 
       width: 100%; 
       border-collapse: collapse; 
@@ -325,6 +334,7 @@
       font-weight: 700; 
     }
 
+    /* Toggle Pills */
     .pill-rack { 
       display: flex; 
       flex-wrap: wrap; 
@@ -347,6 +357,7 @@
       border-color: #0f172a; 
     }
 
+    /* Interactive Coaching Thread */
     .chat-container { 
       display: flex; 
       flex-direction: column; 
@@ -429,6 +440,7 @@
 </head>
 <body>
 
+  <!-- Top Status Header -->
   <div class="app-header">
     <div class="brand-wrap">
       <div class="brand-logo">
@@ -439,6 +451,7 @@
     <div id="networkStatus" class="network-pill status-online">● ONLINE</div>
   </div>
 
+  <!-- Primary Navigation -->
   <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('feed')">Feed</button>
     <button class="tab-btn" onclick="switchTab('graphs')">Graphs</button>
@@ -544,7 +557,7 @@
     <div style="background:#ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; margin: 14px 0;">
       <h4 style="font-size: 0.88rem; margin-bottom: 4px; color: var(--primary);">One-Tap Automatic Sign-In</h4>
       <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 10px;">
-        Tap below to authenticate with Strava via Google. Android will redirect back to this app once approved.
+        Tap below to authenticate with Strava via Google. Android will return directly to this app once authorized.
       </p>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.2 13.828h4.172"/></svg>
@@ -564,9 +577,12 @@
   </div>
 
   <script>
+    // --------------------------------------------------------
+    // 1. DATABASE SCHEMA (DEXIE.JS) - VERSION 3 WITH ++id PRIMARY KEY
+    // --------------------------------------------------------
     const db = new Dexie("AICoachVault");
-    db.version(2).stores({
-      workouts: "id, strava_id, exercise_code, date, sport_category, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec",
+    db.version(3).stores({
+      workouts: "++id, &strava_id, exercise_code, date, sport_category, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec",
       streams: "strava_id, stream_data",
       threads: "++id, workout_code, role, message, created_at",
       reports: "id, ref_code, created_at, analysis_text",
@@ -594,7 +610,7 @@
     checkNetwork();
 
     // --------------------------------------------------------
-    // NATIVE CAPACITOR DEEP-LINK INTERCEPTOR
+    // 2. AUTOMATIC CAPACITOR NATIVE DEEP-LINK INTERCEPTOR
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -635,7 +651,6 @@
       }
     }
 
-    // Bind official Capacitor native App plugin if present
     document.addEventListener("DOMContentLoaded", () => {
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
         window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
@@ -687,6 +702,9 @@
       renderFeed();
     }
 
+    // --------------------------------------------------------
+    // 3. RENDER FEED WITH FULL TELEMETRY
+    // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
       let items = await db.workouts.orderBy('date').reverse().toArray();
@@ -717,6 +735,9 @@
       `).join('');
     }
 
+    // --------------------------------------------------------
+    // 4. IN-SESSION TELEMETRY DETAIL (COMPLETE DASHBOARD)
+    // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
       if (!currentWorkout) return;
@@ -827,7 +848,7 @@
 
     function renderStreamPlotly() {
       if (!activeStream) {
-        document.getElementById("plotlyDetailChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;'>Route streams not cached. Tap Sync Strava to refresh.</div>";
+        document.getElementById("plotlyDetailChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;'>Route streams not cached. Tap Sync Strava to download stream.</div>";
         return;
       }
       const times = activeStream.time ? activeStream.time.data.map(t => (t / 60).toFixed(1)) : [];
@@ -856,7 +877,7 @@
       const layout = {
         margin: { l: 25, r: 25, t: 10, b: 25 },
         template: 'plotly_white',
-        legend: { orientation: 'h', y: 1.15 },
+        legend: { orientation: 'h', y: 1.15, x: 0 },
         hovermode: 'x unified',
         yaxis: { showgrid: true, gridcolor: '#f1f5f9' },
         yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', showgrid: false } : undefined
@@ -953,6 +974,9 @@ Respond concisely with actionable sports-science feedback.
       document.getElementById("tab_feed").style.display = "block";
     }
 
+    // --------------------------------------------------------
+    // 5. GLOBAL TELEMETRY STUDIO (FULL MULTI-METRIC OVERLAY)
+    // --------------------------------------------------------
     function setupGlobalMetricPills() {
       const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Elevation Ascent (m)", "Work (kJ)"];
       document.getElementById("globalMetricPills").innerHTML = available.map(m => `
@@ -1013,6 +1037,9 @@ Respond concisely with actionable sports-science feedback.
       Plotly.newPlot('plotlyGlobalChart', traces, layout, { responsive: true, displayModeBar: false, scrollZoom: false });
     }
 
+    // --------------------------------------------------------
+    // 6. COMPARISON LAB (1-to-1 & 1-to-2)
+    // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('date').reverse().toArray();
       const s1 = document.getElementById("comp_s1");
@@ -1100,6 +1127,9 @@ Provide a structured, elite coaching assessment:
       }
     }
 
+    // --------------------------------------------------------
+    // 7. ALL-TIME PRS & A4 PDF EXPORT
+    // --------------------------------------------------------
     async function renderReports() {
       const workouts = await db.workouts.orderBy('date').toArray();
       if (workouts.length === 0) return;
@@ -1251,7 +1281,7 @@ Provide a high-density, professional progression assessment:
     }
 
     // --------------------------------------------------------
-    // ROBUST CHRONOLOGICAL SYNC & PROPER NUMBERING
+    // 8. ROBUST CHRONOLOGICAL SYNC & PROPER NUMBERING
     // --------------------------------------------------------
     async function syncStrava() {
       if (!navigator.onLine) { alert("Connect to internet to sync with Strava."); return; }
@@ -1288,7 +1318,6 @@ Provide a high-density, professional progression assessment:
           return;
         }
 
-        // Count existing records to maintain strict sequential numbering
         const existingRides = await db.workouts.where("sport_category").equals("Ride").count();
         const existingRuns = await db.workouts.where("sport_category").equals("Run").count();
         let rideSeq = existingRides;
