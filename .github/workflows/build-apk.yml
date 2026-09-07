@@ -23,15 +23,28 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Capacitor & Dependencies
+      - name: Install Dependencies
         run: |
           npm install
           npm install -g @capacitor/cli
 
-      - name: Initialize Android Native Project
+      - name: Initialize Android Native Project & Deep Link Scheme
         run: |
           npx cap add android || true
           npx cap sync android
+          # Inject aicoach:// scheme into AndroidManifest.xml
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if grep -q "aicoach" "$MANIFEST"; then
+            echo "Deep link scheme already present"
+          else
+            sed -i '/<\/activity>/i \
+            <intent-filter>\
+                <action android:name="android.intent.action.VIEW" />\
+                <category android:name="android.intent.category.DEFAULT" />\
+                <category android:name="android.intent.category.BROWSABLE" />\
+                <data android:scheme="aicoach" android:host="auth" />\
+            </intent-filter>' "$MANIFEST"
+          fi
 
       - name: Build Android Debug APK
         run: |
@@ -44,4 +57,3 @@ jobs:
         with:
           name: AI_Coach_Release
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
