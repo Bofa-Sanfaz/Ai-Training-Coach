@@ -28,12 +28,12 @@ jobs:
           npm install
           npm install -g @capacitor/cli
 
-      - name: Initialize Android Native Project & Deep Link Scheme
+      - name: Initialize Android Native Project, Deep Link Scheme & Custom Bike Icon
         run: |
           npx cap add android || true
           npx cap sync android
           
-          # Ensure deep-link intent filter
+          # 1. Inject Deep Link Scheme
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if grep -q "aicoach" "$MANIFEST"; then
             echo "Deep link scheme already present"
@@ -47,10 +47,39 @@ jobs:
             </intent-filter>' "$MANIFEST"
           fi
 
-          # Update Native App Name
+          # 2. Update Native App Name
           STRINGS="android/app/src/main/res/values/strings.xml"
           sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner<\/string>/g' "$STRINGS"
           sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner<\/string>/g' "$STRINGS"
+
+          # 3. Overwrite Default Capacitor Launcher Icons with a Sporty Vector Bike Icon
+          mkdir -p android/app/src/main/res/drawable
+          cat << 'EOF' > android/app/src/main/res/drawable/ic_launcher_foreground.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#FC5200"
+                  android:pathData="M0,0h108v108h-108z"/>
+              <path
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M66.5,33.5c3.3,0 6,-2.7 6,-6s-2.7,-6 -6,-6 -6,2.7 -6,6 2.7,6 6,6zM35,53c-8.4,0 -15,6.6 -15,15s6.6,15 15,15 15,-6.6 15,-15 -6.6,-15 -15,-15zm0,25.5c-5.7,0 -10.5,-4.8 -10.5,-10.5s4.8,-10.5 10.5,-10.5 10.5,4.8 10.5,10.5 -4.8,10.5 -10.5,10.5zm17.4,-30l7.2,-7.2 2.4,2.4c3.9,3.9 9,6.3 15,6.3V44c-4.5,0 -8.7,-1.8 -12,-4.8l-5.4,-5.4c-1.2,-1.2 -2.7,-1.8 -4.2,-1.8 -1.8,0 -3.3,0.6 -4.5,1.8L39.5,45.2c-1.2,1.2 -1.5,2.7 -1.5,4.2 0,1.8 0.6,3.3 1.8,4.5l10.2,10.2v12.9h6v-15.3l-6.6,-6.6 3,-8.7zM77,53c-8.4,0 -15,6.6 -15,15s6.6,15 15,15 15,-6.6 15,-15 -6.6,-15 -15,-15zm0,25.5c-5.7,0 -10.5,-4.8 -10.5,-10.5s4.8,-10.5 10.5,-10.5 10.5,4.8 10.5,10.5 -4.8,10.5 -10.5,10.5z"/>
+          </vector>
+          EOF
+
+          cat << 'EOF' > android/app/src/main/res/drawable/ic_launcher_background.xml
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#0F172A"
+                  android:pathData="M0,0h108v108h-108z"/>
+          </vector>
+          EOF
 
       - name: Build Android Debug APK
         run: |
