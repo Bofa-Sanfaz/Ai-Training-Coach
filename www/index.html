@@ -161,6 +161,19 @@
       font-weight: 700; 
     }
 
+    .status-badge {
+      font-size: 0.64rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .badge-ok { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-stale { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+    .badge-unreviewed { background: #fef08a; color: #854d0e; border: 1px solid #fde047; }
+
     .btn { 
       width: 100%; 
       border: none; 
@@ -489,6 +502,7 @@
     .chat-row-top {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       margin-bottom: 2px;
     }
     .chat-contact-name {
@@ -538,7 +552,7 @@
     <button class="tab-btn" onclick="switchTab('settings', this)">Profile</button>
   </div>
 
-  <!-- TAB 1: FEED (STRICTLY BIKES ONLY) -->
+  <!-- TAB 1: FEED -->
   <div id="tab_feed">
     <button class="btn btn-primary" onclick="syncStrava()">Sync Rides from Strava</button>
     <div id="feedList"></div>
@@ -577,11 +591,19 @@
       </div>
     </div>
 
-    <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Coach Debrief</h4>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 14px 0 6px 0;">
+      <h4 style="font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Coach Debrief</h4>
+      <div id="det_status_badge"></div>
+    </div>
+    
+    <!-- SINGLE MANUAL CALL TRIGGER -->
+    <div id="sessionActionBox" style="margin: 6px 0;"></div>
+    
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>Analyzing ride comparative biometrics...</span>
+      <span>Calling Gemini for Ride comparative analysis...</span>
     </div>
+    
     <div class="chat-container" id="chatThread"></div>
 
     <div class="reply-box">
@@ -590,7 +612,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (HORIZONTAL SWIPE) -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
   <div id="tab_graphs" style="display: none;">
     <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
@@ -672,7 +694,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS & LOCKED PDF GENERATOR -->
+  <!-- TAB 5: REPORTS -->
   <div id="tab_reports" style="display: none;">
     <h4 style="margin-bottom: 8px;">Executive Season Review</h4>
     
@@ -682,7 +704,7 @@
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">1. Generate Executive AI Progression Review</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        To unlock the official A4 PDF report, compile the AI coaching progression audit below.
+        Compiles a strictly retrospective longitudinal audit across all rides and logged feedback.
       </p>
       <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize AI Season Review</button>
       
@@ -696,14 +718,14 @@
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">2. Official A4 PDF Document Download</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        Generates a complete multi-section A4 performance audit and saves it to your phone.
+        Saves the complete executive document directly to your device storage.
       </p>
       <button id="btnDownloadPdf" class="btn btn-primary" style="background:#0f172a;" onclick="triggerOfficialPdfDownload()">📥 Download Official A4 PDF Report</button>
       <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
     </div>
   </div>
 
-  <!-- TAB 6: PROFILE & CONFIGURATION -->
+  <!-- TAB 6: PROFILE -->
   <div id="tab_settings" style="display: none;">
     <h4 style="margin-bottom: 10px;">Athlete Profile & Credentials</h4>
     
@@ -747,9 +769,6 @@
   </div>
 
   <script>
-    // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS)
-    // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
     db.version(1).stores({
       workouts: "++id, &strava_id, ride_number, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
@@ -804,7 +823,7 @@
     }
 
     // --------------------------------------------------------
-    // 2. CAPACITOR DEEP-LINK INTERCEPTOR
+    // CAPACITOR DEEP LINK
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -894,7 +913,7 @@
     }
 
     // --------------------------------------------------------
-    // 3. FEED TAB (RIDES ONLY)
+    // FEED TAB
     // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
@@ -923,7 +942,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (0 TOKENS ON RE-OPEN)
+    // IN-SESSION DETAIL (ZERO AUTOMATIC CALLS)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1000,14 +1019,24 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // Check local storage: 0 tokens if already analyzed
+      // Check debrief status badge
       const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
-      if (!hasCoach || currentWorkout.debrief_stale) {
-        // Debrief ONLY this specific ride
-        await runSingleRideDebrief(currentWorkout);
+      const badgeDiv = document.getElementById("det_status_badge");
+      const actionBox = document.getElementById("sessionActionBox");
+
+      if (!hasCoach) {
+        badgeDiv.innerHTML = `<span class="status-badge badge-unreviewed">🟡 Needs Review</span>`;
+        actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Analyze Ride ${currentWorkout.ride_number} with AI Coach</button>`;
+      } else if (currentWorkout.debrief_stale) {
+        badgeDiv.innerHTML = `<span class="status-badge badge-stale">🟠 Context Update Available</span>`;
+        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate Ride ${currentWorkout.ride_number} (New Prior Notes Added)</button>`;
+      } else {
+        badgeDiv.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+        actionBox.innerHTML = "";
       }
+
       renderChatThread();
     }
 
@@ -1087,7 +1116,6 @@
       return res;
     }
 
-    // In-Ride Plotly: Full touch hover numbers enabled
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
@@ -1200,7 +1228,7 @@
         container.innerHTML = `
           <div class="chat-bubble chat-coach">
             <div class="chat-sender">AI Coach</div>
-            Tap reply below to message coach.
+            Tap the button above to generate a debrief, or message coach below.
           </div>
         `;
         return;
@@ -1215,26 +1243,38 @@
     }
 
     // --------------------------------------------------------
-    // SINGLE RIDE DEBRIEF (ZERO LOOPS, PREVENTS BURST FLOODING)
+    // SINGLE-SHOT RIDE DEBRIEF (MANUAL ONLY, FEEDS ALL PRIOR CONTEXT)
     // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
-      if (!navigator.onLine) return;
+      if (!navigator.onLine) { alert("Connect to internet to run AI debrief."); return; }
       const key = await getConfig("gemini_api_key");
-      if (!key) return;
+      if (!key) { alert("Please save your Gemini Key in Profile."); return; }
 
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      // Get prior rides up to this ride to provide comparative context
+      // 1. Gather all earlier rides up to this ride
       const priorRides = await db.workouts
         .where('ride_number').below(targetRide.ride_number)
         .sortBy('ride_number');
 
-      const priorContinuum = priorRides.map(p => 
-        `• Ride ${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km} km, ${p.avg_speed_kmh} km/h, ${p.avg_hr || '--'} bpm, ${p.avg_power_w || '--'} W, ${p.elevation_gain_m} m asc`
-      ).join('\n');
+      // 2. Extract past takeaways & comments from earlier debriefs
+      let priorContinuum = "";
+      for (const p of priorRides) {
+        const coachMsg = await db.threads.where({ ride_number: p.ride_number, role: 'coach' }).first();
+        const userMsg = await db.threads.where({ ride_number: p.ride_number, role: 'athlete' }).toArray();
+        const userNotes = userMsg.map(u => u.message).join(' | ');
 
-      const athleteNotes = (await db.threads.where("ride_number").equals(targetRide.ride_number).toArray())
+        priorContinuum += `\n• Ride ${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.avg_power_w || '--'}W, ${p.elevation_gain_m}m asc.`;
+        if (coachMsg) {
+          priorContinuum += `\n  - Takeaway: ${coachMsg.message.slice(0, 160)}...`;
+        }
+        if (userNotes) {
+          priorContinuum += `\n  - Athlete Feedback: "${userNotes}"`;
+        }
+      }
+
+      const currentAthleteNotes = (await db.threads.where("ride_number").equals(targetRide.ride_number).toArray())
         .filter(t => t.role === "athlete")
         .map(t => t.message)
         .join(" | ");
@@ -1242,19 +1282,19 @@
       const prompt = `
 You are an expert cycling sports scientist coaching athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
 WORKOUT UNDER EVALUATION:
-- Session: ${targetRide.exercise_code}
+- Ride: ${targetRide.exercise_code}
 - Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
 - Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
 - Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
 
-PRIOR RIDES IN THIS SERIES (COMPARE DIRECTLY AGAINST THESE):
+FULL CHRONOLOGICAL CONTINUUM OF PRIOR RIDES (MUST COMPARE DIRECTLY AGAINST THESE):
 ${priorContinuum || "First baseline ride recorded."}
 
 ATHLETE SENSATIONS/NOTES ON THIS RIDE:
-${athleteNotes || "None recorded."}
+${currentAthleteNotes || "None recorded."}
 
 RULES:
-- Focus strictly on comparative biomechanics, cardiovascular drift, and torque efficiency against prior rides.
+- Focus strictly on comparative biomechanics, cardiovascular drift, aerobic decoupling, and torque efficiency against prior rides.
 - NO generic advice or tips.
 - NO LaTeX, formulas, or dollar signs. Use clean conversational English with units (km/h, W, bpm, m).
 `;
@@ -1268,6 +1308,9 @@ RULES:
         await db.threads.add({ ride_number: targetRide.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
         await db.workouts.update(targetRide.id, { debrief_stale: false });
         targetRide.debrief_stale = false;
+        
+        document.getElementById("sessionActionBox").innerHTML = "";
+        document.getElementById("det_status_badge").innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
         renderChatThread();
       }
     }
@@ -1281,6 +1324,7 @@ RULES:
       input.value = "";
       renderChatThread();
 
+      // Flag all downstream rides as stale so they show the orange update badge
       const downstream = await db.workouts.where('ride_number').above(currentWorkout.ride_number).toArray();
       for (const dw of downstream) {
         await db.workouts.update(dw.id, { debrief_stale: true });
@@ -1319,7 +1363,7 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
     }
 
     // --------------------------------------------------------
-    // 5. GLOBAL TELEMETRY GRAPHS (HORIZONTAL SWIPE SUPPORT)
+    // GLOBAL TELEMETRY GRAPHS
     // --------------------------------------------------------
     function setupGlobalMetricPills() {
       const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Elevation Ascent (m)", "Work (kJ)"];
@@ -1512,7 +1556,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // 6. COMPARE LAB
+    // COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
@@ -1619,7 +1663,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 7. CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB (Ride 1 -> 12)
+    // CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -1644,15 +1688,25 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
 
       for (const w of workouts) {
         const lastMsg = await db.threads.where("ride_number").equals(w.ride_number).reverse().first();
+        const hasCoach = lastMsg ? true : false;
+        const isStale = w.debrief_stale;
+
+        let badgeHtml = `<span class="status-badge badge-unreviewed">🟡 New</span>`;
+        if (hasCoach && isStale) badgeHtml = `<span class="status-badge badge-stale">🟠 Update</span>`;
+        else if (hasCoach) badgeHtml = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+
         html += `
           <div class="chat-row" onclick="openChatThread(${w.ride_number})">
             <div class="chat-avatar">🚴</div>
             <div class="chat-row-body">
               <div class="chat-row-top">
                 <span class="chat-contact-name">Ride ${w.ride_number}</span>
-                <span class="chat-timestamp">${w.date.slice(5, 10)}</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  ${badgeHtml}
+                  <span class="chat-timestamp">${w.date.slice(5, 10)}</span>
+                </div>
               </div>
-              <div class="chat-snippet">${lastMsg ? lastMsg.message.slice(0, 60) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_power_w} W`}</div>
+              <div class="chat-snippet">${lastMsg ? lastMsg.message.slice(0, 55) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_power_w} W`}</div>
             </div>
           </div>
         `;
@@ -1790,7 +1844,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS & NATIVE PDF NOTIFICATION DOWNLOAD
+    // REPORTS & NATIVE PDF NOTIFICATION DOWNLOAD
     // --------------------------------------------------------
     async function renderReports() {
       let workouts = await db.workouts.orderBy('ride_number').toArray();
@@ -1879,7 +1933,6 @@ RULES:
 
         let workouts = await db.workouts.orderBy('ride_number').toArray();
 
-        // 1. Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(252, 82, 0);
@@ -1892,7 +1945,6 @@ RULES:
 
         let startY = 30;
 
-        // 2. PR Box
         const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
         const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
         const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
@@ -1914,7 +1966,6 @@ RULES:
         });
         startY = doc.lastAutoTable.finalY + 8;
 
-        // 3. Executive Assessment
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
@@ -1929,7 +1980,6 @@ RULES:
         doc.text(splitText, 14, startY);
         startY += (splitText.length * 3.4) + 6;
 
-        // 4. Ledger Table
         const tableData = workouts.map(w => [
           `Ride ${w.ride_number}`,
           w.date.split(' ')[0],
@@ -1986,65 +2036,53 @@ RULES:
     }
 
     // --------------------------------------------------------
-    // 9. EXPONENTIAL BACKOFF & 3.8-PRIORITY API CLIENT
+    // STRICT SINGLE-SHOT API CLIENT (NO RETRY CASCADES)
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
-      const models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"];
+      // 1 single request. No loops, no background bursts.
+      const model = "gemini-3.8-flash";
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "x-goog-api-key": key
+          },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+        });
 
-      for (let mIdx = 0; mIdx < models.length; mIdx++) {
-        const model = models[mIdx];
-        let attempts = 0;
-
-        while (attempts < 2) {
-          attempts++;
-          try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-              method: "POST",
-              headers: { 
-                "Content-Type": "application/json",
-                "x-goog-api-key": key
-              },
-              body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-                return data.candidates[0].content.parts[0].text;
-              }
-            }
-
-            // If Overloaded/Busy (503 / 500) -> Wait 5s and retry 3.8
-            if (res.status === 503 || res.status === 500) {
-              console.warn(`${model} busy. Waiting 5 seconds before retry...`);
-              await new Promise(r => setTimeout(r, 5000));
-              continue;
-            }
-
-            // If Quota Exceeded (429) -> Parse retry delay, wait, and retry 3.8
-            if (res.status === 429) {
-              const errData = await res.json().catch(() => ({}));
-              const msg = errData.error?.message || "";
-              
-              // Extract exact retry seconds if Google provides it (e.g. "retry in 13.34s")
-              const match = msg.match(/retry in (\d+(\.\d+)?)s/);
-              let waitSec = match ? Math.ceil(parseFloat(match[1])) + 2 : 15;
-              
-              alert(`API Cooldown: Rate limit reached.\nPausing for ${waitSec}s to protect quota before retrying ${model}...`);
-              await new Promise(r => setTimeout(r, waitSec * 1000));
-              continue; // Retry same model (3.8)
-            }
-
-            // Other unrecoverable errors (e.g., 400 Bad Request)
-            break;
-          } catch (e) {
-            console.warn(`${model} connection error:`, e.message);
-            await new Promise(r => setTimeout(r, 4000));
+        if (res.ok) {
+          const data = await res.json();
+          if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+            return data.candidates[0].content.parts[0].text;
           }
         }
+
+        if (res.status === 429) {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData.error?.message || "";
+          const match = msg.match(/retry in (\d+(\.\d+)?)s/);
+          const waitSec = match ? Math.ceil(parseFloat(match[1])) : 60;
+          alert(`Rate Limit Reached (Free Tier 20 RPM).\nPlease wait ${waitSec}s before tapping again.`);
+          return null;
+        }
+
+        // Single fallback if 3.8 is busy
+        if (res.status === 503 || res.status === 500) {
+          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+          });
+          if (fallbackRes.ok) {
+            const fbData = await fallbackRes.json();
+            return fbData.candidates[0].content.parts[0].text;
+          }
+        }
+      } catch (e) {
+        console.warn("Network error:", e.message);
       }
 
-      alert("Could not reach Gemini API after retries. Please check your internet or API key.");
       return null;
     }
 
