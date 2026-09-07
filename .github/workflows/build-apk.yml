@@ -32,7 +32,6 @@ jobs:
         run: |
           npx cap add android || true
           npx cap sync android
-          # Inject aicoach:// scheme into AndroidManifest.xml
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if grep -q "aicoach" "$MANIFEST"; then
             echo "Deep link scheme already present"
@@ -42,7 +41,7 @@ jobs:
                 <action android:name="android.intent.action.VIEW" />\
                 <category android:name="android.intent.category.DEFAULT" />\
                 <category android:name="android.intent.category.BROWSABLE" />\
-                <data android:scheme="aicoach" android:host="auth" />\
+                <data android:scheme="aicoach" android:host="aicoach.app" />\
             </intent-filter>' "$MANIFEST"
           fi
 
