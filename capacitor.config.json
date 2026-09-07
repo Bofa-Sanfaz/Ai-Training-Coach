@@ -1,6 +1,6 @@
 {
-  "appId": "com.aicoach.telemetry",
-  "appName": "AI Coach",
+  "appId": "com.ridepartner.telemetry",
+  "appName": "Ride Partner",
   "webDir": "www",
   "server": {
     "androidScheme": "https"
