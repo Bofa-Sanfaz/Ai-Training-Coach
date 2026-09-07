@@ -1,0 +1,11 @@
+{
+  "appId": "com.aicoach.telemetry",
+  "appName": "AI Coach",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#f8fafc"
+  }
+}
