@@ -346,7 +346,6 @@
       border-color: #0f172a; 
     }
 
-    /* Dual In-Ride Status Bars */
     .stream-telemetry-banner {
       background: #0f172a;
       color: #f8fafc;
@@ -468,7 +467,6 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* WhatsApp Style Messaging Hub */
     .whatsapp-wrap {
       display: flex;
       flex-direction: column;
@@ -520,28 +518,6 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    /* In-App Direct PDF Auto-Viewer Modal */
-    .report-modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(15, 23, 42, 0.90);
-      z-index: 1000;
-      padding: 8px;
-      overflow-y: auto;
-    }
-    .report-sheet {
-      background: #ffffff;
-      border-radius: 12px;
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 14px;
-      box-shadow: 0 4px 25px rgba(0,0,0,0.4);
     }
   </style>
 </head>
@@ -598,6 +574,7 @@
     <div class="pill-rack" id="metricPills"></div>
     <div id="plotlyDetailChart" style="width:100%; height:320px;"></div>
 
+    <!-- Dual In-Ride Status Bars -->
     <div class="stream-telemetry-banner" id="det_stream_banner">
       <div class="stream-line">
         <span id="banner_line1_l">⏱ Time: -- min</span>
@@ -612,7 +589,7 @@
     <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Coach & Athlete Debrief</h4>
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>AI Coach is analyzing workout strain & fatigue...</span>
+      <span>Analyzing ride against seasonal history...</span>
     </div>
     <div class="chat-container" id="chatThread"></div>
 
@@ -622,16 +599,16 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (HORIZONTAL SWIPE SUPPORT) -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
   <div id="tab_graphs" style="display: none;">
     <div class="filter-strip">
-      <div class="filter-btn active" onclick="setGraphSportFilter('All', this)">All Activities</div>
-      <div class="filter-btn" onclick="setGraphSportFilter('Ride', this)">Rides Only</div>
+      <div class="filter-btn" onclick="setGraphSportFilter('All', this)">All Activities</div>
+      <div class="filter-btn active" onclick="setGraphSportFilter('Ride', this)">Rides Only</div>
       <div class="filter-btn" onclick="setGraphSportFilter('Run', this)">Runs Only</div>
     </div>
     <div class="pill-rack" id="globalMetricPills"></div>
 
-    <!-- Scrollable container so 12+ rides are never cut off -->
+    <!-- Scrollable container so all rides are reachable via swipe -->
     <div style="width:100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 10px; background:#fff; margin-bottom:8px;">
       <div id="plotlyGlobalChart" style="min-height:330px;"></div>
     </div>
@@ -642,7 +619,7 @@
         <span id="global_banner_r">Volume: --</span>
       </div>
       <div class="stream-line" style="margin-top: 4px; color: #94a3b8;">
-        <span id="global_banner_sub">Swipe left/right on graph to view all rides. Touch to scrub numbers.</span>
+        <span id="global_banner_sub">Swipe left/right on graph to view all sessions. Touch to scrub numbers.</span>
       </div>
     </div>
 
@@ -676,7 +653,7 @@
     
     <div id="compareLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>AI Coach is computing biomechanical differences...</span>
+      <span>Computing biomechanical differences...</span>
     </div>
 
     <div id="compareAIBox" class="chat-bubble chat-coach" style="display: none; margin-top: 8px;"></div>
@@ -737,19 +714,8 @@
 
     <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
     
-    <button class="btn btn-primary" style="background:#0f172a; margin-top:8px;" onclick="generateAndAutoOpenPdf()">📄 Generate & Auto-Open PDF Report</button>
-    <div id="pdfDownloadStatus" style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-top:4px;"></div>
-  </div>
-
-  <!-- FULL-SCREEN INTERACTIVE PDF MODAL -->
-  <div id="reportModal" class="report-modal">
-    <div class="report-sheet">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <button class="btn btn-secondary btn-small" onclick="closeReportModal()">✕ Close Viewer</button>
-        <button class="btn btn-primary btn-small" onclick="downloadActualPdfFile()">📥 Save PDF to Phone</button>
-      </div>
-      <div id="modalReportContent"></div>
-    </div>
+    <button class="btn btn-primary" style="background:#0f172a; margin-top:8px;" onclick="downloadRealPdfToDevice()">📥 Download PDF File</button>
+    <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
   </div>
 
   <!-- TAB 6: SETTINGS -->
@@ -797,10 +763,10 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS) - VERSION 7
+    // 1. DATABASE SCHEMA (DEXIE.JS) - VERSION 8
     // --------------------------------------------------------
     const db = new Dexie("AICoachVault");
-    db.version(7).stores({
+    db.version(8).stores({
       workouts: "++id, &strava_id, exercise_code, date, sport_category, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
       streams: "strava_id, stream_data",
       threads: "++id, workout_code, role, message, created_at",
@@ -813,7 +779,7 @@
     let currentWorkout = null;
     let activeStream = null;
     let activeFilter = 'All';
-    let activeGraphSportFilter = 'All';
+    let activeGraphSportFilter = 'Ride'; // Default to Rides Only for clean view
     let reportTimeFilter = '7d';
     let reportSportFilter = 'All';
     let activeChatStreamKey = 'MASTER';
@@ -835,7 +801,6 @@
     window.addEventListener('offline', checkNetwork);
     checkNetwork();
 
-    // Clean conversational English filter (Bans raw LaTeX/formulas)
     function cleanAiText(raw) {
       if (!raw) return "";
       let clean = raw
@@ -1009,7 +974,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (CLEAN TICKS, ZERO TOKEN RE-OPENS)
+    // 4. IN-SESSION DETAIL (FAST, 0 TOKENS ON REOPEN)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1109,7 +1074,7 @@
 
       if (!hasCoach || currentWorkout.debrief_stale) {
         if (currentWorkout.sport_category === 'Ride') {
-          await runSequentialRideDebrief(currentWorkout);
+          await runComparativeRideDebrief(currentWorkout);
         }
       }
       renderChatThread();
@@ -1150,6 +1115,7 @@
       return res;
     }
 
+    // Dynamic Axis-Safe Plotly Rendering: Never delete chart on metric toggle
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
@@ -1165,7 +1131,10 @@
       const watts = activeStream.watts ? activeStream.watts.data : [];
 
       const traces = [];
-      let hasSecondary = false;
+
+      // Always assign axes based on what's currently active so Plotly never breaks
+      let primaryUnit = null;
+      let secondaryUnit = null;
 
       if (selectedMetrics.includes("Elevation (m)") && alts.length) {
         traces.push({ 
@@ -1186,8 +1155,10 @@
           y: hrs, 
           name: 'Heart Rate', 
           type: 'scatter', 
+          yaxis: 'y',
           line: { color: '#ef4444', width: 2 } 
         });
+        primaryUnit = 'bpm';
       }
 
       if (selectedMetrics.includes("Power (Watts)") && (watts.length || currentWorkout.avg_power_w > 0)) {
@@ -1196,31 +1167,34 @@
           y: watts.length ? watts : times.map(() => currentWorkout.avg_power_w), 
           name: 'Power (W)', 
           type: 'scatter', 
+          yaxis: primaryUnit ? 'y' : 'y',
           line: { color: '#fc5200', width: 2 } 
         });
+        if (!primaryUnit) primaryUnit = 'W';
       }
 
       if (selectedMetrics.includes("Speed (km/h)") && speeds.length) {
-        hasSecondary = true;
+        const useY2 = (primaryUnit !== null);
         traces.push({ 
           x: times, 
           y: speeds, 
           name: 'Speed (km/h)', 
-          yaxis: 'y2', 
+          yaxis: useY2 ? 'y2' : 'y', 
           type: 'scatter', 
           line: { color: '#2563eb', width: 2 } 
         });
+        if (useY2) secondaryUnit = 'km/h';
       }
 
       const layout = {
-        margin: { l: 25, r: 25, t: 10, b: 25 },
+        margin: { l: 30, r: 30, t: 10, b: 25 },
         template: 'plotly_white',
         legend: { orientation: 'h', y: 1.15, x: 0 },
         dragmode: false,
         hovermode: 'x unified',
         xaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '' },
-        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', range: [100, 205], dtick: 20 },
-        yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', range: [0, 42], dtick: 5 } : undefined,
+        yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', dtick: 20 },
+        yaxis2: secondaryUnit ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', dtick: 5, range: [0, 42] } : undefined,
         yaxis3: { overlaying: 'y', showgrid: false, showticklabels: false, range: [0, Math.max(...alts, 50) * 3] }
       };
 
@@ -1253,7 +1227,7 @@
         container.innerHTML = `
           <div class="chat-bubble chat-coach">
             <div class="chat-sender">AI Coach</div>
-            Tap reply below to discuss this workout.
+            Tap reply below to analyze this workout.
           </div>
         `;
         return;
@@ -1268,9 +1242,9 @@
     }
 
     // --------------------------------------------------------
-    // STRICT CHRONOLOGICAL RIDE-BY-RIDE COMPARATIVE ENGINE
+    // FAST DIRECT COMPARATIVE DEBRIEF (1 CALL ONLY, FULL PRIOR DATA)
     // --------------------------------------------------------
-    async function runSequentialRideDebrief(targetRide) {
+    async function runComparativeRideDebrief(targetRide) {
       if (!navigator.onLine) return;
       const key = await getConfig("gemini_api_key");
       if (!key) return;
@@ -1278,7 +1252,7 @@
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      // Fetch all prior rides in chronological order to build comparative continuum
+      // Fetch prior rides only (ignoring runs completely)
       const priorRides = await db.workouts
         .where('sport_category').equals('Ride')
         .filter(w => w.date < targetRide.date)
@@ -1288,7 +1262,6 @@
         `• ${p.exercise_code.split('-')[0].trim()} (${p.date.slice(5,10)}): ${p.distance_km} km, ${p.avg_speed_kmh} km/h, ${p.avg_hr || '--'} bpm, ${p.avg_power_w || '--'} W, ${p.elevation_gain_m} m asc`
       ).join('\n');
 
-      // Grab user's specific notes on this ride
       const athleteNotes = (await db.threads.where("workout_code").equals(targetRide.exercise_code).toArray())
         .filter(t => t.role === "athlete")
         .map(t => t.message)
@@ -1302,17 +1275,17 @@ WORKOUT UNDER EVALUATION:
 - Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
 - Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
 
-FULL CHRONOLOGICAL CONTINUUM OF PRIOR RIDES:
+FULL CHRONOLOGICAL CONTINUUM OF PRIOR RIDES (MUST COMPARE DIRECTLY AGAINST THESE):
 ${priorSummaryLedger || "First ride recorded in series."}
 
 ATHLETE SENSATIONS/NOTES:
 ${athleteNotes || "None recorded."}
 
-CRITICAL INSTRUCTIONS:
-- DO NOT provide generic training suggestions, tips, or unsolicited advice.
-- Focus strictly on deep comparative analysis, cardiovascular drift, aerobic decoupling, and torque vs cadence under athlete mass.
-- Compare this session directly against baseline rides and recent workloads across the timeline.
-- DO NOT use LaTeX, math symbols, dollar signs, or formulas like $\\text{...}$. Use clean conversational English with units (km/h, W, bpm, m).
+CRITICAL RULES:
+- DO NOT provide generic tips, coaching suggestions, or unsolicited recovery advice.
+- Focus purely on deep comparative analysis, cardiovascular drift, aerobic decoupling, and torque vs cadence under athlete mass.
+- Directly contrast metrics of this session against key earlier rides (e.g. Ride 002 baseline, Ride 010 high power, etc.).
+- DO NOT use LaTeX, formulas, or dollar signs ($). Use clean conversational English with units (km/h, W, bpm, m).
 `;
 
       document.getElementById("sessionLoadingBanner").style.display = "flex";
@@ -1415,28 +1388,31 @@ RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic
       });
 
       const traces = [];
-      let hasSecondary = false;
+      let primaryUnit = null;
+      let secondaryUnit = null;
 
       const configs = {
-        "Power Output (Watts)": { y: workouts.map(w => w.avg_power_w || null), color: "#fc5200", unit: "W", secondary: false },
-        "Speed (km/h)": { y: workouts.map(w => w.avg_speed_kmh), color: "#2563eb", unit: "km/h", secondary: true },
-        "Heart Rate (bpm)": { y: workouts.map(w => w.avg_hr || null), color: "#ef4444", unit: "bpm", secondary: false },
-        "Elevation Ascent (m)": { y: workouts.map(w => w.elevation_gain_m), color: "#64748b", unit: "m", secondary: true },
-        "Work (kJ)": { y: workouts.map(w => w.kilojoules || null), color: "#10b981", unit: "kJ", secondary: false }
+        "Power Output (Watts)": { y: workouts.map(w => w.avg_power_w || null), color: "#fc5200", unit: "W" },
+        "Speed (km/h)": { y: workouts.map(w => w.avg_speed_kmh), color: "#2563eb", unit: "km/h" },
+        "Heart Rate (bpm)": { y: workouts.map(w => w.avg_hr || null), color: "#ef4444", unit: "bpm" },
+        "Elevation Ascent (m)": { y: workouts.map(w => w.elevation_gain_m), color: "#64748b", unit: "m" },
+        "Work (kJ)": { y: workouts.map(w => w.kilojoules || null), color: "#10b981", unit: "kJ" }
       };
 
       for (const m of globalSelectedMetrics) {
         const cfg = configs[m];
-        if (cfg.secondary) hasSecondary = true;
+        const isSecondary = (primaryUnit !== null);
         traces.push({
           x: xLabels,
           y: cfg.y,
           name: m,
-          yaxis: cfg.secondary ? 'y2' : 'y',
+          yaxis: isSecondary ? 'y2' : 'y',
           type: 'scatter',
           mode: 'lines+markers',
           line: { color: cfg.color, width: 2.5 }
         });
+        if (!primaryUnit) primaryUnit = cfg.unit;
+        else if (isSecondary) secondaryUnit = cfg.unit;
       }
 
       const totalDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
@@ -1444,7 +1420,6 @@ RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic
       document.getElementById("global_banner_l").textContent = `Macro Trajectory: ${workouts.length} Sessions`;
       document.getElementById("global_banner_r").textContent = `Volume: ${totalDist} km | ${totalAsc} m Asc`;
 
-      // Dynamic width ensures no compression; swipe to view all rides
       const dynamicWidth = Math.max(window.innerWidth - 24, workouts.length * 52);
 
       const layout = {
@@ -1456,7 +1431,7 @@ RULES: Clean plain English. NO LaTeX. Focus on comparative analysis, not generic
         hovermode: 'x unified',
         xaxis: { fixedrange: true, tickangle: 0, showgrid: true, gridcolor: '#f1f5f9', title: '' },
         yaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '', dtick: 20 },
-        yaxis2: hasSecondary ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', dtick: 5, range: [0, 42] } : undefined
+        yaxis2: secondaryUnit ? { overlaying: 'y', side: 'right', fixedrange: true, showgrid: false, title: '', dtick: 5, range: [0, 42] } : undefined
       };
 
       const config = { responsive: false, displayModeBar: false, scrollZoom: false, staticPlot: false };
@@ -1841,7 +1816,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS & AUTO-OPENING FULL A4 PDF
+    // 8. REPORTS & REAL ANDROID PDF FILE WRITING
     // --------------------------------------------------------
     async function renderReports() {
       let workouts = await db.workouts.orderBy('date').toArray();
@@ -1909,7 +1884,7 @@ ${qualitativeNotes || "No specific complaints."}
 RULES:
 - Clean English only.
 - DO NOT use LaTeX, dollar signs, or formulas like $\\text{...}$.
-- Use simple units (km/h, W, bpm). Focus strictly on comparative evaluation.
+- Use simple units (km/h, W, bpm). Focus strictly on comparative evaluation across sessions.
 `;
       document.getElementById("reportLoadingBanner").style.display = "flex";
       const report = await callGeminiAPI(key, prompt);
@@ -1923,98 +1898,10 @@ RULES:
       }
     }
 
-    // Direct auto-opening A4 PDF previewer
-    async function generateAndAutoOpenPdf() {
-      let workouts = await db.workouts.orderBy('date').toArray();
-      if (reportSportFilter !== 'All') workouts = workouts.filter(w => w.sport_category === reportSportFilter);
-      if (reportTimeFilter !== 'all') {
-        const days = reportTimeFilter === '7d' ? 7 : 30;
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        workouts = workouts.filter(w => w.date >= cutoff.toISOString().slice(0, 10));
-      }
-
-      let latestReport = await db.reports.get(1);
-      if (!latestReport && navigator.onLine) {
-        await generateExecutiveReport();
-        latestReport = await db.reports.get(1);
-      }
-
-      openReportModal();
-    }
-
-    async function openReportModal() {
-      let workouts = await db.workouts.orderBy('date').toArray();
-      if (reportSportFilter !== 'All') workouts = workouts.filter(w => w.sport_category === reportSportFilter);
-      if (reportTimeFilter !== 'all') {
-        const days = reportTimeFilter === '7d' ? 7 : 30;
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        workouts = workouts.filter(w => w.date >= cutoff.toISOString().slice(0, 10));
-      }
-
-      const latestReport = await db.reports.get(1);
-      const container = document.getElementById("modalReportContent");
-
-      const maxDist = workouts.length ? workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km : 0;
-      const maxSpd = workouts.length ? workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh : 0;
-      const maxPwr = workouts.length ? workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w : 0;
-      const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
-
-      container.innerHTML = `
-        <div style="border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 12px;">
-          <h2 style="color:var(--primary); font-size:1.25rem;">AI COACH — EXECUTIVE PERFORMANCE REPORT</h2>
-          <p style="font-size:0.75rem; color:var(--text-muted);">Athlete: Mustafa (190 cm, 114.8 kg) | Scope: ${reportTimeFilter.toUpperCase()} (${reportSportFilter}) | Date: ${new Date().toLocaleDateString()}</p>
-        </div>
-
-        <h4 style="font-size:0.85rem; margin-bottom:6px; color:#1e293b;">Key Period Bests & Volume</h4>
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:12px; font-size:0.75rem; text-align:center;">
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxDist} km</b><br/><span style="color:#64748b; font-size:0.6rem;">MAX DIST</span></div>
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxSpd} km/h</b><br/><span style="color:#64748b; font-size:0.6rem;">PEAK SPEED</span></div>
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxPwr} W</b><br/><span style="color:#64748b; font-size:0.6rem;">PEAK POWER</span></div>
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${Math.round(totWork)} kJ</b><br/><span style="color:#64748b; font-size:0.6rem;">TOTAL WORK</span></div>
-        </div>
-
-        ${latestReport ? `
-          <div style="background:#f8fafc; border:1px solid var(--border); border-left:4px solid var(--primary); padding:12px; border-radius:8px; margin-bottom:14px; font-size:0.84rem; line-height:1.55;">
-            <h3 style="color:#0f172a; margin-bottom:6px; font-size:0.92rem;">Executive Coaching Assessment</h3>
-            ${cleanAiText(latestReport.analysis_text)}
-          </div>
-        ` : ''}
-
-        <h3 style="font-size:0.90rem; margin:10px 0 6px 0;">Itemized Session Ledger</h3>
-        <table class="delta-table" style="font-size:0.74rem;">
-          <thead>
-            <tr><th>Session</th><th>Date</th><th>Dist</th><th>Time</th><th>Speed</th><th>Power</th><th>HR</th><th>Asc</th></tr>
-          </thead>
-          <tbody>
-            ${workouts.map(w => `
-              <tr>
-                <td><b>${w.exercise_code.split('-')[0].trim()}</b></td>
-                <td>${w.date.split(' ')[0]}</td>
-                <td>${w.distance_km} km</td>
-                <td>${w.duration_str}</td>
-                <td>${w.avg_speed_kmh} km/h</td>
-                <td>${w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--'}</td>
-                <td>${w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--'}</td>
-                <td>${w.elevation_gain_m} m</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-
-      document.getElementById("reportModal").style.display = "block";
-    }
-
-    function closeReportModal() {
-      document.getElementById("reportModal").style.display = "none";
-    }
-
-    // Direct Base64 Anchor download for saving official PDF files to Android storage
-    async function downloadActualPdfFile() {
+    // Direct Native PDF Generation & File Save (Android Native Filesystem Supported)
+    async function downloadRealPdfToDevice() {
       const statusDiv = document.getElementById("pdfDownloadStatus");
-      statusDiv.textContent = "Generating official PDF...";
+      statusDiv.textContent = "Compiling official PDF file...";
 
       try {
         const { jsPDF } = window.jspdf;
@@ -2031,6 +1918,7 @@ RULES:
 
         const latestReport = await db.reports.get(1);
 
+        // Header Title
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(252, 82, 0);
@@ -2043,6 +1931,31 @@ RULES:
 
         let startY = 30;
 
+        // Personal Records Box
+        if (workouts.length) {
+          const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
+          const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
+          const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
+          const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9.5);
+          doc.setTextColor(15, 23, 42);
+          doc.text("Personal Records & Period Volume Scorecard", 14, startY);
+          startY += 4;
+
+          doc.autoTable({
+            head: [['Peak Distance', 'Top Speed', 'Peak Power', 'Total Work Done']],
+            body: [[`${maxDist} km`, `${maxSpd} km/h`, `${maxPwr} W`, `${Math.round(totWork)} kJ`]],
+            startY: startY,
+            theme: 'plain',
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [241, 245, 249], textColor: [100, 116, 139], fontStyle: 'bold' }
+          });
+          startY = doc.lastAutoTable.finalY + 8;
+        }
+
+        // Executive Narrative
         if (latestReport && latestReport.analysis_text) {
           doc.setFont("helvetica", "bold");
           doc.setFontSize(10.5);
@@ -2059,6 +1972,7 @@ RULES:
           startY += (splitText.length * 3.4) + 6;
         }
 
+        // Ledger Table
         const tableData = workouts.map(w => [
           w.exercise_code.split('-')[0].trim(),
           w.date.split(' ')[0],
@@ -2080,7 +1994,22 @@ RULES:
         });
 
         const fileName = `Mustafa_AI_Coach_${reportTimeFilter}_${reportSportFilter}.pdf`;
-        const pdfDataUri = doc.output('datauristring');
+        const base64Data = doc.output('datauristring').split(',')[1];
+
+        // 1. Try Native Capacitor Filesystem Write to Documents directory
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+          await window.Capacitor.Plugins.Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: 'DOCUMENTS'
+          });
+          statusDiv.innerHTML = `✓ Saved directly to phone: <b>Documents/${fileName}</b>`;
+          alert(`PDF successfully saved to your phone's Documents folder:\n${fileName}`);
+          return;
+        }
+
+        // 2. Fallback Direct Data-URI Anchor
+        const pdfDataUri = `data:application/pdf;base64,${base64Data}`;
         const dlLink = document.createElement('a');
         dlLink.href = pdfDataUri;
         dlLink.download = fileName;
@@ -2088,9 +2017,9 @@ RULES:
         dlLink.click();
         document.body.removeChild(dlLink);
 
-        statusDiv.innerHTML = `✓ Download complete: <b>${fileName}</b>.`;
+        statusDiv.innerHTML = `✓ Download initiated: <b>${fileName}</b>`;
       } catch (err) {
-        statusDiv.textContent = "Download failed: " + err.message;
+        statusDiv.textContent = "Download error: " + err.message;
       }
     }
 
