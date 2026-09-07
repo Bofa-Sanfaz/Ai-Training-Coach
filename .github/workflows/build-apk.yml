@@ -32,6 +32,8 @@ jobs:
         run: |
           npx cap add android || true
           npx cap sync android
+          
+          # Ensure deep-link intent filter
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if grep -q "aicoach" "$MANIFEST"; then
             echo "Deep link scheme already present"
@@ -45,6 +47,11 @@ jobs:
             </intent-filter>' "$MANIFEST"
           fi
 
+          # Update Native App Name
+          STRINGS="android/app/src/main/res/values/strings.xml"
+          sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner<\/string>/g' "$STRINGS"
+          sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner<\/string>/g' "$STRINGS"
+
       - name: Build Android Debug APK
         run: |
           cd android
@@ -54,5 +61,5 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI_Coach_Release
+          name: Ride_Partner_Release
           path: android/app/build/outputs/apk/debug/app-debug.apk
