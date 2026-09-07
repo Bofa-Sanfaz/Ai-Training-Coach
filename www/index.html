@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Apex Velo — AI MTB Coach</title>
+  <title>Ride Partner</title>
   
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -14,7 +14,6 @@
     :root {
       --primary: #fc5200;
       --primary-dark: #cc4200;
-      --accent-cyan: #06b6d4;
       --bg: #f8fafc;
       --card-bg: #ffffff;
       --text-main: #0f172a;
@@ -52,7 +51,6 @@
       align-items: center; 
       gap: 10px; 
     }
-    /* Sporty, Clean Aerodynamic Crest Logo */
     .brand-logo { 
       width: 36px; 
       height: 36px; 
@@ -65,11 +63,11 @@
     }
     .brand-logo svg { 
       fill: #ffffff; 
-      width: 20px; 
-      height: 20px; 
+      width: 22px; 
+      height: 22px; 
     }
     .brand-title { 
-      font-size: 1.30rem; 
+      font-size: 1.35rem; 
       font-weight: 900; 
       color: var(--primary); 
       letter-spacing: -0.5px; 
@@ -246,31 +244,42 @@
       color: var(--text-main); 
     }
 
-    .cardiac-card { 
-      background: #ffffff; 
-      border: 1px solid var(--border); 
-      border-radius: 9px; 
-      padding: 10px 12px; 
-      margin: 8px 0; 
+    /* 5-Zone Cardiac Distribution Chart */
+    .zone-chart-box {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 8px 0;
     }
-    .cardiac-head { 
-      display: flex; 
-      justify-content: space-between; 
-      font-size: 0.76rem; 
-      font-weight: 700; 
-      margin-bottom: 6px; 
+    .zone-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.74rem;
     }
-    .bar-bg { 
-      width: 100%; 
-      height: 7px; 
-      background: #e2e8f0; 
-      border-radius: 9999px; 
-      overflow: hidden; 
+    .zone-tag {
+      width: 70px;
+      font-weight: 700;
+      color: var(--text-muted);
     }
-    .bar-fill { 
-      height: 100%; 
-      background: linear-gradient(90deg, #16a34a, #eab308, #fc5200, #ef4444); 
-      border-radius: 9999px; 
+    .zone-bar-bg {
+      flex: 1;
+      height: 8px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .zone-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+    }
+    .zone-val {
+      width: 55px;
+      text-align: right;
+      font-weight: 800;
+      color: var(--text-main);
     }
 
     .delta-table { 
@@ -447,7 +456,7 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* WhatsApp-Style Chats Screen Layout */
+    /* Chronological WhatsApp-Style Hub */
     .whatsapp-wrap {
       display: flex;
       flex-direction: column;
@@ -501,26 +510,12 @@
       text-overflow: ellipsis;
     }
 
-    /* In-App Direct Document Viewer Modal */
-    .report-modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(15, 23, 42, 0.88);
-      z-index: 1000;
-      padding: 10px;
-      overflow-y: auto;
-    }
-    .report-sheet {
+    .report-card {
       background: #ffffff;
+      border: 1px solid var(--border);
       border-radius: 12px;
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 18px;
-      box-shadow: 0 4px 25px rgba(0,0,0,0.4);
+      padding: 14px;
+      margin: 10px 0;
     }
   </style>
 </head>
@@ -528,11 +523,10 @@
 
   <div class="app-header">
     <div class="brand-wrap">
-      <!-- Sporty, Clean Aerodynamic Bike Crest Logo -->
       <div class="brand-logo">
         <svg viewBox="0 0 24 24"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1V9c-1.5 0-2.9-.6-4-1.6l-1.8-1.8c-.4-.4-.9-.6-1.4-.6-.6 0-1.1.2-1.5.6L6.5 9.4c-.4.4-.5.9-.5 1.4 0 .6.2 1.1.6 1.5l3.4 3.4v4.3h2v-5.1l-2.2-2.2 1-2.9zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
       </div>
-      <div class="brand-title">Apex Velo</div>
+      <div class="brand-title">Ride Partner</div>
     </div>
     <div id="networkStatus" class="network-pill status-online">● ONLINE</div>
   </div>
@@ -546,7 +540,7 @@
     <button class="tab-btn" onclick="switchTab('settings', this)">Profile</button>
   </div>
 
-  <!-- TAB 1: FEED (RIDES ONLY) -->
+  <!-- TAB 1: FEED (STRICTLY BIKES ONLY) -->
   <div id="tab_feed">
     <button class="btn btn-primary" onclick="syncStrava()">Sync Rides from Strava</button>
     <div id="feedList"></div>
@@ -561,10 +555,12 @@
     
     <div class="hero-grid" id="det_hero"></div>
 
-    <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Secondary Biometrics & Torque</h4>
+    <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Biometrics & Power Ratios</h4>
     <div class="telemetry-grid" id="det_secondary"></div>
 
-    <div class="cardiac-card" id="det_cardiac"></div>
+    <!-- 5-Zone Cardiac Distribution Bar Graph -->
+    <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Heart Rate Zone Distribution (202 bpm Max)</h4>
+    <div class="zone-chart-box" id="det_zone_bars"></div>
 
     <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Delta vs Last 5 Rides</h4>
     <div id="det_delta"></div>
@@ -603,7 +599,6 @@
     <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
 
-    <!-- Scrollable container so all 12+ rides are visible via swipe -->
     <div style="width:100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 10px; background:#fff; margin-bottom:8px;">
       <div id="plotlyGlobalChart" style="min-height:330px;"></div>
     </div>
@@ -681,33 +676,34 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS & IN-APP DOCUMENT VIEWER -->
+  <!-- TAB 5: REPORTS & LOCKED PDF GENERATOR -->
   <div id="tab_reports" style="display: none;">
     <h4 style="margin-bottom: 8px;">Executive Season Review</h4>
     
     <h4 style="margin-bottom: 8px;">All-Time Cycling Records (PR)</h4>
     <div class="telemetry-grid" id="pr_grid"></div>
     
-    <button class="btn btn-primary" style="margin-top: 12px;" onclick="generateExecutiveReport()">Synthesize Executive Review</button>
-    
-    <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
-      <div class="spinner-ring"></div>
-      <span>Synthesizing multi-week training review...</span>
+    <div class="report-card">
+      <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">1. Generate Executive AI Progression Review</h4>
+      <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+        To unlock the official A4 PDF report, compile the AI coaching progression audit below.
+      </p>
+      <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize AI Season Review</button>
+      
+      <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
+        <div class="spinner-ring"></div>
+        <span>Synthesizing multi-week training review...</span>
+      </div>
+      <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
     </div>
 
-    <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
-    
-    <button class="btn btn-primary" style="background:#0f172a; margin-top:8px;" onclick="openReportModal()">📄 View & Print Executive A4 Report</button>
-  </div>
-
-  <!-- FULL A4 DOCUMENT VIEWER MODAL -->
-  <div id="reportModal" class="report-modal">
-    <div class="report-sheet">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <button class="btn btn-secondary btn-small" onclick="closeReportModal()">✕ Close</button>
-        <button class="btn btn-primary btn-small" onclick="window.print()">🖨 Print / Export PDF</button>
-      </div>
-      <div id="modalReportContent"></div>
+    <div class="report-card">
+      <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">2. Official A4 PDF Document Download</h4>
+      <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+        Generates a complete multi-section A4 performance audit and triggers an immediate download notification to your phone.
+      </p>
+      <button id="btnDownloadPdf" class="btn btn-primary" style="background:#0f172a;" onclick="triggerOfficialPdfDownload()">📥 Download Official A4 PDF Report</button>
+      <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
     </div>
   </div>
 
@@ -756,13 +752,13 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS) - BIKES ONLY
+    // 1. DATABASE SCHEMA (DEXIE.JS) - BIKES ONLY WITH ride_number
     // --------------------------------------------------------
-    const db = new Dexie("ApexVeloDB");
+    const db = new Dexie("RidePartnerDB");
     db.version(1).stores({
-      workouts: "++id, &strava_id, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
+      workouts: "++id, &strava_id, ride_number, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
       streams: "strava_id, stream_data",
-      threads: "++id, workout_code, role, message, created_at",
+      threads: "++id, ride_number, role, message, created_at",
       master_chat: "++id, role, message, created_at",
       graph_threads: "++id, metric_key, role, message, created_at",
       reports: "id, ref_code, created_at, analysis_text",
@@ -931,7 +927,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (0 TOKENS ON RE-OPEN)
+    // 4. IN-SESSION DETAIL (5-ZONE DISTRIBUTION + NO RE-CALLS)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -967,25 +963,10 @@
         <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency (EF)</span><span class="telemetry-val">${efVal} W/bpm</span></div>
       `;
 
-      if (currentWorkout.avg_hr > 0) {
-        const pctMax = Math.min(100, Math.round((currentWorkout.avg_hr / 202) * 100));
-        let zoneDesc = "Zone 1 (Active Recovery)";
-        if (pctMax >= 60 && pctMax < 70) zoneDesc = "Zone 2 (Aerobic Base)";
-        else if (pctMax >= 70 && pctMax < 80) zoneDesc = "Zone 3 (Aerobic Power / Tempo)";
-        else if (pctMax >= 80 && pctMax < 90) zoneDesc = "Zone 4 (Lactate Threshold)";
-        else if (pctMax >= 90) zoneDesc = "Zone 5 (Anaerobic / Neuromuscular Redline)";
-
-        document.getElementById("det_cardiac").innerHTML = `
-          <div class="cardiac-head">
-            <span>Cardiac Load: ${currentWorkout.avg_hr} bpm (${pctMax}% of 202 bpm Max)</span>
-            <span style="color:var(--primary); font-weight:800;">${zoneDesc}</span>
-          </div>
-          <div class="bar-bg"><div class="bar-fill" style="width: ${pctMax}%;"></div></div>
-        `;
-        document.getElementById("det_cardiac").style.display = "block";
-      } else {
-        document.getElementById("det_cardiac").style.display = "none";
-      }
+      // 5-Zone Cardiac Distribution Bar Calculation (Max HR 202 bpm)
+      const cached = await db.streams.get(currentWorkout.strava_id);
+      activeStream = cached ? cached.stream_data : null;
+      renderCardiacZones(activeStream);
 
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
@@ -1021,19 +1002,59 @@
       document.getElementById("banner_line2_l").textContent = `⚡ Avg: ${currentWorkout.avg_speed_kmh} km/h`;
       document.getElementById("banner_line2_r").textContent = `❤️ HR: ${currentWorkout.avg_hr || '--'} bpm | ⚡ Power: ${currentWorkout.avg_power_w || '--'} W | ⛰ Elev: ${currentWorkout.elevation_gain_m} m`;
 
-      const cached = await db.streams.get(currentWorkout.strava_id);
-      activeStream = cached ? cached.stream_data : null;
       setupMetricPills();
       renderStreamPlotly();
 
       // Check local storage: 0 tokens if already analyzed
-      const existing = await db.threads.where("workout_code").equals(currentWorkout.exercise_code).toArray();
+      const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
       if (!hasCoach || currentWorkout.debrief_stale) {
         await runComparativeRideDebrief(currentWorkout);
       }
       renderChatThread();
+    }
+
+    function renderCardiacZones(stream) {
+      const container = document.getElementById("det_zone_bars");
+      if (!stream || !stream.heartrate || !stream.heartrate.data.length) {
+        container.innerHTML = "<div style='color:var(--text-muted); font-size:0.75rem;'>No continuous HR stream available for zone distribution.</div>";
+        return;
+      }
+
+      const hrs = stream.heartrate.data;
+      const totalPoints = hrs.length;
+      let z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0;
+
+      hrs.forEach(h => {
+        if (h < 121) z1++;
+        else if (h < 141) z2++;
+        else if (h < 162) z3++;
+        else if (h < 182) z4++;
+        else z5++;
+      });
+
+      const zones = [
+        { name: "Zone 1 (<121)", count: z1, color: "#94a3b8" },
+        { name: "Zone 2 (121-141)", count: z2, color: "#16a34a" },
+        { name: "Zone 3 (142-161)", count: z3, color: "#eab308" },
+        { name: "Zone 4 (162-181)", count: z4, color: "#fc5200" },
+        { name: "Zone 5 (182-202)", count: z5, color: "#ef4444" }
+      ];
+
+      container.innerHTML = zones.map(z => {
+        const pct = Math.round((z.count / totalPoints) * 100);
+        const mins = Math.round(z.count / 60);
+        return `
+          <div class="zone-row">
+            <span class="zone-tag">${z.name}</span>
+            <div class="zone-bar-bg">
+              <div class="zone-bar-fill" style="width:${pct}%; background:${z.color};"></div>
+            </div>
+            <span class="zone-val">${mins}m (${pct}%)</span>
+          </div>
+        `;
+      }).join('');
     }
 
     function setupMetricPills() {
@@ -1070,7 +1091,6 @@
       return res;
     }
 
-    // 0-100% Normalized Clean Scale: Eliminates multi-axis collisions
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
@@ -1087,7 +1107,6 @@
 
       const traces = [];
 
-      // Elevation Area
       if (selectedMetrics.includes("Elevation (m)") && alts.length) {
         const minA = Math.min(...alts);
         const maxA = Math.max(...alts) || 1;
@@ -1104,7 +1123,6 @@
         });
       }
 
-      // Heart Rate: Normalized 100-202 bpm -> 0-100%
       if (selectedMetrics.includes("Heart Rate (bpm)") && hrs.length) {
         const normHR = hrs.map(h => Math.max(0, Math.min(100, Math.round(((h - 100) / (202 - 100)) * 100))));
         traces.push({ 
@@ -1117,7 +1135,6 @@
         });
       }
 
-      // Power Output: Normalized 0-400W -> 0-100%
       if (selectedMetrics.includes("Power (Watts)") && (watts.length || currentWorkout.avg_power_w > 0)) {
         const srcW = watts.length ? watts : times.map(() => currentWorkout.avg_power_w);
         const normWatts = srcW.map(w => Math.min(100, Math.round((w / 400) * 100)));
@@ -1131,7 +1148,6 @@
         });
       }
 
-      // Speed: Normalized 0-45 km/h -> 0-100%
       if (selectedMetrics.includes("Speed (km/h)") && speeds.length) {
         const normSpd = speeds.map(s => Math.min(100, Math.round((s / 45) * 100)));
         traces.push({ 
@@ -1177,7 +1193,7 @@
 
     async function renderChatThread() {
       const container = document.getElementById("chatThread");
-      const messages = await db.threads.where("workout_code").equals(currentWorkout.exercise_code).toArray();
+      const messages = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
 
       if (messages.length === 0) {
         container.innerHTML = `
@@ -1198,7 +1214,7 @@
     }
 
     // --------------------------------------------------------
-    // FAST DIRECT COMPARATIVE DEBRIEF (1 CALL ONLY)
+    // STRICT CHRONOLOGICAL SEQUENTIAL CHAIN DEBRIEF ENGINE
     // --------------------------------------------------------
     async function runComparativeRideDebrief(targetRide) {
       if (!navigator.onLine) return;
@@ -1208,50 +1224,60 @@
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      const priorRides = await db.workouts
-        .where('date').below(targetRide.date)
-        .sortBy('date');
+      // Ensure all prior rides up to targetRide are debriefed in order (1 -> 2 -> 3)
+      const allRidesUpToTarget = await db.workouts
+        .where('ride_number').belowOrEqual(targetRide.ride_number)
+        .sortBy('ride_number');
 
-      const priorSummaryLedger = priorRides.map(p => 
-        `• ${p.exercise_code.split('-')[0].trim()} (${p.date.slice(5,10)}): ${p.distance_km} km, ${p.avg_speed_kmh} km/h, ${p.avg_hr || '--'} bpm, ${p.avg_power_w || '--'} W, ${p.elevation_gain_m} m asc`
-      ).join('\n');
+      let priorContinuum = "";
 
-      const athleteNotes = (await db.threads.where("workout_code").equals(targetRide.exercise_code).toArray())
-        .filter(t => t.role === "athlete")
-        .map(t => t.message)
-        .join(" | ");
+      for (const r of allRidesUpToTarget) {
+        const existing = await db.threads.where("ride_number").equals(r.ride_number).toArray();
+        const hasCoach = existing.some(t => t.role === 'coach');
 
-      const prompt = `
-You are an expert cycling physiologist analyzing athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
+        if (!hasCoach || r.debrief_stale) {
+          document.getElementById("sessionLoadingBanner").style.display = "flex";
+          document.getElementById("sessionLoadingBanner").querySelector("span").textContent = `Analyzing Ride ${r.ride_number} in chronological sequence...`;
+
+          const athleteNotes = existing.filter(t => t.role === "athlete").map(t => t.message).join(" | ");
+
+          const prompt = `
+You are an expert cycling sports scientist coaching athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
 WORKOUT UNDER EVALUATION:
-- Ride: ${targetRide.exercise_code}
-- Distance: ${targetRide.distance_km} km | Time: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
-- Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
-- Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
+- Session: ${r.exercise_code}
+- Distance: ${r.distance_km} km | Duration: ${r.duration_str} | Speed: Avg ${r.avg_speed_kmh} km/h, Max ${r.max_speed_kmh} km/h
+- Heart Rate: Avg ${r.avg_hr} bpm, Peak ${r.max_hr} bpm (Max HR benchmark: 202 bpm)
+- Mechanical Output: Avg ${r.avg_power_w} W, Work ${r.kilojoules} kJ, Ascent ${r.elevation_gain_m} m
 
-CHRONOLOGICAL TIMELINE OF ALL PRIOR RIDES:
-${priorSummaryLedger || "First ride recorded."}
+PRIOR SESSIONS IN THIS SERIES:
+${priorContinuum || "First baseline ride recorded."}
 
-ATHLETE SENSATIONS/NOTES:
+ATHLETE SENSATIONS/NOTES ON THIS RIDE:
 ${athleteNotes || "None recorded."}
 
 RULES:
-- Strictly comparative analysis: contrast efficiency, cardiac cost, and decoupling against earlier rides.
-- NO generic advice or tips. Factual sports-science analysis only.
-- NO LaTeX, dollar signs, or formulas. Use standard units (km/h, W, bpm, m).
+- Focus strictly on comparative biomechanics, cardiovascular drift, and torque efficiency against prior rides.
+- NO generic advice or tips.
+- NO LaTeX, formulas, or dollar signs. Use clean conversational English with units (km/h, W, bpm, m).
 `;
-
-      document.getElementById("sessionLoadingBanner").style.display = "flex";
-      const reply = await callGeminiAPI(key, prompt);
-      document.getElementById("sessionLoadingBanner").style.display = "none";
-
-      if (reply) {
-        await db.threads.where({ workout_code: targetRide.exercise_code, role: 'coach' }).delete();
-        await db.threads.add({ workout_code: targetRide.exercise_code, role: 'coach', message: reply, created_at: new Date().toISOString() });
-        await db.workouts.update(targetRide.id, { debrief_stale: false });
-        targetRide.debrief_stale = false;
-        renderChatThread();
+          const reply = await callGeminiAPI(key, prompt);
+          if (reply) {
+            await db.threads.where({ ride_number: r.ride_number, role: 'coach' }).delete();
+            await db.threads.add({ ride_number: r.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
+            await db.workouts.update(r.id, { debrief_stale: false });
+            r.debrief_stale = false;
+            priorContinuum += `\n• Ride ${r.ride_number}: ${r.distance_km}km, ${r.avg_speed_kmh}km/h, ${r.avg_hr}bpm, ${r.avg_power_w}W. Takeaway: ${reply.slice(0, 160)}...`;
+          }
+        } else {
+          const coachMsg = existing.find(t => t.role === 'coach');
+          if (coachMsg) {
+            priorContinuum += `\n• Ride ${r.ride_number}: ${r.distance_km}km, ${r.avg_speed_kmh}km/h, ${r.avg_hr}bpm, ${r.avg_power_w}W. Takeaway: ${coachMsg.message.slice(0, 160)}...`;
+          }
+        }
       }
+
+      document.getElementById("sessionLoadingBanner").style.display = "none";
+      renderChatThread();
     }
 
     async function sendAthleteReply() {
@@ -1259,27 +1285,25 @@ RULES:
       const text = input.value.trim();
       if (!text) return;
 
-      await db.threads.add({ workout_code: currentWorkout.exercise_code, role: 'athlete', message: text, created_at: new Date().toISOString() });
+      await db.threads.add({ ride_number: currentWorkout.ride_number, role: 'athlete', message: text, created_at: new Date().toISOString() });
       input.value = "";
       renderChatThread();
 
-      const downstreamWorkouts = await db.workouts
-        .where('date').above(currentWorkout.date)
-        .toArray();
-      for (const dw of downstreamWorkouts) {
+      const downstream = await db.workouts.where('ride_number').above(currentWorkout.ride_number).toArray();
+      for (const dw of downstream) {
         await db.workouts.update(dw.id, { debrief_stale: true });
       }
 
       if (navigator.onLine) {
         const key = await getConfig("gemini_api_key");
         if (key) {
-          const pastThreads = await db.threads.where("workout_code").equals(currentWorkout.exercise_code).toArray();
+          const pastThreads = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
           const dialogueContext = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
           const prompt = `
 You are Mustafa's personal cycling coach.
 ATHLETE: 190 cm, 114.8 kg, XC Mountain Bike.
-WORKOUT: ${currentWorkout.exercise_code} (${currentWorkout.distance_km} km, ${currentWorkout.avg_speed_kmh} km/h, ${currentWorkout.avg_hr} bpm, ${currentWorkout.avg_power_w} W).
+WORKOUT: Ride ${currentWorkout.ride_number} (${currentWorkout.distance_km} km, ${currentWorkout.avg_speed_kmh} km/h, ${currentWorkout.avg_hr} bpm, ${currentWorkout.avg_power_w} W).
 CONVERSATION:
 ${dialogueContext}
 
@@ -1290,7 +1314,7 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
           document.getElementById("sessionLoadingBanner").style.display = "none";
 
           if (aiResponse) {
-            await db.threads.add({ workout_code: currentWorkout.exercise_code, role: 'coach', message: aiResponse, created_at: new Date().toISOString() });
+            await db.threads.add({ ride_number: currentWorkout.ride_number, role: 'coach', message: aiResponse, created_at: new Date().toISOString() });
             renderChatThread();
           }
         }
@@ -1324,17 +1348,16 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
 
     async function renderGlobalGraphs() {
       setupGlobalMetricPills();
-      let workouts = await db.workouts.orderBy('date').toArray();
+      let workouts = await db.workouts.orderBy('ride_number').toArray();
 
       if (workouts.length < 2) {
-        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 rides to plot macro progression.</div>";
+        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 rides to plot progression.</div>";
         return;
       }
 
-      const xLabels = workouts.map(w => w.exercise_code.split('-')[0].trim().replace("Ride ", "R"));
+      const xLabels = workouts.map(w => `R${w.ride_number}`);
       const traces = [];
 
-      // Normalized 0-100% relative Effort values with exact hover text
       const metricConfigs = {
         "Power Output (Watts)": { 
           y: workouts.map(w => w.avg_power_w ? Math.min(100, Math.round((w.avg_power_w / 350) * 100)) : null), 
@@ -1438,7 +1461,7 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
       const key = await getConfig("gemini_api_key");
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
-      let workouts = await db.workouts.orderBy('date').toArray();
+      let workouts = await db.workouts.orderBy('ride_number').toArray();
       const summaryLogs = workouts.map(w => `${w.exercise_code}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join('\n');
 
       const prompt = `
@@ -1500,7 +1523,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     // 6. COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
-      const workouts = await db.workouts.orderBy('date').reverse().toArray();
+      const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
       const s1 = document.getElementById("comp_s1");
       const s2 = document.getElementById("comp_s2");
       const s3 = document.getElementById("comp_s3");
@@ -1604,15 +1627,15 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 7. CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB
+    // 7. CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB (Ride 1 -> 12)
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
       document.getElementById("chatsThreadView").style.display = "none";
 
       const container = document.getElementById("chatsListContainer");
-      // Sort in strict chronological order (Ride 001 -> Ride 012)
-      const workouts = await db.workouts.orderBy('date').toArray();
+      // STRICT CHRONOLOGICAL ORDER: Ride 1 -> Ride 12
+      const workouts = await db.workouts.orderBy('ride_number').toArray();
       const lastMaster = await db.master_chat.reverse().first();
 
       let html = `
@@ -1629,13 +1652,13 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       `;
 
       for (const w of workouts) {
-        const lastMsg = await db.threads.where("workout_code").equals(w.exercise_code).reverse().first();
+        const lastMsg = await db.threads.where("ride_number").equals(w.ride_number).reverse().first();
         html += `
-          <div class="chat-row" onclick="openChatThread('${w.exercise_code}')">
+          <div class="chat-row" onclick="openChatThread(${w.ride_number})">
             <div class="chat-avatar">🚴</div>
             <div class="chat-row-body">
               <div class="chat-row-top">
-                <span class="chat-contact-name">${w.exercise_code.split('-')[0].trim()}</span>
+                <span class="chat-contact-name">Ride ${w.ride_number}</span>
                 <span class="chat-timestamp">${w.date.slice(5, 10)}</span>
               </div>
               <div class="chat-snippet">${lastMsg ? lastMsg.message.slice(0, 60) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_power_w} W`}</div>
@@ -1651,7 +1674,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       activeChatStreamKey = streamKey;
       document.getElementById("chatsListView").style.display = "none";
       document.getElementById("chatsThreadView").style.display = "block";
-      document.getElementById("activeChatHeaderTitle").textContent = streamKey === 'MASTER' ? 'Master Season Coach' : streamKey;
+      document.getElementById("activeChatHeaderTitle").textContent = streamKey === 'MASTER' ? 'Master Season Coach' : `Ride ${streamKey}`;
       renderHubChat();
     }
 
@@ -1682,9 +1705,9 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
           </div>
         `).join('');
       } else {
-        const messages = await db.threads.where("workout_code").equals(activeChatStreamKey).toArray();
+        const messages = await db.threads.where("ride_number").equals(Number(activeChatStreamKey)).toArray();
         if (messages.length === 0) {
-          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for ${activeChatStreamKey}. Type below to message coach.</div>`;
+          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for Ride ${activeChatStreamKey}. Type below to message coach.</div>`;
           return;
         }
         container.innerHTML = messages.map(m => `
@@ -1710,11 +1733,11 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
         if (navigator.onLine) {
           const key = await getConfig("gemini_api_key");
           if (key) {
-            const workouts = await db.workouts.orderBy('date').toArray();
+            const workouts = await db.workouts.orderBy('ride_number').toArray();
             const athleteW = await getConfig("athlete_weight") || "114.8";
             const athleteH = await getConfig("athlete_height") || "190";
 
-            const summaryLogs = workouts.map(w => `${w.exercise_code.split('-')[0].trim()}: ${w.distance_km}km, ${w.avg_speed_kmh}km/h, ${w.avg_hr || '--'}bpm, ${w.avg_power_w || '--'}W`).join(' | ');
+            const summaryLogs = workouts.map(w => `Ride ${w.ride_number}: ${w.distance_km}km, ${w.avg_speed_kmh}km/h, ${w.avg_hr || '--'}bpm, ${w.avg_power_w || '--'}W`).join(' | ');
             const pastMessages = await db.master_chat.toArray();
             const dialogue = pastMessages.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
@@ -1743,19 +1766,20 @@ RULES:
           }
         }
       } else {
-        await db.threads.add({ workout_code: activeChatStreamKey, role: 'athlete', message: text, created_at: new Date().toISOString() });
+        const rNum = Number(activeChatStreamKey);
+        await db.threads.add({ ride_number: rNum, role: 'athlete', message: text, created_at: new Date().toISOString() });
         renderHubChat();
 
         if (navigator.onLine) {
           const key = await getConfig("gemini_api_key");
           if (key) {
-            const w = await db.workouts.where("exercise_code").equals(activeChatStreamKey).first();
-            const pastThreads = await db.threads.where("workout_code").equals(activeChatStreamKey).toArray();
+            const w = await db.workouts.where("ride_number").equals(rNum).first();
+            const pastThreads = await db.threads.where("ride_number").equals(rNum).toArray();
             const dialogue = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
             const prompt = `
 You are Mustafa's personal cycling coach.
-WORKOUT: ${activeChatStreamKey} (${w ? w.distance_km + 'km, ' + w.avg_speed_kmh + 'km/h' : ''})
+WORKOUT: Ride ${rNum} (${w ? w.distance_km + 'km, ' + w.avg_speed_kmh + 'km/h' : ''})
 CONVERSATION:
 ${dialogue}
 
@@ -1766,7 +1790,7 @@ RULES: NO LaTeX. Plain English only.
             document.getElementById("hubLoadingBanner").style.display = "none";
 
             if (reply) {
-              await db.threads.add({ workout_code: activeChatStreamKey, role: 'coach', message: reply, created_at: new Date().toISOString() });
+              await db.threads.add({ ride_number: rNum, role: 'coach', message: reply, created_at: new Date().toISOString() });
               renderHubChat();
             }
           }
@@ -1775,10 +1799,10 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS & IN-APP FULL A4 VIEWER
+    // 8. REPORTS & NATIVE PDF NOTIFICATION DOWNLOAD
     // --------------------------------------------------------
     async function renderReports() {
-      let workouts = await db.workouts.orderBy('date').toArray();
+      let workouts = await db.workouts.orderBy('ride_number').toArray();
 
       if (workouts.length === 0) {
         document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored.</div>`;
@@ -1801,7 +1825,7 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Total Season Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
 
-      // Render cached review if it exists in local storage
+      // Render cached review if present
       const cachedReport = await db.reports.get(1);
       if (cachedReport && cachedReport.analysis_text) {
         const box = document.getElementById("reportSummaryBox");
@@ -1813,12 +1837,12 @@ RULES: NO LaTeX. Plain English only.
     async function generateExecutiveReport() {
       if (!navigator.onLine) { alert("Connect to internet."); return; }
       const key = await getConfig("gemini_api_key");
-      if (!key) { alert("Enter Gemini key in Settings."); return; }
+      if (!key) { alert("Enter Gemini key in Profile."); return; }
 
-      let workouts = await db.workouts.orderBy('date').toArray();
+      let workouts = await db.workouts.orderBy('ride_number').toArray();
       const athleteReplies = await db.threads.where("role").equals("athlete").toArray();
-      const qualitativeNotes = athleteReplies.map(r => `- ${r.workout_code}: "${r.message}"`).join("\n");
-      const telemetryTable = workouts.map(w => `${w.exercise_code}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join("\n");
+      const qualitativeNotes = athleteReplies.map(r => `- Ride ${r.ride_number}: "${r.message}"`).join("\n");
+      const telemetryTable = workouts.map(w => `Ride ${w.ride_number}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join("\n");
 
       const prompt = `
 You are an executive sports science director reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
@@ -1831,14 +1855,16 @@ ${qualitativeNotes || "No specific complaints."}
 RULES:
 - Clean English only.
 - DO NOT use LaTeX, dollar signs, or formulas.
-- Use simple units (km/h, W, bpm, m). Focus strictly on comparative evaluation across sessions.
+- Structure:
+  1. Aerobic Base & Decoupling Shift
+  2. Absolute Mechanical Demands under Body Mass
+  3. Actionable Progression Focus
 `;
       document.getElementById("reportLoadingBanner").style.display = "flex";
       const report = await callGeminiAPI(key, prompt);
       document.getElementById("reportLoadingBanner").style.display = "none";
 
       if (report) {
-        // Persist permanently in IndexedDB
         await db.reports.put({ id: 1, ref_code: `REPORT_CACHE`, created_at: new Date().toISOString(), analysis_text: report });
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
@@ -1846,74 +1872,131 @@ RULES:
       }
     }
 
-    async function openReportModal() {
-      let workouts = await db.workouts.orderBy('date').toArray();
+    // Direct Native PDF Download with File Write & Notification Trigger
+    async function triggerOfficialPdfDownload() {
+      const statusDiv = document.getElementById("pdfDownloadStatus");
       const latestReport = await db.reports.get(1);
-      const athleteNotes = await db.threads.where("role").equals("athlete").toArray();
-      const container = document.getElementById("modalReportContent");
 
-      const maxDist = workouts.length ? workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km : 0;
-      const maxSpd = workouts.length ? workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh : 0;
-      const maxPwr = workouts.length ? workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w : 0;
-      const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
+      if (!latestReport || !latestReport.analysis_text) {
+        alert("Please tap 'Synthesize AI Season Review' first before downloading the PDF.");
+        return;
+      }
 
-      container.innerHTML = `
-        <div style="border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 12px;">
-          <h2 style="color:var(--primary); font-size:1.25rem;">APEX VELO — EXECUTIVE PERFORMANCE AUDIT</h2>
-          <p style="font-size:0.75rem; color:var(--text-muted);">Athlete: Mustafa (190 cm, 114.8 kg) | Discipline: XC Mountain Bike | Date: ${new Date().toLocaleDateString()}</p>
-        </div>
+      statusDiv.textContent = "Compiling official PDF file...";
 
-        <h4 style="font-size:0.85rem; margin-bottom:6px; color:#1e293b;">Personal Record (PR) Scorecard</h4>
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:12px; font-size:0.75rem; text-align:center;">
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxDist} km</b><br/><span style="color:#64748b; font-size:0.6rem;">MAX DIST</span></div>
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxSpd} km/h</b><br/><span style="color:#64748b; font-size:0.6rem;">TOP SPEED</span></div>
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${maxPwr} W</b><br/><span style="color:#64748b; font-size:0.6rem;">PEAK POWER</span></div>
-          <div style="background:#f8fafc; padding:6px; border:1px solid #e2e8f0; border-radius:6px;"><b>${Math.round(totWork)} kJ</b><br/><span style="color:#64748b; font-size:0.6rem;">TOTAL WORK</span></div>
-        </div>
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ format: 'a4', unit: 'mm' });
 
-        ${latestReport ? `
-          <div style="background:#f8fafc; border:1px solid var(--border); border-left:4px solid var(--primary); padding:12px; border-radius:8px; margin-bottom:14px; font-size:0.84rem; line-height:1.55;">
-            <h3 style="color:#0f172a; margin-bottom:6px; font-size:0.92rem;">Executive Coaching Assessment</h3>
-            ${cleanAiText(latestReport.analysis_text)}
-          </div>
-        ` : ''}
+        let workouts = await db.workouts.orderBy('ride_number').toArray();
+        const athleteNotes = await db.threads.where("role").equals("athlete").toArray();
 
-        ${athleteNotes.length ? `
-          <div style="background:#fff7ed; border:1px solid #fed7aa; padding:10px 12px; border-radius:8px; margin-bottom:14px; font-size:0.78rem;">
-            <b style="color:#9a3412;">Recorded Athlete Session Feedback:</b>
-            <ul style="margin-top:4px; padding-left:16px;">
-              ${athleteNotes.map(n => `<li><b>${n.workout_code}:</b> "${n.message}"</li>`).join('')}
-            </ul>
-          </div>
-        ` : ''}
+        // 1. Header Banner
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(252, 82, 0);
+        doc.text("RIDE PARTNER — EXECUTIVE PERFORMANCE AUDIT", 14, 18);
 
-        <h3 style="font-size:0.90rem; margin:10px 0 6px 0;">Itemized Session Ledger</h3>
-        <table class="delta-table" style="font-size:0.74rem;">
-          <thead>
-            <tr><th>Session</th><th>Date</th><th>Dist</th><th>Time</th><th>Speed</th><th>Power</th><th>HR</th><th>Asc</th></tr>
-          </thead>
-          <tbody>
-            ${workouts.map(w => `
-              <tr>
-                <td><b>${w.exercise_code.split('-')[0].trim()}</b></td>
-                <td>${w.date.split(' ')[0]}</td>
-                <td>${w.distance_km} km</td>
-                <td>${w.duration_str}</td>
-                <td>${w.avg_speed_kmh} km/h</td>
-                <td>${w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--'}</td>
-                <td>${w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--'}</td>
-                <td>${w.elevation_gain_m} m</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Discipline: XC Mountain Bike | Date: ${new Date().toLocaleDateString()}`, 14, 24);
 
-      document.getElementById("reportModal").style.display = "block";
-    }
+        let startY = 30;
 
-    function closeReportModal() {
-      document.getElementById("reportModal").style.display = "none";
+        // 2. Personal Records Scorecard Box
+        const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
+        const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
+        const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
+        const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text("Personal Records & Volume Scorecard", 14, startY);
+        startY += 4;
+
+        doc.autoTable({
+          head: [['Max Distance', 'Peak Speed', 'Peak Power', 'Total Mechanical Work']],
+          body: [[`${maxDist} km`, `${maxSpd} km/h`, `${maxPwr} W`, `${Math.round(totWork)} kJ`]],
+          startY: startY,
+          theme: 'plain',
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [241, 245, 249], textColor: [100, 116, 139], fontStyle: 'bold' }
+        });
+        startY = doc.lastAutoTable.finalY + 8;
+
+        // 3. Executive AI Progression Audit
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text("Executive Coaching Assessment", 14, startY);
+        startY += 5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(30, 41, 59);
+        const rawClean = latestReport.analysis_text.replace(/[*#$]/g, '');
+        const splitText = doc.splitTextToSize(rawClean, 180);
+        doc.text(splitText, 14, startY);
+        startY += (splitText.length * 3.4) + 6;
+
+        // 4. Itemized Training Session Ledger Table
+        const tableData = workouts.map(w => [
+          `Ride ${w.ride_number}`,
+          w.date.split(' ')[0],
+          w.distance_km + ' km',
+          w.duration_str || '--',
+          w.avg_speed_kmh + ' km/h',
+          w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--',
+          w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--',
+          w.elevation_gain_m + ' m'
+        ]);
+
+        doc.autoTable({
+          head: [['Ride', 'Date', 'Distance', 'Duration', 'Avg Speed', 'Avg Power', 'Avg HR', 'Ascent']],
+          body: tableData,
+          startY: startY,
+          theme: 'grid',
+          headStyles: { fillColor: [15, 23, 42], fontSize: 8 },
+          styles: { fontSize: 7.5, cellPadding: 2 }
+        });
+
+        const fileName = `Mustafa_Ride_Partner_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+        const base64Data = doc.output('datauristring').split(',')[1];
+
+        // 1. Native Capacitor Filesystem Download
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+          await window.Capacitor.Plugins.Filesystem.writeFile({
+            path: `Download/${fileName}`,
+            data: base64Data,
+            directory: 'EXTERNAL_STORAGE'
+          }).catch(async () => {
+            await window.Capacitor.Plugins.Filesystem.writeFile({
+              path: fileName,
+              data: base64Data,
+              directory: 'DOCUMENTS'
+            });
+          });
+
+          statusDiv.innerHTML = `✓ Downloaded: <b>${fileName}</b> in your Downloads folder!`;
+          alert(`PDF Report downloaded successfully:\n${fileName}`);
+          return;
+        }
+
+        // 2. Direct Anchor Fallback
+        const pdfDataUri = `data:application/pdf;base64,${base64Data}`;
+        const dlLink = document.createElement('a');
+        dlLink.href = pdfDataUri;
+        dlLink.download = fileName;
+        document.body.appendChild(dlLink);
+        dlLink.click();
+        document.body.removeChild(dlLink);
+
+        statusDiv.innerHTML = `✓ Download initiated: <b>${fileName}</b>`;
+      } catch (err) {
+        statusDiv.textContent = "Download failed: " + err.message;
+      }
     }
 
     // --------------------------------------------------------
@@ -2014,7 +2097,7 @@ RULES:
     }
 
     // --------------------------------------------------------
-    // STRAVA SYNC (STRICTLY BIKES ONLY)
+    // STRAVA SYNC (STRICTLY BIKES ONLY WITH ride_number)
     // --------------------------------------------------------
     async function syncStrava() {
       if (!navigator.onLine) { alert("Connect to internet to sync with Strava."); return; }
@@ -2051,7 +2134,7 @@ RULES:
           return;
         }
 
-        // Filter: Keep ONLY Rides (VirtualRide, MountainBikeRide, GravelRide, Ride)
+        // Strict bike filter: ignore runs, walks, and hikes
         const rideActs = acts.filter(a => ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide'].includes(a.type || 'Ride'));
 
         let existingRidesCount = await db.workouts.count();
@@ -2064,7 +2147,8 @@ RULES:
             existingRidesCount++;
             addedCount++;
 
-            const seqStr = String(existingRidesCount).padStart(3, '0');
+            const currentRideNum = existingRidesCount;
+            const seqStr = String(currentRideNum).padStart(3, '0');
             const dt = new Date(a.start_date_local.replace('Z', ''));
             const dateStr = dt.toISOString().slice(0, 10);
             const code = `Ride ${seqStr} - ${dateStr}`;
@@ -2075,6 +2159,7 @@ RULES:
 
             await db.workouts.add({
               strava_id: a.id,
+              ride_number: currentRideNum,
               exercise_code: code,
               date: a.start_date_local.replace('T', ' ').slice(0, 16),
               distance_km: +(a.distance / 1000).toFixed(2),
