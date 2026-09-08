@@ -529,6 +529,28 @@
       padding: 14px;
       margin: 10px 0;
     }
+
+    /* Lab Report Medical Grid */
+    .lab-panel {
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 0.76rem;
+    }
+    .lab-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .lab-item {
+      background: #1e293b;
+      padding: 8px;
+      border-radius: 6px;
+      border-left: 3px solid var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -596,12 +618,11 @@
       <div id="det_status_badge"></div>
     </div>
     
-    <!-- SINGLE MANUAL CALL TRIGGER -->
     <div id="sessionActionBox" style="margin: 6px 0;"></div>
     
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>Calling Gemini for Ride comparative analysis...</span>
+      <span>Calling Gemini for ride comparative analysis...</span>
     </div>
     
     <div class="chat-container" id="chatThread"></div>
@@ -612,7 +633,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (WITH DISTANCE INCLUDED) -->
   <div id="tab_graphs" style="display: none;">
     <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
@@ -636,12 +657,12 @@
     
     <div id="graphLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>AI Coach is auditing season curves...</span>
+      <span>Auditing season progression curves...</span>
     </div>
 
     <div class="chat-container" id="graphChatThread"></div>
     <div class="reply-box" id="graphReplyBox" style="display:none;">
-      <input type="text" id="graphReplyInput" class="reply-input" placeholder="Reply to macro progression analysis..." onkeydown="if(event.key==='Enter') sendGraphAthleteReply()" />
+      <input type="text" id="graphReplyInput" class="reply-input" placeholder="Reply to progression audit..." onkeydown="if(event.key==='Enter') sendGraphAthleteReply()" />
       <button class="btn btn-primary btn-small" onclick="sendGraphAthleteReply()">Send</button>
     </div>
   </div>
@@ -667,7 +688,7 @@
     <div id="compareAIBox" class="chat-bubble chat-coach" style="display: none; margin-top: 8px;"></div>
   </div>
 
-  <!-- TAB 4: CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB -->
+  <!-- TAB 4: CHATS HUB WITH IN-CHAT DEBRIEF BUTTON -->
   <div id="tab_chats" style="display: none;">
     <div id="chatsListView">
       <h4 style="margin-bottom: 8px;">Coaching Communications</h4>
@@ -680,9 +701,11 @@
         <span id="activeChatHeaderTitle" style="font-size:0.84rem; font-weight:800; color:var(--primary);"></span>
       </div>
 
+      <div id="hubActionBox" style="margin: 6px 0;"></div>
+
       <div id="hubLoadingBanner" class="loading-banner" style="display: none;">
         <div class="spinner-ring"></div>
-        <span>AI Coach is replying...</span>
+        <span>AI Coach is processing...</span>
       </div>
 
       <div class="chat-container" id="hubChatContainer"></div>
@@ -694,33 +717,51 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS -->
+  <!-- TAB 5: REPORTS (WITH LAB DATA, TIMEFRAME SELECTOR, & DATE RANGES) -->
   <div id="tab_reports" style="display: none;">
-    <h4 style="margin-bottom: 8px;">Executive Season Review</h4>
+    <h4 style="margin-bottom: 6px;">Executive Clinical Physiology Report</h4>
     
-    <h4 style="margin-bottom: 8px;">All-Time Cycling Records (PR)</h4>
+    <!-- Timeframe Filter -->
+    <div class="pill-rack" style="margin-bottom: 8px;">
+      <div class="metric-pill active" onclick="setReportTimeframe('7d', this)">1 Week (7D)</div>
+      <div class="metric-pill" onclick="setReportTimeframe('30d', this)">1 Month (30D)</div>
+      <div class="metric-pill" onclick="setReportTimeframe('365d', this)">1 Year (365D)</div>
+      <div class="metric-pill" onclick="setReportTimeframe('all', this)">All Time</div>
+    </div>
+
+    <div id="reportScopeDateHeader" style="font-size:0.75rem; font-weight:700; color:var(--primary); margin-bottom: 8px;">
+      Period Range: Calculating...
+    </div>
+
+    <!-- Lab-Grade Diagnostic Scorecard -->
+    <div class="lab-panel">
+      <div style="font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#38bdf8;">🔬 Physiological Stress & Biomarker Indicators</div>
+      <div class="lab-grid" id="labDiagnosticGrid"></div>
+    </div>
+
+    <h4 style="margin: 10px 0 6px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">All-Time Cycling Records (PR)</h4>
     <div class="telemetry-grid" id="pr_grid"></div>
     
     <div class="report-card">
-      <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">1. Generate Executive AI Progression Review</h4>
+      <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Clinical Longitudinal Review</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        Compiles a strictly retrospective longitudinal audit across all rides and logged feedback.
+        Compiles an objective medical-grade review assessing cardiovascular drift, lactate endurance, and torque scalability.
       </p>
-      <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize AI Season Review</button>
+      <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize Clinical Review</button>
       
       <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
         <div class="spinner-ring"></div>
-        <span>Synthesizing multi-week training review...</span>
+        <span>Synthesizing physiological review...</span>
       </div>
       <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
     </div>
 
     <div class="report-card">
-      <h4 style="font-size:0.88rem; margin-bottom:6px; color:var(--text-main);">2. Official A4 PDF Document Download</h4>
+      <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Official PDF Export</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        Saves the complete executive document directly to your device storage.
+        Saves the structured diagnostic report directly to your phone's storage.
       </p>
-      <button id="btnDownloadPdf" class="btn btn-primary" style="background:#0f172a;" onclick="triggerOfficialPdfDownload()">📥 Download Official A4 PDF Report</button>
+      <button id="btnDownloadPdf" class="btn btn-primary" style="background:#0f172a;" onclick="triggerOfficialPdfDownload()">📥 Download Official A4 Report</button>
       <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
     </div>
   </div>
@@ -749,7 +790,7 @@
     <div style="background:#ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; margin: 14px 0;">
       <h4 style="font-size: 0.88rem; margin-bottom: 4px; color: var(--primary);">One-Tap Automatic Sign-In</h4>
       <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 10px;">
-        Tap below to authenticate with Strava via Google.
+        Authenticate with Strava via Google.
       </p>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.2 13.828h4.172"/></svg>
@@ -769,8 +810,11 @@
   </div>
 
   <script>
+    // --------------------------------------------------------
+    // 1. DATABASE SCHEMA (DEXIE.JS)
+    // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
-    db.version(1).stores({
+    db.version(2).stores({
       workouts: "++id, &strava_id, ride_number, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
       streams: "strava_id, stream_data",
       threads: "++id, ride_number, role, message, created_at",
@@ -783,9 +827,10 @@
     let currentWorkout = null;
     let activeStream = null;
     let activeChatStreamKey = 'MASTER';
+    let reportTimeframe = '7d';
 
     let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
-    let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)"];
+    let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)"];
 
     function checkNetwork() {
       const pill = document.getElementById("networkStatus");
@@ -823,7 +868,7 @@
     }
 
     // --------------------------------------------------------
-    // CAPACITOR DEEP LINK
+    // 2. CAPACITOR DEEP LINK INTERCEPTOR
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -913,7 +958,7 @@
     }
 
     // --------------------------------------------------------
-    // FEED TAB
+    // 3. FEED TAB
     // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
@@ -942,7 +987,7 @@
     }
 
     // --------------------------------------------------------
-    // IN-SESSION DETAIL (ZERO AUTOMATIC CALLS)
+    // 4. IN-SESSION DETAIL (WITH DISTANCE IN DELTA TABLE)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -982,8 +1027,10 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
+      // Delta Table: Including Distance Row
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
+        const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
         const avgSpdPrior = (allPrior.reduce((a, b) => a + b.avg_speed_kmh, 0) / allPrior.length).toFixed(1);
         const validHRPrior = allPrior.filter(x => x.avg_hr > 0);
         const avgHRPrior = validHRPrior.length ? Math.round(validHRPrior.reduce((a, b) => a + b.avg_hr, 0) / validHRPrior.length) : 0;
@@ -991,6 +1038,7 @@
         const avgPwrPrior = validPwrPrior.length ? Math.round(validPwrPrior.reduce((a, b) => a + b.avg_power_w, 0) / validPwrPrior.length) : 0;
         const avgAscPrior = Math.round(allPrior.reduce((a, b) => a + b.elevation_gain_m, 0) / allPrior.length);
 
+        const dDist = (currentWorkout.distance_km - avgDistPrior).toFixed(2);
         const dSpd = (currentWorkout.avg_speed_kmh - avgSpdPrior).toFixed(1);
         const dHR = avgHRPrior ? (currentWorkout.avg_hr - avgHRPrior) : 0;
         const dPwr = avgPwrPrior ? (currentWorkout.avg_power_w - avgPwrPrior) : 0;
@@ -1000,6 +1048,7 @@
           <table class="delta-table">
             <thead><tr><th>Metric</th><th>This Ride</th><th>Prior 5 Avg</th><th>Delta</th></tr></thead>
             <tbody>
+              <tr><td>Distance</td><td>${currentWorkout.distance_km} km</td><td>${avgDistPrior} km</td><td class="${dDist >= 0 ? 'delta-pos' : 'delta-neg'}">${dDist >= 0 ? '+' : ''}${dDist} km</td></tr>
               <tr><td>Average Speed</td><td>${currentWorkout.avg_speed_kmh} km/h</td><td>${avgSpdPrior} km/h</td><td class="${dSpd >= 0 ? 'delta-pos' : 'delta-neg'}">${dSpd >= 0 ? '+' : ''}${dSpd} km/h</td></tr>
               <tr><td>Average HR</td><td>${currentWorkout.avg_hr || '--'} bpm</td><td>${avgHRPrior || '--'} bpm</td><td class="${dHR <= 0 ? 'delta-pos' : 'delta-neg'}">${dHR >= 0 ? '+' : ''}${dHR} bpm</td></tr>
               <tr><td>Average Power</td><td>${currentWorkout.avg_power_w || '--'} W</td><td>${avgPwrPrior || '--'} W</td><td class="${dPwr >= 0 ? 'delta-pos' : 'delta-neg'}">${dPwr >= 0 ? '+' : ''}${dPwr} W</td></tr>
@@ -1019,7 +1068,7 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // Check debrief status badge
+      // UI Status Badge & Action Button
       const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
@@ -1027,11 +1076,11 @@
       const actionBox = document.getElementById("sessionActionBox");
 
       if (!hasCoach) {
-        badgeDiv.innerHTML = `<span class="status-badge badge-unreviewed">🟡 Needs Review</span>`;
+        badgeDiv.innerHTML = `<span class="status-badge badge-unreviewed">🟡 Needs Analysis</span>`;
         actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Analyze Ride ${currentWorkout.ride_number} with AI Coach</button>`;
       } else if (currentWorkout.debrief_stale) {
         badgeDiv.innerHTML = `<span class="status-badge badge-stale">🟠 Context Update Available</span>`;
-        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate Ride ${currentWorkout.ride_number} (New Prior Notes Added)</button>`;
+        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate Ride ${currentWorkout.ride_number} (Upstream Notes Added)</button>`;
       } else {
         badgeDiv.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
         actionBox.innerHTML = "";
@@ -1243,65 +1292,92 @@
     }
 
     // --------------------------------------------------------
-    // SINGLE-SHOT RIDE DEBRIEF (MANUAL ONLY, FEEDS ALL PRIOR CONTEXT)
+    // COMPACT CONTEXT BUILDER (PREVENTS TOKEN BLOAT)
+    // --------------------------------------------------------
+    async function buildCompactPriorContinuum(targetRideNumber) {
+      const priorRides = await db.workouts
+        .where('ride_number').below(targetRideNumber)
+        .sortBy('ride_number');
+
+      let lines = [];
+      for (const p of priorRides) {
+        // High density single line context (~30-40 tokens per ride)
+        let line = `R${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.avg_power_w || '--'}W, ${p.elevation_gain_m}m asc.`;
+        
+        // Grab short athlete complaint if one exists
+        const athleteMsg = await db.threads.where({ ride_number: p.ride_number, role: 'athlete' }).first();
+        if (athleteMsg) {
+          line += ` Note: "${athleteMsg.message.slice(0, 45)}"`;
+        }
+        lines.push(line);
+      }
+      return lines.join('\n');
+    }
+
+    // --------------------------------------------------------
+    // ROBUST SINGLE-RIDE DEBRIEF (BACKGROUND EXECUTION SAFE)
     // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
-      if (!navigator.onLine) { alert("Connect to internet to run AI debrief."); return; }
+      if (!navigator.onLine) { alert("Connect to internet."); return; }
       const key = await getConfig("gemini_api_key");
       if (!key) { alert("Please save your Gemini Key in Profile."); return; }
+
+      // Hard lock button to prevent concurrent duplicate submissions
+      const btn = document.querySelector("#sessionActionBox button") || document.querySelector("#hubActionBox button");
+      if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+        btn.textContent = "Analyzing Ride with AI...";
+      }
+
+      document.getElementById("sessionLoadingBanner").style.display = "flex";
+      const hubBanner = document.getElementById("hubLoadingBanner");
+      if (hubBanner) hubBanner.style.display = "flex";
 
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
 
-      // 1. Gather all earlier rides up to this ride
-      const priorRides = await db.workouts
-        .where('ride_number').below(targetRide.ride_number)
-        .sortBy('ride_number');
-
-      // 2. Extract past takeaways & comments from earlier debriefs
-      let priorContinuum = "";
-      for (const p of priorRides) {
-        const coachMsg = await db.threads.where({ ride_number: p.ride_number, role: 'coach' }).first();
-        const userMsg = await db.threads.where({ ride_number: p.ride_number, role: 'athlete' }).toArray();
-        const userNotes = userMsg.map(u => u.message).join(' | ');
-
-        priorContinuum += `\n• Ride ${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.avg_power_w || '--'}W, ${p.elevation_gain_m}m asc.`;
-        if (coachMsg) {
-          priorContinuum += `\n  - Takeaway: ${coachMsg.message.slice(0, 160)}...`;
-        }
-        if (userNotes) {
-          priorContinuum += `\n  - Athlete Feedback: "${userNotes}"`;
-        }
+      // Register background task with Android OS so request survives if app is closed
+      let taskId = null;
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundTask) {
+        taskId = await window.Capacitor.Plugins.BackgroundTask.beforeExit(async () => {});
       }
 
-      const currentAthleteNotes = (await db.threads.where("ride_number").equals(targetRide.ride_number).toArray())
+      const priorContinuum = await buildCompactPriorContinuum(targetRide.ride_number);
+
+      const athleteNotes = (await db.threads.where("ride_number").equals(targetRide.ride_number).toArray())
         .filter(t => t.role === "athlete")
         .map(t => t.message)
         .join(" | ");
 
       const prompt = `
-You are an expert cycling sports scientist coaching athlete Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
+You are a cycling physiologist and clinical sports scientist coaching Mustafa (${userH} cm, ${userW} kg, XC Mountain Bike).
 WORKOUT UNDER EVALUATION:
 - Ride: ${targetRide.exercise_code}
 - Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
 - Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm (Max HR benchmark: 202 bpm)
 - Mechanical Output: Avg ${targetRide.avg_power_w} W, Work ${targetRide.kilojoules} kJ, Ascent ${targetRide.elevation_gain_m} m
 
-FULL CHRONOLOGICAL CONTINUUM OF PRIOR RIDES (MUST COMPARE DIRECTLY AGAINST THESE):
+PRIOR RIDES IN THIS SERIES (COMPARE DIRECTLY AGAINST THESE):
 ${priorContinuum || "First baseline ride recorded."}
 
 ATHLETE SENSATIONS/NOTES ON THIS RIDE:
-${currentAthleteNotes || "None recorded."}
+${athleteNotes || "None recorded."}
 
-RULES:
-- Focus strictly on comparative biomechanics, cardiovascular drift, aerobic decoupling, and torque efficiency against prior rides.
-- NO generic advice or tips.
+CRITICAL RULES:
+- Strictly retrospective comparative analysis: contrast efficiency factor (W/bpm), cardiovascular drift, and torque against earlier rides.
+- NO generic advice, future training plans, or tips.
 - NO LaTeX, formulas, or dollar signs. Use clean conversational English with units (km/h, W, bpm, m).
 `;
 
-      document.getElementById("sessionLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt);
+
       document.getElementById("sessionLoadingBanner").style.display = "none";
+      if (hubBanner) hubBanner.style.display = "none";
+
+      if (taskId && window.Capacitor.Plugins.BackgroundTask) {
+        window.Capacitor.Plugins.BackgroundTask.finish({ taskId });
+      }
 
       if (reply) {
         await db.threads.where({ ride_number: targetRide.ride_number, role: 'coach' }).delete();
@@ -1310,8 +1386,22 @@ RULES:
         targetRide.debrief_stale = false;
         
         document.getElementById("sessionActionBox").innerHTML = "";
-        document.getElementById("det_status_badge").innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+        const hubAct = document.getElementById("hubActionBox");
+        if (hubAct) hubAct.innerHTML = "";
+
+        const badge = document.getElementById("det_status_badge");
+        if (badge) badge.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+        
         renderChatThread();
+        if (document.getElementById("chatsThreadView").style.display === "block") {
+          renderHubChat();
+        }
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.style.opacity = "1";
+          btn.textContent = `⚡ Analyze Ride ${targetRide.ride_number} with AI Coach`;
+        }
       }
     }
 
@@ -1324,7 +1414,6 @@ RULES:
       input.value = "";
       renderChatThread();
 
-      // Flag all downstream rides as stale so they show the orange update badge
       const downstream = await db.workouts.where('ride_number').above(currentWorkout.ride_number).toArray();
       for (const dw of downstream) {
         await db.workouts.update(dw.id, { debrief_stale: true });
@@ -1363,10 +1452,10 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
     }
 
     // --------------------------------------------------------
-    // GLOBAL TELEMETRY GRAPHS
+    // 5. GLOBAL TELEMETRY GRAPHS (WITH DISTANCE INCLUDED)
     // --------------------------------------------------------
     function setupGlobalMetricPills() {
-      const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Elevation Ascent (m)", "Work (kJ)"];
+      const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)", "Elevation Ascent (m)", "Work (kJ)"];
       document.getElementById("globalMetricPills").innerHTML = available.map(m => `
         <div class="metric-pill ${globalSelectedMetrics.includes(m) ? 'active' : ''}" onclick="toggleGlobalMetric('${m}')">${m}</div>
       `).join('');
@@ -1409,6 +1498,11 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
           y: workouts.map(w => w.avg_hr ? Math.max(0, Math.min(100, Math.round(((w.avg_hr - 100) / (202 - 100)) * 100))) : null), 
           color: "#ef4444",
           text: workouts.map(w => `${w.avg_hr || '--'} bpm`)
+        },
+        "Distance (km)": { 
+          y: workouts.map(w => Math.min(100, Math.round((w.distance_km / 45) * 100))), 
+          color: "#8b5cf6",
+          text: workouts.map(w => `${w.distance_km} km`)
         },
         "Elevation Ascent (m)": { 
           y: workouts.map(w => Math.min(100, Math.round((w.elevation_gain_m / 200) * 100))), 
@@ -1556,7 +1650,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // COMPARE LAB
+    // 6. COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
@@ -1663,7 +1757,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // CHRONOLOGICAL WHATSAPP-STYLE CHATS HUB
+    // 7. CHATS HUB (WITH IN-CHAT ACTION BUTTON)
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -1715,12 +1809,36 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       container.innerHTML = html;
     }
 
-    function openChatThread(streamKey) {
+    async function openChatThread(streamKey) {
       activeChatStreamKey = streamKey;
       document.getElementById("chatsListView").style.display = "none";
       document.getElementById("chatsThreadView").style.display = "block";
       document.getElementById("activeChatHeaderTitle").textContent = streamKey === 'MASTER' ? 'Master Season Coach' : `Ride ${streamKey}`;
+
+      const hubActionBox = document.getElementById("hubActionBox");
+      if (streamKey !== 'MASTER') {
+        const rNum = Number(streamKey);
+        const w = await db.workouts.where("ride_number").equals(rNum).first();
+        const existing = await db.threads.where("ride_number").equals(rNum).toArray();
+        const hasCoach = existing.some(t => t.role === 'coach');
+
+        if (!hasCoach) {
+          hubActionBox.innerHTML = `<button class="btn btn-primary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">⚡ Generate AI Debrief for Ride ${rNum}</button>`;
+        } else if (w && w.debrief_stale) {
+          hubActionBox.innerHTML = `<button class="btn btn-secondary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">🔄 Re-Evaluate Ride ${rNum} (Upstream Context Added)</button>`;
+        } else {
+          hubActionBox.innerHTML = "";
+        }
+      } else {
+        hubActionBox.innerHTML = "";
+      }
+
       renderHubChat();
+    }
+
+    async function runSingleRideDebriefByNumber(num) {
+      const w = await db.workouts.where("ride_number").equals(num).first();
+      if (w) await runSingleRideDebrief(w);
     }
 
     function closeChatThreadView() {
@@ -1752,7 +1870,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       } else {
         const messages = await db.threads.where("ride_number").equals(Number(activeChatStreamKey)).toArray();
         if (messages.length === 0) {
-          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for Ride ${activeChatStreamKey}. Type below to message coach.</div>`;
+          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for Ride ${activeChatStreamKey}. Tap the button above to analyze or type below.</div>`;
           return;
         }
         container.innerHTML = messages.map(m => `
@@ -1844,22 +1962,54 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // REPORTS & NATIVE PDF NOTIFICATION DOWNLOAD
+    // 8. REPORTS (WITH TIMEFRAME SELECTOR, DATE SCOPE, & LAB PANEL)
     // --------------------------------------------------------
+    function setReportTimeframe(tf, el) {
+      reportTimeframe = tf;
+      document.querySelectorAll('#tab_reports .metric-pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      renderReports();
+    }
+
+    async function getScopedWorkouts() {
+      let workouts = await db.workouts.orderBy('date').toArray();
+      if (!workouts.length) return [];
+
+      if (reportTimeframe === 'all') return workouts;
+
+      const latestDate = new Date(workouts[workouts.length - 1].date);
+      let days = 7;
+      if (reportTimeframe === '30d') days = 30;
+      if (reportTimeframe === '365d') days = 365;
+
+      const cutoff = new Date(latestDate);
+      cutoff.setDate(cutoff.getDate() - days);
+
+      return workouts.filter(w => new Date(w.date) >= cutoff);
+    }
+
     async function renderReports() {
-      let workouts = await db.workouts.orderBy('ride_number').toArray();
+      const workouts = await getScopedWorkouts();
+      const scopeHeader = document.getElementById("reportScopeDateHeader");
 
       if (workouts.length === 0) {
+        scopeHeader.textContent = "Period Range: No recorded workouts found in this timeframe.";
         document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored.</div>`;
+        document.getElementById("labDiagnosticGrid").innerHTML = "<div style='color:#94a3b8; padding:8px;'>No data.</div>";
         return;
       }
 
-      const maxDist = workouts.reduce((prev, curr) => (curr.distance_km > prev.distance_km) ? curr : prev, workouts[0]);
-      const maxSpd = workouts.reduce((prev, curr) => (curr.max_speed_kmh > prev.max_speed_kmh) ? curr : prev, workouts[0]);
-      const maxPwr = workouts.reduce((prev, curr) => (curr.avg_power_w > prev.avg_power_w) ? curr : prev, workouts[0]);
-      const maxAsc = workouts.reduce((prev, curr) => (curr.elevation_gain_m > prev.elevation_gain_m) ? curr : prev, workouts[0]);
+      const startDate = workouts[0].date.split(' ')[0];
+      const endDate = workouts[workouts.length - 1].date.split(' ')[0];
+      scopeHeader.textContent = `Period Range: ${startDate} to ${endDate} (${workouts.length} Sessions Analyzed)`;
+
+      // PR Cards
+      const maxDist = workouts.reduce((p, c) => (c.distance_km > p.distance_km) ? c : p, workouts[0]);
+      const maxSpd = workouts.reduce((p, c) => (c.max_speed_kmh > p.max_speed_kmh) ? c : p, workouts[0]);
+      const maxPwr = workouts.reduce((p, c) => (c.avg_power_w > p.avg_power_w) ? c : p, workouts[0]);
+      const maxAsc = workouts.reduce((p, c) => (c.elevation_gain_m > p.elevation_gain_m) ? c : p, workouts[0]);
       const calcVAM = w => w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
-      const maxVAM = workouts.reduce((prev, curr) => (calcVAM(curr) > calcVAM(prev)) ? curr : prev, workouts[0]);
+      const maxVAM = workouts.reduce((p, c) => (calcVAM(c) > calcVAM(p)) ? c : p, workouts[0]);
 
       document.getElementById("pr_grid").innerHTML = `
         <div class="telemetry-row"><span class="telemetry-name">Longest Distance</span><span class="telemetry-val">${maxDist.distance_km} km</span></div>
@@ -1867,14 +2017,40 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Peak Power</span><span class="telemetry-val">${maxPwr.avg_power_w > 0 ? maxPwr.avg_power_w + ' W' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Highest Ascent</span><span class="telemetry-val">${maxAsc.elevation_gain_m} m</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Best Climbing VAM</span><span class="telemetry-val">${calcVAM(maxVAM)} m/h</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Total Season Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Total Period Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
 
+      // Lab Grade Panel Calculations
+      const avgWatts = Math.round(workouts.reduce((a, b) => a + b.avg_power_w, 0) / workouts.length);
+      const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
+      const efMean = avgHR > 0 ? (avgWatts / avgHR).toFixed(2) : '--';
+      const cardiacDecoupling = workouts.length >= 2 ? (workouts[workouts.length - 1].avg_hr - workouts[0].avg_hr) : 0;
+
+      document.getElementById("labDiagnosticGrid").innerHTML = `
+        <div class="lab-item">
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Aerobic Efficiency (EF)</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${efMean} W/bpm</div>
+        </div>
+        <div class="lab-item">
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Net Cardiac Drift (ΔHR)</div>
+          <div style="font-size:1.05rem; font-weight:800; color:${cardiacDecoupling <= 0 ? '#4ade80' : '#f87171'};">${cardiacDecoupling > 0 ? '+' : ''}${cardiacDecoupling} bpm</div>
+        </div>
+        <div class="lab-item">
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Threshold Index (L4/L5)</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#fbbf24;">${avgHR >= 162 ? 'Elevated Strain' : 'Sub-Threshold'}</div>
+        </div>
+        <div class="lab-item">
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Gross Mechanical Work</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${Math.round(workouts.reduce((a,b)=>a+b.kilojoules,0))} kJ</div>
+        </div>
+      `;
+
+      // Render cached review if present
       const cachedReport = await db.reports.get(1);
       if (cachedReport && cachedReport.analysis_text) {
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
-        box.innerHTML = `<b>Executive Season Progression Audit</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
+        box.innerHTML = `<b>Clinical Longitudinal Review</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
       }
     }
 
@@ -1883,36 +2059,43 @@ RULES: NO LaTeX. Plain English only.
       const key = await getConfig("gemini_api_key");
       if (!key) { alert("Enter Gemini key in Profile."); return; }
 
-      let workouts = await db.workouts.orderBy('ride_number').toArray();
+      const workouts = await getScopedWorkouts();
+      if (!workouts.length) { alert("No workouts in timeframe."); return; }
+
+      const startDate = workouts[0].date.split(' ')[0];
+      const endDate = workouts[workouts.length - 1].date.split(' ')[0];
+
       const athleteReplies = await db.threads.where("role").equals("athlete").toArray();
       const qualitativeNotes = athleteReplies.map(r => `- Ride ${r.ride_number}: "${r.message}"`).join("\n");
-      const telemetryTable = workouts.map(w => `Ride ${w.ride_number}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join("\n");
+      const telemetryTable = workouts.map(w => `Ride ${w.ride_number} (${w.date.slice(5,10)}): ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join("\n");
 
       const prompt = `
-You are an executive sports science director reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
-SEASON RIDES LOG:
+You are an executive head clinical sports scientist and medical trainer reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
+EVALUATION SCOPE: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}).
+TELEMETRY LEDGER:
 ${telemetryTable}
 
-ATHLETE QUALITATIVE IN-RIDE FEEDBACK:
-${qualitativeNotes || "No specific complaints."}
+ATHLETE QUALITATIVE IN-RIDE SENSATIONS:
+${qualitativeNotes || "No specific discomfort notes recorded."}
 
-RULES:
-- Clean English only.
-- DO NOT provide generic tips or future advice. Focus strictly on a comparative review and longitudinal trend synthesis across the logged rides.
-- Structure:
-  1. Aerobic Base & Decoupling Shift
-  2. Absolute Mechanical Demands under Body Mass
-  3. Factual Season Progression Summary
+CLINICAL REPORT DIRECTIVES:
+- Write in an executive, medical sports-science diagnostic tone.
+- NO conversational chit-chat, NO friendly talk, and NO future unsolicited tips.
+- Focus strictly on:
+  1. Longitudinal Aerobic Adaptations & Efficiency Factor Shift (W/bpm)
+  2. Cardiovascular Cost & Decoupling Under 114.8 kg Body Mass
+  3. Mechanical Work Scalability (kJ) & Ascent Metabolic Penalty
+  4. Clinical Summary of Recorded Athlete Notes
 `;
       document.getElementById("reportLoadingBanner").style.display = "flex";
       const report = await callGeminiAPI(key, prompt);
       document.getElementById("reportLoadingBanner").style.display = "none";
 
       if (report) {
-        await db.reports.put({ id: 1, ref_code: `REPORT_CACHE`, created_at: new Date().toISOString(), analysis_text: report });
+        await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeframe}`, created_at: new Date().toISOString(), analysis_text: report });
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
-        box.innerHTML = `<b>Executive Season Progression Audit</b><br/><br/>` + cleanAiText(report);
+        box.innerHTML = `<b>Clinical Longitudinal Review (${startDate} to ${endDate})</b><br/><br/>` + cleanAiText(report);
       }
     }
 
@@ -1921,7 +2104,7 @@ RULES:
       const latestReport = await db.reports.get(1);
 
       if (!latestReport || !latestReport.analysis_text) {
-        alert("Please tap 'Synthesize AI Season Review' first before downloading the PDF.");
+        alert("Please tap 'Synthesize Clinical Review' first before exporting the PDF.");
         return;
       }
 
@@ -1931,20 +2114,24 @@ RULES:
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ format: 'a4', unit: 'mm' });
 
-        let workouts = await db.workouts.orderBy('ride_number').toArray();
+        const workouts = await getScopedWorkouts();
+        const startDate = workouts[0].date.split(' ')[0];
+        const endDate = workouts[workouts.length - 1].date.split(' ')[0];
 
+        // 1. Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(252, 82, 0);
-        doc.text("RIDE PARTNER — EXECUTIVE PERFORMANCE AUDIT", 14, 18);
+        doc.text("RIDE PARTNER — CLINICAL PHYSIOLOGY REPORT", 14, 18);
 
         doc.setFontSize(8.5);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100, 116, 139);
-        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Discipline: XC Mountain Bike | Date: ${new Date().toLocaleDateString()}`, 14, 24);
+        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Period: ${startDate} to ${endDate} | Exported: ${new Date().toLocaleDateString()}`, 14, 24);
 
         let startY = 30;
 
+        // 2. Scorecard
         const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
         const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
         const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
@@ -1953,7 +2140,7 @@ RULES:
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9.5);
         doc.setTextColor(15, 23, 42);
-        doc.text("Personal Records & Volume Scorecard", 14, startY);
+        doc.text("Physiological Biomarker & Work Scorecard", 14, startY);
         startY += 4;
 
         doc.autoTable({
@@ -1966,10 +2153,11 @@ RULES:
         });
         startY = doc.lastAutoTable.finalY + 8;
 
+        // 3. Clinical Narrative
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10.5);
         doc.setTextColor(15, 23, 42);
-        doc.text("Executive Coaching Assessment", 14, startY);
+        doc.text("Clinical Longitudinal Assessment", 14, startY);
         startY += 5;
 
         doc.setFont("helvetica", "normal");
@@ -1980,6 +2168,7 @@ RULES:
         doc.text(splitText, 14, startY);
         startY += (splitText.length * 3.4) + 6;
 
+        // 4. Ledger Table
         const tableData = workouts.map(w => [
           `Ride ${w.ride_number}`,
           w.date.split(' ')[0],
@@ -2000,7 +2189,7 @@ RULES:
           styles: { fontSize: 7.5, cellPadding: 2 }
         });
 
-        const fileName = `Mustafa_Ride_Partner_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+        const fileName = `Mustafa_Ride_Partner_${startDate}_to_${endDate}.pdf`;
         const base64Data = doc.output('datauristring').split(',')[1];
 
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
@@ -2016,7 +2205,7 @@ RULES:
             });
           });
 
-          statusDiv.innerHTML = `✓ Downloaded: <b>${fileName}</b> in Downloads folder!`;
+          statusDiv.innerHTML = `✓ Saved to Downloads: <b>${fileName}</b>`;
           alert(`PDF Report downloaded successfully:\n${fileName}`);
           return;
         }
@@ -2036,10 +2225,9 @@ RULES:
     }
 
     // --------------------------------------------------------
-    // STRICT SINGLE-SHOT API CLIENT (NO RETRY CASCADES)
+    // 9. STRICT SINGLE REQUEST API CLIENT
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
-      // 1 single request. No loops, no background bursts.
       const model = "gemini-3.8-flash";
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
@@ -2062,13 +2250,13 @@ RULES:
           const errData = await res.json().catch(() => ({}));
           const msg = errData.error?.message || "";
           const match = msg.match(/retry in (\d+(\.\d+)?)s/);
-          const waitSec = match ? Math.ceil(parseFloat(match[1])) : 60;
-          alert(`Rate Limit Reached (Free Tier 20 RPM).\nPlease wait ${waitSec}s before tapping again.`);
+          const waitSec = match ? Math.ceil(parseFloat(match[1])) : 45;
+          alert(`Google AI Cooldown: Rate limit reached.\nPlease wait ${waitSec} seconds before analyzing another ride.`);
           return null;
         }
 
-        // Single fallback if 3.8 is busy
         if (res.status === 503 || res.status === 500) {
+          // Single backup attempt to 3.7 if 3.8 is overloaded
           const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
