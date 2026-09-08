@@ -512,11 +512,11 @@
     }
     .chat-timestamp {
       font-size: 0.65rem;
-      color: var(--text-muted);
+      color: var(--text-muted); 
     }
     .chat-snippet {
       font-size: 0.74rem;
-      color: var(--text-muted);
+      color: var(--text-muted); 
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -524,10 +524,10 @@
 
     .report-card {
       background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      margin: 10px 0;
+      border: 1px solid var(--border); 
+      border-radius: 12px; 
+      padding: 14px; 
+      margin: 10px 0; 
     }
 
     .lab-panel {
@@ -549,6 +549,30 @@
       padding: 8px;
       border-radius: 6px;
       border-left: 3px solid var(--primary);
+    }
+
+    /* Model Selector Inline Pill Rack */
+    .model-selector-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      margin: 6px 0;
+      gap: 8px;
+    }
+    .model-select-input {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--text-main);
+      outline: none;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -616,6 +640,18 @@
       <h4 style="font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Coach Debrief</h4>
       <div id="det_status_badge"></div>
     </div>
+
+    <!-- Model Selector Bar for Debrief -->
+    <div class="model-selector-bar">
+      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Reasoning Engine:</span>
+      <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
+        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+        <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+      </select>
+    </div>
     
     <div id="sessionActionBox" style="margin: 6px 0;"></div>
     
@@ -652,6 +688,16 @@
     </div>
 
     <h4 style="margin: 14px 0 6px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Season Progression Audit</h4>
+    <div class="model-selector-bar">
+      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Reasoning Engine:</span>
+      <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
+        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+        <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+      </select>
+    </div>
     <button class="btn btn-primary" onclick="generateGraphDebrief()">Analyze Macro Trends</button>
     
     <div id="graphLoadingBanner" class="loading-banner" style="display: none;">
@@ -677,7 +723,18 @@
       </select>
     </div>
     <div id="compareTableContainer"></div>
-    <button class="btn btn-primary" style="margin-top: 10px;" onclick="generateAIComparison()">Generate Comparative AI Breakdown</button>
+
+    <div class="model-selector-bar" style="margin-top:10px;">
+      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Engine:</span>
+      <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
+        <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+        <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="generateAIComparison()">Generate Comparative AI Breakdown</button>
     
     <div id="compareLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
@@ -698,6 +755,17 @@
       <div class="sticky-back" style="display:flex; justify-content:space-between; align-items:center;">
         <button class="btn btn-secondary btn-small" onclick="closeChatThreadView()">← All Chats</button>
         <span id="activeChatHeaderTitle" style="font-size:0.84rem; font-weight:800; color:var(--primary);"></span>
+      </div>
+
+      <div class="model-selector-bar">
+        <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">Coach Model:</span>
+        <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
+          <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+          <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+          <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+        </select>
       </div>
 
       <div id="hubActionBox" style="margin: 6px 0;"></div>
@@ -747,9 +815,21 @@
     
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Clinical Longitudinal Review</h4>
-      <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+      <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">
         Compiles an objective medical-grade review assessing cardiovascular drift, lactate endurance, and torque scalability under body mass.
       </p>
+
+      <div class="model-selector-bar" style="margin-bottom:8px;">
+        <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">Synthesis Engine:</span>
+        <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
+          <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+          <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+          <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+        </select>
+      </div>
+
       <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize Clinical Review</button>
       
       <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
@@ -779,6 +859,15 @@
     <label style="font-size:0.75rem; font-weight:700;">Athlete Height (cm)</label>
     <input type="number" id="cfg_height" class="input-box" value="190" step="0.5" />
     
+    <label style="font-size:0.75rem; font-weight:700;">Default Gemini Model</label>
+    <select id="cfg_model" class="input-box" onchange="syncModelSelection(this.value)">
+      <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
+      <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+      <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+      <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+    </select>
+
     <label style="font-size:0.75rem; font-weight:700;">Strava Client ID</label>
     <input type="text" id="cfg_client_id" class="input-box" value="277202" />
     
@@ -872,7 +961,23 @@
     }
 
     // --------------------------------------------------------
-    // 2. CAPACITOR DEEP LINK INTERCEPTOR (FULL RESTORATION)
+    // 2. MODEL SYNCHRONIZATION
+    // --------------------------------------------------------
+    async function syncModelSelection(modelName) {
+      await setConfig("selected_gemini_model", modelName);
+      document.querySelectorAll('.global-model-selector').forEach(sel => {
+        sel.value = modelName;
+      });
+      const cfgModel = document.getElementById("cfg_model");
+      if (cfgModel) cfgModel.value = modelName;
+    }
+
+    async function getActiveModel() {
+      return (await getConfig("selected_gemini_model")) || "gemini-3.8-flash";
+    }
+
+    // --------------------------------------------------------
+    // 3. CAPACITOR DEEP LINK INTERCEPTOR (RESTORED)
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -914,12 +1019,14 @@
       }
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
         window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
           if (data && data.url) processIncomingUrl(data.url);
         });
       }
+      const savedModel = await getActiveModel();
+      syncModelSelection(savedModel);
     });
 
     window.addEventListener('appUrlOpen', (e) => {
@@ -964,7 +1071,7 @@
     }
 
     // --------------------------------------------------------
-    // 3. FEED TAB
+    // 4. FEED TAB
     // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
@@ -993,7 +1100,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (DISTANCE IN DELTA CARD & WORKING CHARTS)
+    // 5. IN-SESSION DETAIL VIEW
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1033,7 +1140,7 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
-      // Delta Table: Safe Subtraction without zero-average pollution
+      // Delta Table: Safe Subtraction without zero pollution
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
@@ -1171,7 +1278,6 @@
       return res;
     }
 
-    // In-Ride Plotly: Clean Listener Recycling & Scaled Normalization
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
@@ -1329,7 +1435,7 @@
     async function runSingleRideDebrief(targetRide) {
       if (isRequestInProgress) return;
       if (!navigator.onLine) { alert("Connect to internet to run AI debrief."); return; }
-      const key = await getConfig("gemini_api_key");
+      const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Please save your Gemini Key in Profile."); return; }
 
       const btn = document.querySelector("#sessionActionBox button");
@@ -1424,7 +1530,7 @@ CRITICAL RULES:
       }
 
       if (navigator.onLine) {
-        const key = await getConfig("gemini_api_key");
+        const key = (await getConfig("gemini_api_key")).trim();
         if (key) {
           const pastThreads = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
           const dialogueContext = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
@@ -1456,7 +1562,7 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
     }
 
     // --------------------------------------------------------
-    // 5. GLOBAL TELEMETRY GRAPHS (WITH DISTANCE INCLUDED)
+    // 6. GLOBAL TELEMETRY GRAPHS
     // --------------------------------------------------------
     function setupGlobalMetricPills() {
       const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)", "Elevation Ascent (m)", "Work (kJ)"];
@@ -1600,7 +1706,7 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
 
     async function generateGraphDebrief() {
       if (!navigator.onLine) { alert("Connect to internet."); return; }
-      const key = await getConfig("gemini_api_key");
+      const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
       let workouts = await db.workouts.orderBy('ride_number').toArray();
@@ -1637,7 +1743,7 @@ RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (
       renderGraphChatThread();
 
       if (navigator.onLine) {
-        const key = await getConfig("gemini_api_key");
+        const key = (await getConfig("gemini_api_key")).trim();
         if (key) {
           const pastThreads = await db.graph_threads.where("metric_key").equals(metricKey).toArray();
           const dialogueContext = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
@@ -1662,7 +1768,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // 6. COMPARE LAB (WITH ZERO-POLLUTION DELTA GUARDS)
+    // 7. COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
@@ -1712,7 +1818,7 @@ RULES: Clean plain English. NO LaTeX formulas.
         { name: "Peak Speed", v1: `${w1.max_speed_kmh} km/h`, v2: `${w2.max_speed_kmh} km/h`, dHtml: diffStr(w2.max_speed_kmh, w1.max_speed_kmh, ' km/h'), v3: w3 ? `${w3.max_speed_kmh} km/h` : null },
         { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', dHtml: (w1.avg_hr > 0 && w2.avg_hr > 0) ? `<span class="${(w2.avg_hr - w1.avg_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.avg_hr - w1.avg_hr) >= 0 ? '+' : ''}${w2.avg_hr - w1.avg_hr} bpm</span>` : '--', v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
         { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', dHtml: (w1.max_hr > 0 && w2.max_hr > 0) ? `<span class="${(w2.max_hr - w1.max_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.max_hr - w1.max_hr) >= 0 ? '+' : ''}${w2.max_hr - w1.max_hr} bpm</span>` : '--', v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
-        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', dHtml: diffStr(w2.avg_power_w, w1.avg_power_w, ' W'), v3: w3 && w3.avg_power_w ? `${w3.avg_power_w} W` : '--' },
+        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', dHtml: diffStr(w2.avg_power_w, w1.avg_power_w, ' W'), v3: w3 ? `${w3.avg_power_w} W` : '--' },
         { name: "Normalized Power", v1: `${getNP(w1)} W`, v2: `${getNP(w2)} W`, dHtml: diffStr(getNP(w2), getNP(w1), ' W'), v3: w3 ? `${getNP(w3)} W` : '--' },
         { name: "Power to Weight", v1: `${getWPK(w1)} W/kg`, v2: `${getWPK(w2)} W/kg`, dHtml: diffStr(parseFloat(getWPK(w2)) || 0, parseFloat(getWPK(w1)) || 0, ' W/kg'), v3: w3 ? `${getWPK(w3)} W/kg` : '--' },
         { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, dHtml: diffStr(w2.elevation_gain_m, w1.elevation_gain_m, ' m'), v3: w3 ? `${w3.elevation_gain_m} m` : null },
@@ -1745,7 +1851,7 @@ RULES: Clean plain English. NO LaTeX formulas.
 
     async function generateAIComparison() {
       if (!navigator.onLine) { alert("Connect to internet."); return; }
-      const key = await getConfig("gemini_api_key");
+      const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
       const id1 = parseInt(document.getElementById("comp_s1").value);
@@ -1777,7 +1883,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 7. CHATS HUB (IN-CHAT ACTION TRIGGER)
+    // 8. CHATS HUB (IN-CHAT ACTION TRIGGER)
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -1914,7 +2020,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
         renderHubChat();
 
         if (navigator.onLine) {
-          const key = await getConfig("gemini_api_key");
+          const key = (await getConfig("gemini_api_key")).trim();
           if (key) {
             const workouts = await db.workouts.orderBy('ride_number').toArray();
             const athleteW = await getConfig("athlete_weight") || "114.8";
@@ -1959,7 +2065,7 @@ DIRECTIVES:
         renderHubChat();
 
         if (navigator.onLine) {
-          const key = await getConfig("gemini_api_key");
+          const key = (await getConfig("gemini_api_key")).trim();
           if (key) {
             const w = await db.workouts.where("ride_number").equals(rNum).first();
             const pastThreads = await db.threads.where("ride_number").equals(rNum).toArray();
@@ -1987,7 +2093,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS (TIMEFRAME SELECTOR, DATE SCOPE, LAB SCORECARD)
+    // 9. REPORTS (TIMEFRAME SELECTOR, DATE SCOPE, LAB SCORECARD)
     // --------------------------------------------------------
     function setReportTimeframe(tf, el) {
       reportTimeframe = tf;
@@ -2287,7 +2393,7 @@ CLINICAL REPORT DIRECTIVES:
     }
 
     // --------------------------------------------------------
-    // 9. CENTRALIZED API CLIENT (70S TIMEOUT, CORS SAFE)
+    // 10. CENTRALIZED API CLIENT (DYNAMIC MODEL, 70S TIMEOUT, CORS SAFE)
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
       if (isRequestInProgress) {
@@ -2296,9 +2402,8 @@ CLINICAL REPORT DIRECTIVES:
       }
 
       isRequestInProgress = true;
-      const model = "gemini-3.8-flash";
+      const model = await getActiveModel();
 
-      // 70s timeout to allow full longitudinal analysis
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 70000);
 
@@ -2328,13 +2433,14 @@ CLINICAL REPORT DIRECTIVES:
           const msg = errData.error?.message || "";
           const match = msg.match(/retry in (\d+(\.\d+)?)s/);
           const waitSec = match ? Math.ceil(parseFloat(match[1])) : 45;
-          alert(`Google AI Cooldown: Rate limit reached.\nPlease wait ${waitSec} seconds before analyzing another ride.`);
+          alert(`Google AI Cooldown on ${model}: Rate limit reached.\nPlease switch to another model or wait ${waitSec}s.`);
           isRequestInProgress = false;
           return null;
         }
 
         if (res.status === 503 || res.status === 500) {
-          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
+          const fallbackModel = (model === "gemini-3.8-flash") ? "gemini-3.7-flash" : "gemini-3.6-flash";
+          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
             body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
@@ -2347,10 +2453,10 @@ CLINICAL REPORT DIRECTIVES:
         }
 
         const errText = await res.text().catch(() => "");
-        alert(`API Error (${res.status}): ${errText.slice(0, 100)}`);
+        alert(`API Error (${res.status}): ${errText.slice(0, 120)}`);
       } catch (e) {
         if (e.name === 'AbortError') {
-          alert("Request timed out (70s). The analysis took longer than expected—please try again.");
+          alert(`Request timed out (70s) on ${model}. Consider switching to Gemini 3.7 or 3.6 Flash for faster processing.`);
         } else {
           alert("Network exception: " + e.message);
         }
@@ -2368,6 +2474,7 @@ CLINICAL REPORT DIRECTIVES:
     async function saveSettings() {
       await setConfig("athlete_weight", document.getElementById("cfg_weight").value);
       await setConfig("athlete_height", document.getElementById("cfg_height").value);
+      await setConfig("selected_gemini_model", document.getElementById("cfg_model").value);
       await setConfig("strava_client_id", document.getElementById("cfg_client_id").value.trim());
       await setConfig("strava_client_secret", document.getElementById("cfg_client_secret").value.trim());
       await setConfig("gemini_api_key", document.getElementById("cfg_gemini_key").value.trim());
@@ -2377,6 +2484,7 @@ CLINICAL REPORT DIRECTIVES:
     async function loadSettings() {
       document.getElementById("cfg_weight").value = await getConfig("athlete_weight") || "114.8";
       document.getElementById("cfg_height").value = await getConfig("athlete_height") || "190";
+      document.getElementById("cfg_model").value = await getActiveModel();
       document.getElementById("cfg_client_id").value = await getConfig("strava_client_id") || "277202";
       document.getElementById("cfg_client_secret").value = await getConfig("strava_client_secret");
       document.getElementById("cfg_gemini_key").value = await getConfig("gemini_api_key");
