@@ -291,7 +291,7 @@
       width: 55px;
       text-align: right;
       font-weight: 800;
-      color: var(--text-main);
+      color: var(--text-main); 
     }
 
     .delta-table { 
@@ -790,7 +790,7 @@
         Authenticate with Strava via Google.
       </p>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1V9c-1.5 0-2.9-.6-4-1.6l-1.8-1.8c-.4-.4-.9-.6-1.4-.6-.6 0-1.1.2-1.5.6L6.5 9.4c-.4.4-.5.9-.5 1.4 0 .6.2 1.1.6 1.5l3.4 3.4v4.3h2v-5.1l-2.2-2.2 1-2.9zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.2 13.828h4.172"/></svg>
         Sign in to Strava via Google
       </button>
 
@@ -825,7 +825,7 @@
     let activeStream = null;
     let activeChatStreamKey = 'MASTER';
     let reportTimeframe = '7d';
-    let isRequestInProgress = false; // Centralized API Guard
+    let isRequestInProgress = false; // Centralized API Lock Guard
 
     let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
     let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)"];
@@ -866,7 +866,7 @@
     }
 
     // --------------------------------------------------------
-    // 2. CAPACITOR DEEP LINK INTERCEPTOR
+    // 2. CAPACITOR DEEP LINK INTERCEPTOR (FULL RESTORATION)
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -875,8 +875,10 @@
       const code = match[1];
 
       const box = document.getElementById("stravaDiagBox");
-      box.style.display = "block";
-      box.textContent = `Deep link detected: code=${code.substring(0, 6)}...\nExchanging with Strava API...\n`;
+      if (box) {
+        box.style.display = "block";
+        box.textContent = `Deep link detected: code=${code.substring(0, 6)}...\nExchanging with Strava API...\n`;
+      }
 
       const clientId = (await getConfig("strava_client_id") || "277202").trim();
       const clientSecret = (await getConfig("strava_client_secret")).trim();
@@ -895,16 +897,24 @@
         const data = await res.json();
         if (data.refresh_token) {
           await setConfig("strava_refresh_token", data.refresh_token);
-          alert("Strava authenticated! Syncing rides now...");
+          alert("Strava authenticated successfully! Syncing rides now...");
           switchTab('feed');
           syncStrava();
         } else {
-          box.textContent += "Exchange Error: " + JSON.stringify(data, null, 2);
+          if (box) box.textContent += "Exchange Error: " + JSON.stringify(data, null, 2);
         }
       } catch (e) {
-        box.textContent += "Network exception: " + e.message;
+        if (box) box.textContent += "Network exception: " + e.message;
       }
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+        window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
+          if (data && data.url) processIncomingUrl(data.url);
+        });
+      }
+    });
 
     window.addEventListener('appUrlOpen', (e) => {
       if (e.detail && e.detail.url) processIncomingUrl(e.detail.url);
@@ -1017,7 +1027,7 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
-      // Delta Table: Safe Subtraction without zero pollution
+      // Delta Table: Safe Subtraction without zero-average pollution
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
@@ -1245,7 +1255,6 @@
       const config = { responsive: true, displayModeBar: false, scrollZoom: false, staticPlot: false };
       Plotly.newPlot('plotlyDetailChart', traces, layout, config);
 
-      // Clean listener recycle: prevent duplicate handler accumulation (Bug #2)
       if (chartDiv.removeAllListeners) chartDiv.removeAllListeners('plotly_hover');
 
       chartDiv.on('plotly_hover', function(data) {
@@ -1682,7 +1691,6 @@ RULES: Clean plain English. NO LaTeX formulas.
       const getWPK = w => w.avg_power_w > 0 ? (w.avg_power_w / userW).toFixed(2) : '--';
       const getNP = w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0);
 
-      // Safe subtraction helper that avoids showing wild numbers when data is missing (Bug #5)
       const diffStr = (v2, v1, unit = '') => {
         if (v1 > 0 && v2 > 0) {
           const diff = +(v2 - v1).toFixed(1);
@@ -2014,7 +2022,6 @@ RULES: NO LaTeX. Plain English only.
       const endDate = workouts[workouts.length - 1].date.split(' ')[0];
       scopeHeader.textContent = `Period Range: ${startDate} to ${endDate} (${workouts.length} Sessions Analyzed)`;
 
-      // PR Cards
       const maxDist = workouts.reduce((p, c) => (c.distance_km > p.distance_km) ? c : p, workouts[0]);
       const maxSpd = workouts.reduce((p, c) => (c.max_speed_kmh > p.max_speed_kmh) ? c : p, workouts[0]);
       const maxPwr = workouts.reduce((p, c) => (c.avg_power_w > p.avg_power_w) ? c : p, workouts[0]);
@@ -2031,7 +2038,6 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Total Period Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
 
-      // Lab-Grade Physiological Biomarker Grid (Using True NP if available)
       const validNP = workouts.map(w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0)).filter(p => p > 0);
       const avgNP = validNP.length ? Math.round(validNP.reduce((a, b) => a + b, 0) / validNP.length) : 0;
       const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
@@ -2057,7 +2063,6 @@ RULES: NO LaTeX. Plain English only.
         </div>
       `;
 
-      // Render cached review ONLY if matching current timeframe (Bug #6)
       const cachedReport = await db.reports.get(1);
       const box = document.getElementById("reportSummaryBox");
       if (cachedReport && cachedReport.timeframe === reportTimeframe && cachedReport.analysis_text) {
@@ -2251,12 +2256,10 @@ CLINICAL REPORT DIRECTIVES:
       isRequestInProgress = true;
       const model = "gemini-3.8-flash";
 
-      // 25-Second AbortController (Bug #4)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       try {
-        // Security Fix (Bug #1): Send key strictly via header, NOT in URL query parameter
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST",
           signal: controller.signal,
