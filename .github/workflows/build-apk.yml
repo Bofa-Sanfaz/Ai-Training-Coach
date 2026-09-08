@@ -25,15 +25,14 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          npm install
+          npm install --legacy-peer-deps
           npm install -g @capacitor/cli
 
-      - name: Initialize Android Native Project, Deep Link Scheme & Custom Bike Icon
+      - name: Configure Native Identity, Deep Links & Sporty Launcher Icon
         run: |
           npx cap add android || true
           npx cap sync android
           
-          # 1. Inject Deep Link Scheme
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if grep -q "aicoach" "$MANIFEST"; then
             echo "Deep link scheme already present"
@@ -47,13 +46,13 @@ jobs:
             </intent-filter>' "$MANIFEST"
           fi
 
-          # 2. Update Native App Name
           STRINGS="android/app/src/main/res/values/strings.xml"
           sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner<\/string>/g' "$STRINGS"
           sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner<\/string>/g' "$STRINGS"
 
-          # 3. Overwrite Default Capacitor Launcher Icons with a Sporty Vector Bike Icon
           mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/mipmap-anydpi-v26
+
           cat << 'EOF' > android/app/src/main/res/drawable/ic_launcher_foreground.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp"
@@ -80,6 +79,16 @@ jobs:
                   android:pathData="M0,0h108v108h-108z"/>
           </vector>
           EOF
+
+          cat << 'EOF' > android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_launcher_background"/>
+              <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF
+
+          cp android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
       - name: Build Android Debug APK
         run: |
