@@ -530,7 +530,7 @@
       margin: 10px 0;
     }
 
-    /* Lab Report Medical Grid */
+    /* Clinical Lab Diagnostics */
     .lab-panel {
       background: #0f172a;
       color: #f8fafc;
@@ -622,7 +622,7 @@
     
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>Calling Gemini for ride comparative analysis...</span>
+      <span id="sessionLoadingText">Calling Gemini for Ride comparative analysis...</span>
     </div>
     
     <div class="chat-container" id="chatThread"></div>
@@ -717,7 +717,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS (WITH LAB DATA, TIMEFRAME SELECTOR, & DATE RANGES) -->
+  <!-- TAB 5: REPORTS (CLINICAL LAB DATA & TIMEFRAME SELECTOR) -->
   <div id="tab_reports" style="display: none;">
     <h4 style="margin-bottom: 6px;">Executive Clinical Physiology Report</h4>
     
@@ -745,7 +745,7 @@
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Clinical Longitudinal Review</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        Compiles an objective medical-grade review assessing cardiovascular drift, lactate endurance, and torque scalability.
+        Compiles an objective medical-grade review assessing cardiovascular drift, lactate endurance, and torque scalability under body mass.
       </p>
       <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize Clinical Review</button>
       
@@ -811,7 +811,7 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS)
+    // 1. DATABASE SCHEMA (DEXIE.JS WITH PENDING QUEUE)
     // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
     db.version(2).stores({
@@ -821,16 +821,15 @@
       master_chat: "++id, role, message, created_at",
       graph_threads: "++id, metric_key, role, message, created_at",
       reports: "id, ref_code, created_at, analysis_text",
-      config: "key, val"
+      config: "key, val",
+      pending_tasks: "id, type, target_id, prompt, timestamp"
     });
 
     let currentWorkout = null;
     let activeStream = null;
     let activeChatStreamKey = 'MASTER';
     let reportTimeframe = '7d';
-
-    let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
-    let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)"];
+    let isRequestInProgress = false;
 
     function checkNetwork() {
       const pill = document.getElementById("networkStatus");
@@ -868,8 +867,37 @@
     }
 
     // --------------------------------------------------------
-    // 2. CAPACITOR DEEP LINK INTERCEPTOR
+    // 2. CAPACITOR LIFECYCLE & BACKGROUND PERSISTENCE
     // --------------------------------------------------------
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+      window.Capacitor.Plugins.App.addListener('appStateChange', async (state) => {
+        if (state.isActive) {
+          // Re-entering app: check if any pending task needs finalization
+          processPendingQueue();
+        }
+      });
+    }
+
+    async function processPendingQueue() {
+      const pending = await db.pending_tasks.toArray();
+      if (!pending || pending.length === 0) return;
+
+      for (const task of pending) {
+        if (task.type === 'ride_debrief') {
+          const w = await db.workouts.where('ride_number').equals(task.target_id).first();
+          if (w) {
+            const existing = await db.threads.where({ ride_number: w.ride_number, role: 'coach' }).first();
+            if (!existing) {
+              // Retry seamlessly
+              runSingleRideDebrief(w);
+            }
+          }
+        }
+      }
+      await db.pending_tasks.clear();
+    }
+
+    // Deep link handling
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
       const match = urlStr.match(/[?&]code=([^&]+)/);
@@ -914,6 +942,7 @@
           if (data && data.url) processIncomingUrl(data.url);
         });
       }
+      processPendingQueue();
     });
 
     window.addEventListener('appUrlOpen', (e) => {
@@ -987,7 +1016,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (WITH DISTANCE IN DELTA TABLE)
+    // 4. IN-SESSION DETAIL (WITH DISTANCE IN DELTA CARD)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1027,7 +1056,7 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
-      // Delta Table: Including Distance Row
+      // Delta Table: Distance Included
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
@@ -1068,7 +1097,7 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // UI Status Badge & Action Button
+      // UI Status Badge & Single-Shot Action Button
       const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
@@ -1292,7 +1321,7 @@
     }
 
     // --------------------------------------------------------
-    // COMPACT CONTEXT BUILDER (PREVENTS TOKEN BLOAT)
+    // HIGH-DENSITY PRIOR CONTINUUM (NO TOKEN BLOAT)
     // --------------------------------------------------------
     async function buildCompactPriorContinuum(targetRideNumber) {
       const priorRides = await db.workouts
@@ -1301,10 +1330,7 @@
 
       let lines = [];
       for (const p of priorRides) {
-        // High density single line context (~30-40 tokens per ride)
-        let line = `R${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.avg_power_w || '--'}W, ${p.elevation_gain_m}m asc.`;
-        
-        // Grab short athlete complaint if one exists
+        let line = `• R${p.ride_number} (${p.date.slice(5,10)}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.avg_power_w || '--'}W, ${p.elevation_gain_m}m asc.`;
         const athleteMsg = await db.threads.where({ ride_number: p.ride_number, role: 'athlete' }).first();
         if (athleteMsg) {
           line += ` Note: "${athleteMsg.message.slice(0, 45)}"`;
@@ -1315,33 +1341,41 @@
     }
 
     // --------------------------------------------------------
-    // ROBUST SINGLE-RIDE DEBRIEF (BACKGROUND EXECUTION SAFE)
+    // ROBUST SINGLE-RIDE DEBRIEF (ZERO LOOPS & BACKGROUND SAFE)
     // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
-      if (!navigator.onLine) { alert("Connect to internet."); return; }
+      if (isRequestInProgress) return;
+      if (!navigator.onLine) { alert("Connect to internet to run AI debrief."); return; }
       const key = await getConfig("gemini_api_key");
       if (!key) { alert("Please save your Gemini Key in Profile."); return; }
 
-      // Hard lock button to prevent concurrent duplicate submissions
-      const btn = document.querySelector("#sessionActionBox button") || document.querySelector("#hubActionBox button");
-      if (btn) {
-        btn.disabled = true;
-        btn.style.opacity = "0.5";
-        btn.textContent = "Analyzing Ride with AI...";
-      }
+      isRequestInProgress = true;
+
+      // Disable buttons to block duplicate concurrent requests
+      const btn = document.querySelector("#sessionActionBox button");
+      const hubBtn = document.querySelector("#hubActionBox button");
+      [btn, hubBtn].forEach(b => {
+        if (b) {
+          b.disabled = true;
+          b.style.opacity = "0.5";
+          b.textContent = "Analyzing Ride with AI...";
+        }
+      });
 
       document.getElementById("sessionLoadingBanner").style.display = "flex";
       const hubBanner = document.getElementById("hubLoadingBanner");
       if (hubBanner) hubBanner.style.display = "flex";
 
+      // Save task to pending queue in case app is paused/closed mid-flight
+      await db.pending_tasks.put({
+        id: `debrief_${targetRide.ride_number}`,
+        type: 'ride_debrief',
+        target_id: targetRide.ride_number,
+        timestamp: Date.now()
+      });
+
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
-
-      // Register background task with Android OS so request survives if app is closed
-      let taskId = null;
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundTask) {
-        taskId = await window.Capacitor.Plugins.BackgroundTask.beforeExit(async () => {});
-      }
 
       const priorContinuum = await buildCompactPriorContinuum(targetRide.ride_number);
 
@@ -1372,12 +1406,11 @@ CRITICAL RULES:
 
       const reply = await callGeminiAPI(key, prompt);
 
+      isRequestInProgress = false;
+      await db.pending_tasks.delete(`debrief_${targetRide.ride_number}`);
+
       document.getElementById("sessionLoadingBanner").style.display = "none";
       if (hubBanner) hubBanner.style.display = "none";
-
-      if (taskId && window.Capacitor.Plugins.BackgroundTask) {
-        window.Capacitor.Plugins.BackgroundTask.finish({ taskId });
-      }
 
       if (reply) {
         await db.threads.where({ ride_number: targetRide.ride_number, role: 'coach' }).delete();
@@ -1397,11 +1430,13 @@ CRITICAL RULES:
           renderHubChat();
         }
       } else {
-        if (btn) {
-          btn.disabled = false;
-          btn.style.opacity = "1";
-          btn.textContent = `⚡ Analyze Ride ${targetRide.ride_number} with AI Coach`;
-        }
+        [btn, hubBtn].forEach(b => {
+          if (b) {
+            b.disabled = false;
+            b.style.opacity = "1";
+            b.textContent = `⚡ Analyze Ride ${targetRide.ride_number} with AI Coach`;
+          }
+        });
       }
     }
 
@@ -1692,7 +1727,7 @@ RULES: Clean plain English. NO LaTeX formulas.
         { name: "Peak Speed", v1: `${w1.max_speed_kmh} km/h`, v2: `${w2.max_speed_kmh} km/h`, d: `${(w2.max_speed_kmh - w1.max_speed_kmh).toFixed(1)} km/h`, pos: (w2.max_speed_kmh >= w1.max_speed_kmh), v3: w3 ? `${w3.max_speed_kmh} km/h` : null },
         { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', d: `${w2.avg_hr - w1.avg_hr} bpm`, pos: (w2.avg_hr <= w1.avg_hr), v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
         { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', d: `${w2.max_hr - w1.max_hr} bpm`, pos: (w2.max_hr <= w1.max_hr), v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
-        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', d: `${w2.avg_power_w - w1.avg_power_w} W`, pos: (w2.avg_power_w >= w1.avg_power_w), v3: w3 && w3.avg_power_w ? `${w3.avg_power_w} W` : '--' },
+        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', d: `${w2.avg_power_w - w1.avg_power_w} W`, pos: (w2.avg_power_w >= w1.avg_power_w), v3: w3 ? `${w3.avg_power_w} W` : '--' },
         { name: "Normalized Power", v1: `${getNP(w1)} W`, v2: `${getNP(w2)} W`, d: `${getNP(w2) - getNP(w1)} W`, pos: (getNP(w2) >= getNP(w1)), v3: w3 ? `${getNP(w3)} W` : '--' },
         { name: "Power to Weight", v1: `${getWPK(w1)} W/kg`, v2: `${getWPK(w2)} W/kg`, d: `${(getWPK(w2) - getWPK(w1)).toFixed(2)} W/kg`, pos: (getWPK(w2) >= getWPK(w1)), v3: w3 ? `${getWPK(w3)} W/kg` : '--' },
         { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, d: `${w2.elevation_gain_m - w1.elevation_gain_m} m`, pos: (w2.elevation_gain_m >= w1.elevation_gain_m), v3: w3 ? `${w3.elevation_gain_m} m` : null },
@@ -1757,7 +1792,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 7. CHATS HUB (WITH IN-CHAT ACTION BUTTON)
+    // 7. CHRONOLOGICAL CHATS HUB (IN-CHAT ACTION BUTTON)
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -1882,6 +1917,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       }
     }
 
+    // MASTER AI COACH & CHAT DISPATCHER
     async function sendHubReply() {
       const input = document.getElementById("hubReplyInput");
       const text = input.value.trim();
@@ -1900,23 +1936,28 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
             const athleteW = await getConfig("athlete_weight") || "114.8";
             const athleteH = await getConfig("athlete_height") || "190";
 
-            const summaryLogs = workouts.map(w => `Ride ${w.ride_number}: ${w.distance_km}km, ${w.avg_speed_kmh}km/h, ${w.avg_hr || '--'}bpm, ${w.avg_power_w || '--'}W`).join(' | ');
+            const summaryLogs = workouts.map(w => `R${w.ride_number} (${w.date.slice(5,10)}): ${w.distance_km}km, ${w.avg_speed_kmh}km/h, ${w.avg_hr||'--'}bpm, ${w.avg_power_w||'--'}W, ${w.elevation_gain_m}m asc`).join('\n');
+            const totalWork = Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0));
+            const totalDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
+
             const pastMessages = await db.master_chat.toArray();
             const dialogue = pastMessages.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
             const prompt = `
-You are Mustafa's head cycling sports director.
-ATHLETE BIO: ${athleteH} cm, ${athleteW} kg, XC Mountain Bike.
-SEASON RIDES (${workouts.length} total):
+You are Mustafa's head cycling sports director and clinical exercise physiologist.
+ATHLETE BIO: ${athleteH} cm, ${athleteW} kg, Cross-Country Mountain Biking (XC MTB). Max Heart Rate: 202 bpm.
+SEASON ACCUMULATION: ${workouts.length} total rides recorded, ${totalDist} km total distance, ${totalWork} kJ mechanical work.
+
+CHRONOLOGICAL WORKOUT LEDGER:
 ${summaryLogs}
 
-CONVERSATION:
+CONVERSATION HISTORY:
 ${dialogue}
 
-RULES:
-- Answer directly and conversationally.
-- DO NOT use LaTeX, dollar signs, or formulas.
-- Use simple units (km, km/h, W, bpm).
+DIRECTIVES:
+- Provide high-level, authoritative sports science and physiological insights.
+- Answer Mustafa's specific questions directly using his exact seasonal training metrics.
+- NO LaTeX, dollar signs, or abstract math formulas. Clean conversational English with units (km, km/h, W, bpm, kJ).
 `;
             document.getElementById("hubLoadingBanner").style.display = "flex";
             const reply = await callGeminiAPI(key, prompt);
@@ -1962,7 +2003,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS (WITH TIMEFRAME SELECTOR, DATE SCOPE, & LAB PANEL)
+    // 8. REPORTS (WITH LAB DATA, TIMEFRAME SELECTOR & SCOPE)
     // --------------------------------------------------------
     function setReportTimeframe(tf, el) {
       reportTimeframe = tf;
@@ -1994,8 +2035,8 @@ RULES: NO LaTeX. Plain English only.
 
       if (workouts.length === 0) {
         scopeHeader.textContent = "Period Range: No recorded workouts found in this timeframe.";
-        document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored.</div>`;
-        document.getElementById("labDiagnosticGrid").innerHTML = "<div style='color:#94a3b8; padding:8px;'>No data.</div>";
+        document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored in selected scope.</div>`;
+        document.getElementById("labDiagnosticGrid").innerHTML = "<div style='color:#94a3b8; padding:8px;'>No data available.</div>";
         return;
       }
 
@@ -2020,7 +2061,7 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Total Period Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
 
-      // Lab Grade Panel Calculations
+      // Lab-Grade Physiological Biomarker Grid
       const avgWatts = Math.round(workouts.reduce((a, b) => a + b.avg_power_w, 0) / workouts.length);
       const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
       const efMean = avgHR > 0 ? (avgWatts / avgHR).toFixed(2) : '--';
@@ -2036,16 +2077,16 @@ RULES: NO LaTeX. Plain English only.
           <div style="font-size:1.05rem; font-weight:800; color:${cardiacDecoupling <= 0 ? '#4ade80' : '#f87171'};">${cardiacDecoupling > 0 ? '+' : ''}${cardiacDecoupling} bpm</div>
         </div>
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Threshold Index (L4/L5)</div>
-          <div style="font-size:1.05rem; font-weight:800; color:#fbbf24;">${avgHR >= 162 ? 'Elevated Strain' : 'Sub-Threshold'}</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Threshold Strain Index</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#fbbf24;">${avgHR >= 162 ? 'Zone 4+ Heavy' : 'Sub-Threshold Steady'}</div>
         </div>
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Gross Mechanical Work</div>
-          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${Math.round(workouts.reduce((a,b)=>a+b.kilojoules,0))} kJ</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Total Period Volume</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1)} km</div>
         </div>
       `;
 
-      // Render cached review if present
+      // Render cached review
       const cachedReport = await db.reports.get(1);
       if (cachedReport && cachedReport.analysis_text) {
         const box = document.getElementById("reportSummaryBox");
@@ -2060,7 +2101,7 @@ RULES: NO LaTeX. Plain English only.
       if (!key) { alert("Enter Gemini key in Profile."); return; }
 
       const workouts = await getScopedWorkouts();
-      if (!workouts.length) { alert("No workouts in timeframe."); return; }
+      if (!workouts.length) { alert("No workouts in selected timeframe."); return; }
 
       const startDate = workouts[0].date.split(' ')[0];
       const endDate = workouts[workouts.length - 1].date.split(' ')[0];
@@ -2070,8 +2111,8 @@ RULES: NO LaTeX. Plain English only.
       const telemetryTable = workouts.map(w => `Ride ${w.ride_number} (${w.date.slice(5,10)}): ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.avg_power_w || '--'} W, ${w.elevation_gain_m} m`).join("\n");
 
       const prompt = `
-You are an executive head clinical sports scientist and medical trainer reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
-EVALUATION SCOPE: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}).
+You are an executive head clinical sports scientist and medical exercise physiologist reviewing athlete Mustafa (190 cm, 114.8 kg, XC Mountain Bike).
+EVALUATION TIMEFRAME SCOPE: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}).
 TELEMETRY LEDGER:
 ${telemetryTable}
 
@@ -2225,7 +2266,7 @@ CLINICAL REPORT DIRECTIVES:
     }
 
     // --------------------------------------------------------
-    // 9. STRICT SINGLE REQUEST API CLIENT
+    // 9. STRICT SINGLE-REQUEST API CLIENT (ZERO RETRY CASCADES)
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
       const model = "gemini-3.8-flash";
@@ -2255,8 +2296,8 @@ CLINICAL REPORT DIRECTIVES:
           return null;
         }
 
+        // Single fallback if 3.8 is busy
         if (res.status === 503 || res.status === 500) {
-          // Single backup attempt to 3.7 if 3.8 is overloaded
           const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
