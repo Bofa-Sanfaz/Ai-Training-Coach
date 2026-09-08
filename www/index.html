@@ -274,7 +274,7 @@
     .zone-tag {
       width: 70px;
       font-weight: 700;
-      color: var(--text-muted);
+      color: var(--text-muted); 
     }
     .zone-bar-bg {
       flex: 1;
@@ -621,7 +621,7 @@
     
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span id="sessionLoadingText">Calling Gemini for ride comparative analysis...</span>
+      <span id="sessionLoadingText">Calling Gemini for comparative analysis...</span>
     </div>
     
     <div class="chat-container" id="chatThread"></div>
@@ -731,9 +731,15 @@
       Period Range: Calculating...
     </div>
 
+    <!-- Lab-Grade Diagnostic Scorecard -->
     <div class="lab-panel">
       <div style="font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#38bdf8;">🔬 Physiological Stress & Biomarker Indicators</div>
       <div class="lab-grid" id="labDiagnosticGrid"></div>
+      
+      <div style="margin-top:10px;">
+        <div style="font-size:0.68rem; color:#94a3b8; margin-bottom:4px; font-weight:700; text-transform:uppercase;">Estimated Lactate & Cardiovascular Strain Profile</div>
+        <div id="reportLactateBars"></div>
+      </div>
     </div>
 
     <h4 style="margin: 10px 0 6px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">All-Time Cycling Records (PR)</h4>
@@ -748,7 +754,7 @@
       
       <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
         <div class="spinner-ring"></div>
-        <span>Synthesizing physiological review...</span>
+        <span>Synthesizing physiological review with Gemini...</span>
       </div>
       <div id="reportSummaryBox" class="chat-bubble chat-coach" style="display: none; margin: 10px 0;"></div>
     </div>
@@ -2015,6 +2021,7 @@ RULES: NO LaTeX. Plain English only.
         scopeHeader.textContent = "Period Range: No recorded workouts found in this timeframe.";
         document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored in selected scope.</div>`;
         document.getElementById("labDiagnosticGrid").innerHTML = "<div style='color:#94a3b8; padding:8px;'>No data available.</div>";
+        document.getElementById("reportLactateBars").innerHTML = "";
         return;
       }
 
@@ -2063,6 +2070,39 @@ RULES: NO LaTeX. Plain English only.
         </div>
       `;
 
+      // 5-Tier Lactate & Metabolic Stress Profile
+      let totalMins = 0, z1Mins = 0, z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0;
+      workouts.forEach(w => {
+        const mins = Math.round((w.moving_sec || 0) / 60);
+        totalMins += mins;
+        if (w.avg_hr < 121) z1Mins += mins;
+        else if (w.avg_hr < 141) z2Mins += mins;
+        else if (w.avg_hr < 162) z3Mins += mins;
+        else if (w.avg_hr < 182) z4Mins += mins;
+        else z5Mins += mins;
+      });
+
+      const zBars = [
+        { label: "Zone 1 Recovery", mins: z1Mins, color: "#94a3b8" },
+        { label: "Zone 2 Base Aerobic", mins: z2Mins, color: "#16a34a" },
+        { label: "Zone 3 Tempo / Glycolytic", mins: z3Mins, color: "#eab308" },
+        { label: "Zone 4 Sub-Threshold", mins: z4Mins, color: "#fc5200" },
+        { label: "Zone 5 Neuromuscular/Peak", mins: z5Mins, color: "#ef4444" }
+      ];
+
+      document.getElementById("reportLactateBars").innerHTML = zBars.map(z => {
+        const pct = totalMins > 0 ? Math.round((z.mins / totalMins) * 100) : 0;
+        return `
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:0.70rem;">
+            <span style="width:130px; color:#cbd5e1;">${z.label}</span>
+            <div style="flex:1; height:6px; background:#1e293b; border-radius:4px; overflow:hidden;">
+              <div style="width:${pct}%; height:100%; background:${z.color};"></div>
+            </div>
+            <span style="width:55px; text-align:right; font-weight:700; color:#f8fafc;">${z.mins}m (${pct}%)</span>
+          </div>
+        `;
+      }).join('');
+
       const cachedReport = await db.reports.get(1);
       const box = document.getElementById("reportSummaryBox");
       if (cachedReport && cachedReport.timeframe === reportTimeframe && cachedReport.analysis_text) {
@@ -2076,7 +2116,7 @@ RULES: NO LaTeX. Plain English only.
 
     async function generateExecutiveReport() {
       if (!navigator.onLine) { alert("Connect to internet."); return; }
-      const key = await getConfig("gemini_api_key");
+      const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Enter Gemini key in Profile."); return; }
 
       const workouts = await getScopedWorkouts();
@@ -2107,9 +2147,11 @@ CLINICAL REPORT DIRECTIVES:
   3. Mechanical Work Scalability (kJ) & Ascent Metabolic Penalty
   4. Clinical Summary of Recorded Athlete Notes
 `;
-      document.getElementById("reportLoadingBanner").style.display = "flex";
+      const banner = document.getElementById("reportLoadingBanner");
+      banner.style.display = "flex";
+
       const report = await callGeminiAPI(key, prompt);
-      document.getElementById("reportLoadingBanner").style.display = "none";
+      banner.style.display = "none";
 
       if (report) {
         await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeframe}`, created_at: new Date().toISOString(), timeframe: reportTimeframe, analysis_text: report });
@@ -2245,22 +2287,23 @@ CLINICAL REPORT DIRECTIVES:
     }
 
     // --------------------------------------------------------
-    // 9. CENTRALIZED API CLIENT (LOCK GUARD, TIMEOUT & HEADER-ONLY KEY)
+    // 9. CENTRALIZED API CLIENT (70S TIMEOUT, CORS SAFE)
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
       if (isRequestInProgress) {
-        console.warn("API request already in flight. Blocking duplicate tap.");
+        alert("An analysis is currently in progress. Please wait a moment.");
         return null;
       }
 
       isRequestInProgress = true;
       const model = "gemini-3.8-flash";
 
+      // 70s timeout to allow full longitudinal analysis
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 70000);
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
           method: "POST",
           signal: controller.signal,
           headers: { 
@@ -2291,7 +2334,7 @@ CLINICAL REPORT DIRECTIVES:
         }
 
         if (res.status === 503 || res.status === 500) {
-          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent`, {
+          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
             body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
@@ -2302,11 +2345,14 @@ CLINICAL REPORT DIRECTIVES:
             return fbData.candidates[0].content.parts[0].text;
           }
         }
+
+        const errText = await res.text().catch(() => "");
+        alert(`API Error (${res.status}): ${errText.slice(0, 100)}`);
       } catch (e) {
         if (e.name === 'AbortError') {
-          alert("Request timed out (25s). Check your connection and try again.");
+          alert("Request timed out (70s). The analysis took longer than expected—please try again.");
         } else {
-          console.warn("Network error:", e.message);
+          alert("Network exception: " + e.message);
         }
       } finally {
         clearTimeout(timeoutId);
