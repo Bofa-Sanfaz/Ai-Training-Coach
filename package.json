@@ -1,7 +1,7 @@
 {
   "name": "ai-training-coach",
   "version": "1.0.0",
-  "description": "Offline-First AI Cycling Coach",
+  "description": "Offline-First AI Cycling and Running Coach",
   "main": "index.js",
   "scripts": {
     "build": "echo 'Assets compiled in www/'"
