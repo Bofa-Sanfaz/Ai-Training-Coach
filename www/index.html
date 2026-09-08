@@ -551,7 +551,6 @@
       border-left: 3px solid var(--primary);
     }
 
-    /* Model Selector Inline Pill Rack */
     .model-selector-bar {
       display: flex;
       align-items: center;
@@ -641,9 +640,8 @@
       <div id="det_status_badge"></div>
     </div>
 
-    <!-- Model Selector Bar for Debrief -->
     <div class="model-selector-bar">
-      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Reasoning Engine:</span>
+      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Engine:</span>
       <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
         <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
         <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
@@ -668,7 +666,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (WITH DISTANCE INCLUDED) -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
   <div id="tab_graphs" style="display: none;">
     <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
@@ -689,7 +687,7 @@
 
     <h4 style="margin: 14px 0 6px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">AI Season Progression Audit</h4>
     <div class="model-selector-bar">
-      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Reasoning Engine:</span>
+      <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted);">AI Engine:</span>
       <select class="model-select-input global-model-selector" onchange="syncModelSelection(this.value)">
         <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest)</option>
         <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
@@ -744,7 +742,7 @@
     <div id="compareAIBox" class="chat-bubble chat-coach" style="display: none; margin-top: 8px;"></div>
   </div>
 
-  <!-- TAB 4: CHATS HUB WITH IN-CHAT DEBRIEF BUTTON -->
+  <!-- TAB 4: CHATS HUB -->
   <div id="tab_chats" style="display: none;">
     <div id="chatsListView">
       <h4 style="margin-bottom: 8px;">Coaching Communications</h4>
@@ -799,7 +797,6 @@
       Period Range: Calculating...
     </div>
 
-    <!-- Lab-Grade Diagnostic Scorecard -->
     <div class="lab-panel">
       <div style="font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#38bdf8;">🔬 Physiological Stress & Biomarker Indicators</div>
       <div class="lab-grid" id="labDiagnosticGrid"></div>
@@ -977,7 +974,7 @@
     }
 
     // --------------------------------------------------------
-    // 3. CAPACITOR DEEP LINK INTERCEPTOR (RESTORED)
+    // 3. CAPACITOR DEEP LINK INTERCEPTOR
     // --------------------------------------------------------
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
@@ -1140,7 +1137,6 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
-      // Delta Table: Safe Subtraction without zero pollution
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
@@ -1181,7 +1177,6 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // UI Status Badge & Action Button
       const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
@@ -1409,9 +1404,6 @@
       `).join('');
     }
 
-    // --------------------------------------------------------
-    // HIGH-DENSITY COMPACT CONTINUUM
-    // --------------------------------------------------------
     async function buildCompactPriorContinuum(targetRideNumber) {
       const priorRides = await db.workouts
         .where('ride_number').below(targetRideNumber)
@@ -1429,9 +1421,6 @@
       return lines.join('\n');
     }
 
-    // --------------------------------------------------------
-    // SINGLE-RIDE DEBRIEF
-    // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
       if (isRequestInProgress) return;
       if (!navigator.onLine) { alert("Connect to internet to run AI debrief."); return; }
@@ -2176,7 +2165,6 @@ RULES: NO LaTeX. Plain English only.
         </div>
       `;
 
-      // 5-Tier Lactate & Metabolic Stress Profile
       let totalMins = 0, z1Mins = 0, z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0;
       workouts.forEach(w => {
         const mins = Math.round((w.moving_sec || 0) / 60);
@@ -2267,6 +2255,9 @@ CLINICAL REPORT DIRECTIVES:
       }
     }
 
+    // --------------------------------------------------------
+    // HIGH-DENSITY, LAB-GRADE OFFICIAL PDF EXPORTER
+    // --------------------------------------------------------
     async function triggerOfficialPdfDownload() {
       const statusDiv = document.getElementById("pdfDownloadStatus");
       const latestReport = await db.reports.get(1);
@@ -2276,67 +2267,203 @@ CLINICAL REPORT DIRECTIVES:
         return;
       }
 
-      statusDiv.textContent = "Compiling official PDF file...";
+      statusDiv.textContent = "Compiling lab-grade PDF report...";
 
       try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 14;
+        const contentWidth = pageWidth - (margin * 2);
 
         const workouts = await getScopedWorkouts();
         const startDate = workouts[0].date.split(' ')[0];
         const endDate = workouts[workouts.length - 1].date.split(' ')[0];
+        const athleteW = (await getConfig("athlete_weight")) || "114.8";
+        const athleteH = (await getConfig("athlete_height")) || "190";
 
-        // 1. Header
+        // 1. TOP HEADER BAND
+        doc.setFillColor(15, 23, 42); // Navy Header Bar
+        doc.rect(0, 0, pageWidth, 28, 'F');
+        doc.setFillColor(252, 82, 0); // Orange Top Accent
+        doc.rect(0, 0, pageWidth, 3.5, 'F');
+
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.setTextColor(252, 82, 0);
-        doc.text("RIDE PARTNER — CLINICAL PHYSIOLOGY REPORT", 14, 18);
+        doc.setFontSize(14);
+        doc.setTextColor(255, 255, 255);
+        doc.text("RIDE PARTNER — CLINICAL PHYSIOLOGY REPORT", margin, 14);
 
-        doc.setFontSize(8.5);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Period: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}) | Exported: ${new Date().toLocaleDateString()}`, 14, 24);
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`ATHLETE: Mustafa (${athleteH} cm | ${athleteW} kg | XC MTB)   •   PERIOD: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()})   •   ISSUED: ${new Date().toLocaleDateString()}`, margin, 21);
 
-        let startY = 30;
+        let y = 35;
 
-        // 2. Scorecard
-        const maxDist = workouts.reduce((p, c) => c.distance_km > p.distance_km ? c : p, workouts[0]).distance_km;
-        const maxSpd = workouts.reduce((p, c) => c.max_speed_kmh > p.max_speed_kmh ? c : p, workouts[0]).max_speed_kmh;
-        const maxPwr = workouts.reduce((p, c) => c.avg_power_w > p.avg_power_w ? c : p, workouts[0]).avg_power_w;
-        const totWork = workouts.reduce((a, b) => a + b.kilojoules, 0);
+        // 2. LAB SCORECARD (4-PANEL GRID)
+        const validNP = workouts.map(w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0)).filter(p => p > 0);
+        const avgNP = validNP.length ? Math.round(validNP.reduce((a, b) => a + b, 0) / validNP.length) : 0;
+        const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
+        const efVal = (avgNP > 0 && avgHR > 0) ? (avgNP / avgHR).toFixed(2) : '--';
+        const dHRVal = workouts.length >= 2 ? (workouts[workouts.length - 1].avg_hr - workouts[0].avg_hr) : 0;
+        const totWork = Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0));
+        const totDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9.5);
-        doc.setTextColor(15, 23, 42);
-        doc.text("Physiological Biomarker & Work Scorecard", 14, startY);
-        startY += 4;
+        const cardWidth = (contentWidth - 9) / 4;
+        const cardHeight = 16;
+        const cards = [
+          { label: "AEROBIC EFFICIENCY", val: `${efVal} W/bpm`, color: [37, 99, 235] },
+          { label: "NET CARDIAC DRIFT", val: `${dHRVal > 0 ? '+' : ''}${dHRVal} bpm`, color: dHRVal <= 0 ? [22, 163, 74] : [220, 38, 38] },
+          { label: "TOTAL MECHANICAL WORK", val: `${totWork} kJ`, color: [252, 82, 0] },
+          { label: "PERIOD ACCUMULATION", val: `${totDist} km`, color: [15, 23, 42] }
+        ];
 
-        doc.autoTable({
-          head: [['Max Distance', 'Peak Speed', 'Peak Power', 'Total Mechanical Work']],
-          body: [[`${maxDist} km`, `${maxSpd} km/h`, `${maxPwr} W`, `${Math.round(totWork)} kJ`]],
-          startY: startY,
-          theme: 'plain',
-          styles: { fontSize: 8, cellPadding: 2 },
-          headStyles: { fillColor: [241, 245, 249], textColor: [100, 116, 139], fontStyle: 'bold' }
+        cards.forEach((c, idx) => {
+          const cx = margin + (idx * (cardWidth + 3));
+          doc.setFillColor(248, 250, 252);
+          doc.setDrawColor(226, 232, 240);
+          doc.roundedRect(cx, y, cardWidth, cardHeight, 2, 2, 'FD');
+
+          // Left border badge
+          doc.setFillColor(...c.color);
+          doc.rect(cx, y, 2.5, cardHeight, 'F');
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(5.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(c.label, cx + 5, y + 5);
+
+          doc.setFontSize(9.5);
+          doc.setTextColor(15, 23, 42);
+          doc.text(c.val, cx + 5, y + 12);
         });
-        startY = doc.lastAutoTable.finalY + 8;
 
-        // 3. Clinical Narrative
+        y += cardHeight + 8;
+
+        // 3. METABOLIC & LACTATE STRESS BARS
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(10.5);
+        doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
-        doc.text("Clinical Longitudinal Assessment", 14, startY);
-        startY += 5;
+        doc.text("CARDIOVASCULAR & METABOLIC STRAIN PROFILE", margin, y);
+        y += 4;
 
+        let totalMins = 0, z1Mins = 0, z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0;
+        workouts.forEach(w => {
+          const m = Math.round((w.moving_sec || 0) / 60);
+          totalMins += m;
+          if (w.avg_hr < 121) z1Mins += m;
+          else if (w.avg_hr < 141) z2Mins += m;
+          else if (w.avg_hr < 162) z3Mins += m;
+          else if (w.avg_hr < 182) z4Mins += m;
+          else z5Mins += m;
+        });
+
+        const zonePdfBars = [
+          { name: "Z1 Recovery (<121 bpm)", mins: z1Mins, rgb: [148, 163, 184] },
+          { name: "Z2 Base Aerobic (121-141 bpm)", mins: z2Mins, rgb: [22, 163, 74] },
+          { name: "Z3 Tempo / Glycolytic (142-161 bpm)", mins: z3Mins, rgb: [234, 179, 8] },
+          { name: "Z4 Sub-Threshold (162-181 bpm)", mins: z4Mins, rgb: [252, 82, 0] },
+          { name: "Z5 Neuromuscular Peak (182-202 bpm)", mins: z5Mins, rgb: [239, 68, 68] }
+        ];
+
+        const barMaxWidth = contentWidth - 75;
+        zonePdfBars.forEach(z => {
+          const pct = totalMins > 0 ? (z.mins / totalMins) : 0;
+          const fillWidth = Math.max(1, Math.round(barMaxWidth * pct));
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.5);
+          doc.setTextColor(71, 85, 105);
+          doc.text(z.name, margin, y + 3);
+
+          // Bar track
+          doc.setFillColor(241, 245, 249);
+          doc.roundedRect(margin + 52, y, barMaxWidth, 4, 1.5, 1.5, 'F');
+          // Bar fill
+          doc.setFillColor(...z.rgb);
+          doc.roundedRect(margin + 52, y, fillWidth, 4, 1.5, 1.5, 'F');
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(6.5);
+          doc.setTextColor(15, 23, 42);
+          doc.text(`${z.mins} min (${Math.round(pct * 100)}%)`, margin + 55 + barMaxWidth, y + 3);
+
+          y += 5.5;
+        });
+
+        y += 4;
+
+        // 4. CLINICAL LONGITUDINAL ASSESSMENT
+        doc.setFillColor(252, 82, 0);
+        doc.rect(margin, y, contentWidth, 0.7, 'F');
+        y += 5;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(15, 23, 42);
+        doc.text("CLINICAL LONGITUDINAL ASSESSMENT", margin, y);
+        y += 5;
+
+        const rawNarrative = latestReport.analysis_text
+          .replace(/\r/g, '')
+          .replace(/[*#$]/g, '');
+
+        const narrativeLines = rawNarrative.split('\n');
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
+        doc.setFontSize(7.2);
         doc.setTextColor(30, 41, 59);
-        const rawClean = latestReport.analysis_text.replace(/[*#$]/g, '');
-        const splitText = doc.splitTextToSize(rawClean, 180);
-        doc.text(splitText, 14, startY);
-        startY += (splitText.length * 3.4) + 6;
 
-        // 4. Ledger Table
+        for (let line of narrativeLines) {
+          line = line.trim();
+          if (!line) {
+            y += 2.5;
+            continue;
+          }
+
+          if (y > pageHeight - 35) {
+            doc.addPage();
+            y = 20;
+          }
+
+          const isHeader = /^[0-9]+\.\s+[A-Z\s]+/.test(line) || /^[A-Z\s]{4,}:/.test(line);
+          if (isHeader) {
+            y += 2;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7.5);
+            doc.setTextColor(252, 82, 0);
+            doc.text(line, margin, y);
+            y += 3.8;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.2);
+            doc.setTextColor(30, 41, 59);
+          } else {
+            const split = doc.splitTextToSize(line, contentWidth - 4);
+            split.forEach(sLine => {
+              if (y > pageHeight - 20) {
+                doc.addPage();
+                y = 20;
+              }
+              doc.text(sLine, margin + 2, y);
+              y += 3.4;
+            });
+          }
+        }
+
+        // 5. TELEMETRY LEDGER TABLE
+        if (y > pageHeight - 65) {
+          doc.addPage();
+          y = 20;
+        } else {
+          y += 6;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text("SESSION TELEMETRY LEDGER", margin, y);
+        y += 3;
+
         const tableData = workouts.map(w => [
           `Ride ${w.ride_number}`,
           w.date.split(' ')[0],
@@ -2345,19 +2472,49 @@ CLINICAL REPORT DIRECTIVES:
           w.avg_speed_kmh + ' km/h',
           w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--',
           w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--',
-          w.elevation_gain_m + ' m'
+          w.elevation_gain_m + ' m',
+          w.kilojoules > 0 ? w.kilojoules + ' kJ' : '--'
         ]);
 
         doc.autoTable({
-          head: [['Ride', 'Date', 'Distance', 'Duration', 'Avg Speed', 'Avg Power', 'Avg HR', 'Ascent']],
+          head: [['Session', 'Date', 'Distance', 'Duration', 'Avg Speed', 'Power', 'Avg HR', 'Ascent', 'Work']],
           body: tableData,
-          startY: startY,
+          startY: y,
           theme: 'grid',
-          headStyles: { fillColor: [15, 23, 42], fontSize: 8 },
-          styles: { fontSize: 7.5, cellPadding: 2 }
+          margin: { left: margin, right: margin },
+          headStyles: { 
+            fillColor: [15, 23, 42], 
+            textColor: [255, 255, 255], 
+            fontSize: 6.8, 
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          bodyStyles: { 
+            fontSize: 6.5, 
+            cellPadding: 1.8,
+            textColor: [15, 23, 42],
+            halign: 'center'
+          },
+          alternateRowStyles: { 
+            fillColor: [248, 250, 252] 
+          }
         });
 
-        const fileName = `Mustafa_Ride_Partner_${startDate}_to_${endDate}.pdf`;
+        // 6. PAGE NUMBERING & FOOTER
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+          doc.setPage(i);
+          doc.setDrawColor(226, 232, 240);
+          doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.5);
+          doc.setTextColor(148, 163, 184);
+          doc.text("CONFIDENTIAL — PHYSIOLOGICAL PERFORMANCE RECORD", margin, pageHeight - 7);
+          doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 15, pageHeight - 7);
+        }
+
+        const fileName = `Mustafa_Clinical_Report_${startDate}_to_${endDate}.pdf`;
         const base64Data = doc.output('datauristring').split(',')[1];
 
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
