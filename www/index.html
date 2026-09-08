@@ -621,7 +621,7 @@
     
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span>Calling Gemini for ride comparative analysis...</span>
+      <span id="sessionLoadingText">Calling Gemini for ride comparative analysis...</span>
     </div>
     
     <div class="chat-container" id="chatThread"></div>
@@ -632,7 +632,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (WITH DISTANCE INCLUDED) -->
   <div id="tab_graphs" style="display: none;">
     <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
@@ -687,7 +687,7 @@
     <div id="compareAIBox" class="chat-bubble chat-coach" style="display: none; margin-top: 8px;"></div>
   </div>
 
-  <!-- TAB 4: CHATS HUB -->
+  <!-- TAB 4: CHATS HUB WITH IN-CHAT DEBRIEF BUTTON -->
   <div id="tab_chats" style="display: none;">
     <div id="chatsListView">
       <h4 style="margin-bottom: 8px;">Coaching Communications</h4>
@@ -716,7 +716,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS -->
+  <!-- TAB 5: REPORTS (CLINICAL LAB DATA & TIMEFRAME SELECTOR) -->
   <div id="tab_reports" style="display: none;">
     <h4 style="margin-bottom: 6px;">Executive Clinical Physiology Report</h4>
     
@@ -817,7 +817,7 @@
       threads: "++id, ride_number, role, message, created_at",
       master_chat: "++id, role, message, created_at",
       graph_threads: "++id, metric_key, role, message, created_at",
-      reports: "id, ref_code, created_at, analysis_text",
+      reports: "id, ref_code, created_at, timeframe, analysis_text",
       config: "key, val"
     });
 
@@ -825,7 +825,7 @@
     let activeStream = null;
     let activeChatStreamKey = 'MASTER';
     let reportTimeframe = '7d';
-    let isRequestInProgress = false;
+    let isRequestInProgress = false; // Centralized API Guard
 
     let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
     let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)"];
@@ -1001,13 +1001,13 @@
       `;
 
       const vam = currentWorkout.moving_sec > 0 ? Math.round(currentWorkout.elevation_gain_m / (currentWorkout.moving_sec / 3600)) : 0;
-      const npVal = currentWorkout.norm_power_w > 0 ? currentWorkout.norm_power_w + ' W' : (currentWorkout.avg_power_w > 0 ? `~${Math.round(currentWorkout.avg_power_w * 1.05)} W (Est)` : '--');
-      const efVal = (currentWorkout.avg_power_w > 0 && currentWorkout.avg_hr > 0) ? (currentWorkout.avg_power_w / currentWorkout.avg_hr).toFixed(2) : '--';
+      const npVal = currentWorkout.norm_power_w > 0 ? currentWorkout.norm_power_w : (currentWorkout.avg_power_w > 0 ? Math.round(currentWorkout.avg_power_w * 1.05) : 0);
+      const efVal = (npVal > 0 && currentWorkout.avg_hr > 0) ? (npVal / currentWorkout.avg_hr).toFixed(2) : '--';
 
       document.getElementById("det_secondary").innerHTML = `
         <div class="telemetry-row"><span class="telemetry-name">Max Speed</span><span class="telemetry-val">${currentWorkout.max_speed_kmh || '--'} km/h</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Peak Heart Rate</span><span class="telemetry-val">${currentWorkout.max_hr || '--'} bpm</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Normalized Power</span><span class="telemetry-val">${npVal}</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Normalized Power</span><span class="telemetry-val">${npVal > 0 ? npVal + ' W' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Mechanical Work</span><span class="telemetry-val">${currentWorkout.kilojoules > 0 ? currentWorkout.kilojoules + ' kJ' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Climbing VAM</span><span class="telemetry-val">${vam > 0 ? vam + ' m/h' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency (EF)</span><span class="telemetry-val">${efVal} W/bpm</span></div>
@@ -1017,7 +1017,7 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
-      // Delta Table: Including Distance Row
+      // Delta Table: Safe Subtraction without zero pollution
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
@@ -1030,8 +1030,8 @@
 
         const dDist = (currentWorkout.distance_km - avgDistPrior).toFixed(2);
         const dSpd = (currentWorkout.avg_speed_kmh - avgSpdPrior).toFixed(1);
-        const dHR = avgHRPrior ? (currentWorkout.avg_hr - avgHRPrior) : 0;
-        const dPwr = avgPwrPrior ? (currentWorkout.avg_power_w - avgPwrPrior) : 0;
+        const dHR = (currentWorkout.avg_hr > 0 && avgHRPrior > 0) ? (currentWorkout.avg_hr - avgHRPrior) : null;
+        const dPwr = (currentWorkout.avg_power_w > 0 && avgPwrPrior > 0) ? (currentWorkout.avg_power_w - avgPwrPrior) : null;
         const dAsc = currentWorkout.elevation_gain_m - avgAscPrior;
 
         document.getElementById("det_delta").innerHTML = `
@@ -1040,8 +1040,8 @@
             <tbody>
               <tr><td>Distance</td><td>${currentWorkout.distance_km} km</td><td>${avgDistPrior} km</td><td class="${dDist >= 0 ? 'delta-pos' : 'delta-neg'}">${dDist >= 0 ? '+' : ''}${dDist} km</td></tr>
               <tr><td>Average Speed</td><td>${currentWorkout.avg_speed_kmh} km/h</td><td>${avgSpdPrior} km/h</td><td class="${dSpd >= 0 ? 'delta-pos' : 'delta-neg'}">${dSpd >= 0 ? '+' : ''}${dSpd} km/h</td></tr>
-              <tr><td>Average HR</td><td>${currentWorkout.avg_hr || '--'} bpm</td><td>${avgHRPrior || '--'} bpm</td><td class="${dHR <= 0 ? 'delta-pos' : 'delta-neg'}">${dHR >= 0 ? '+' : ''}${dHR} bpm</td></tr>
-              <tr><td>Average Power</td><td>${currentWorkout.avg_power_w || '--'} W</td><td>${avgPwrPrior || '--'} W</td><td class="${dPwr >= 0 ? 'delta-pos' : 'delta-neg'}">${dPwr >= 0 ? '+' : ''}${dPwr} W</td></tr>
+              <tr><td>Average HR</td><td>${currentWorkout.avg_hr || '--'} bpm</td><td>${avgHRPrior || '--'} bpm</td><td>${dHR !== null ? `<span class="${dHR <= 0 ? 'delta-pos' : 'delta-neg'}">${dHR >= 0 ? '+' : ''}${dHR} bpm</span>` : '--'}</td></tr>
+              <tr><td>Average Power</td><td>${currentWorkout.avg_power_w || '--'} W</td><td>${avgPwrPrior || '--'} W</td><td>${dPwr !== null ? `<span class="${dPwr >= 0 ? 'delta-pos' : 'delta-neg'}">${dPwr >= 0 ? '+' : ''}${dPwr} W</span>` : '--'}</td></tr>
               <tr><td>Ascent Climbed</td><td>${currentWorkout.elevation_gain_m} m</td><td>${avgAscPrior} m</td><td class="${dAsc >= 0 ? 'delta-pos' : 'delta-neg'}">${dAsc >= 0 ? '+' : ''}${dAsc} m</td></tr>
             </tbody>
           </table>
@@ -1155,6 +1155,7 @@
       return res;
     }
 
+    // In-Ride Plotly: Clean Listener Recycling & Scaled Normalization
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
       if (!activeStream) {
@@ -1168,6 +1169,9 @@
       const hrs = activeStream.heartrate ? activeStream.heartrate.data : [];
       const alts = activeStream.altitude ? activeStream.altitude.data : [];
       const watts = activeStream.watts ? activeStream.watts.data : [];
+
+      const peakSpd = Math.max(...speeds, currentWorkout.max_speed_kmh || 35, 1);
+      const peakWatts = Math.max(...watts, currentWorkout.max_power_w || 350, 1);
 
       const traces = [];
 
@@ -1203,7 +1207,7 @@
 
       if (selectedMetrics.includes("Power (Watts)") && (watts.length || currentWorkout.avg_power_w > 0)) {
         const srcW = watts.length ? watts : times.map(() => currentWorkout.avg_power_w);
-        const normWatts = srcW.map(w => Math.min(100, Math.round((w / 400) * 100)));
+        const normWatts = srcW.map(w => Math.min(100, Math.round((w / peakWatts) * 100)));
         traces.push({ 
           x: times, 
           y: normWatts, 
@@ -1216,7 +1220,7 @@
       }
 
       if (selectedMetrics.includes("Speed (km/h)") && speeds.length) {
-        const normSpd = speeds.map(s => Math.min(100, Math.round((s / 45) * 100)));
+        const normSpd = speeds.map(s => Math.min(100, Math.round((s / peakSpd) * 100)));
         traces.push({ 
           x: times, 
           y: normSpd, 
@@ -1240,6 +1244,9 @@
 
       const config = { responsive: true, displayModeBar: false, scrollZoom: false, staticPlot: false };
       Plotly.newPlot('plotlyDetailChart', traces, layout, config);
+
+      // Clean listener recycle: prevent duplicate handler accumulation (Bug #2)
+      if (chartDiv.removeAllListeners) chartDiv.removeAllListeners('plotly_hover');
 
       chartDiv.on('plotly_hover', function(data) {
         if (!data.points || data.points.length === 0) return;
@@ -1282,7 +1289,7 @@
     }
 
     // --------------------------------------------------------
-    // HIGH-DENSITY COMPACT CONTINUUM (ZERO TOKEN BLOAT)
+    // HIGH-DENSITY COMPACT CONTINUUM
     // --------------------------------------------------------
     async function buildCompactPriorContinuum(targetRideNumber) {
       const priorRides = await db.workouts
@@ -1302,15 +1309,13 @@
     }
 
     // --------------------------------------------------------
-    // SINGLE-RIDE DEBRIEF (ZERO LOOPS & 1-TAP PROTECTION)
+    // SINGLE-RIDE DEBRIEF
     // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
       if (isRequestInProgress) return;
       if (!navigator.onLine) { alert("Connect to internet to run AI debrief."); return; }
       const key = await getConfig("gemini_api_key");
       if (!key) { alert("Please save your Gemini Key in Profile."); return; }
-
-      isRequestInProgress = true;
 
       const btn = document.querySelector("#sessionActionBox button");
       const hubBtn = document.querySelector("#hubActionBox button");
@@ -1357,8 +1362,6 @@ CRITICAL RULES:
 `;
 
       const reply = await callGeminiAPI(key, prompt);
-
-      isRequestInProgress = false;
 
       document.getElementById("sessionLoadingBanner").style.display = "none";
       if (hubBanner) hubBanner.style.display = "none";
@@ -1469,14 +1472,20 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
       const xLabels = workouts.map(w => `R${w.ride_number}`);
       const traces = [];
 
+      const peakPwr = Math.max(...workouts.map(w => w.avg_power_w || 0), 350);
+      const peakSpd = Math.max(...workouts.map(w => w.avg_speed_kmh || 0), 35);
+      const peakDist = Math.max(...workouts.map(w => w.distance_km || 0), 40);
+      const peakAsc = Math.max(...workouts.map(w => w.elevation_gain_m || 0), 150);
+      const peakWork = Math.max(...workouts.map(w => w.kilojoules || 0), 1200);
+
       const metricConfigs = {
         "Power Output (Watts)": { 
-          y: workouts.map(w => w.avg_power_w ? Math.min(100, Math.round((w.avg_power_w / 350) * 100)) : null), 
+          y: workouts.map(w => w.avg_power_w ? Math.min(100, Math.round((w.avg_power_w / peakPwr) * 100)) : null), 
           color: "#fc5200",
           text: workouts.map(w => `${w.avg_power_w || '--'} W`)
         },
         "Speed (km/h)": { 
-          y: workouts.map(w => Math.min(100, Math.round((w.avg_speed_kmh / 35) * 100))), 
+          y: workouts.map(w => Math.min(100, Math.round((w.avg_speed_kmh / peakSpd) * 100))), 
           color: "#2563eb",
           text: workouts.map(w => `${w.avg_speed_kmh} km/h`)
         },
@@ -1486,17 +1495,17 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
           text: workouts.map(w => `${w.avg_hr || '--'} bpm`)
         },
         "Distance (km)": { 
-          y: workouts.map(w => Math.min(100, Math.round((w.distance_km / 45) * 100))), 
+          y: workouts.map(w => Math.min(100, Math.round((w.distance_km / peakDist) * 100))), 
           color: "#8b5cf6",
           text: workouts.map(w => `${w.distance_km} km`)
         },
         "Elevation Ascent (m)": { 
-          y: workouts.map(w => Math.min(100, Math.round((w.elevation_gain_m / 200) * 100))), 
+          y: workouts.map(w => Math.min(100, Math.round((w.elevation_gain_m / peakAsc) * 100))), 
           color: "#64748b",
           text: workouts.map(w => `${w.elevation_gain_m} m`)
         },
         "Work (kJ)": { 
-          y: workouts.map(w => w.kilojoules ? Math.min(100, Math.round((w.kilojoules / 1500) * 100)) : null), 
+          y: workouts.map(w => w.kilojoules ? Math.min(100, Math.round((w.kilojoules / peakWork) * 100)) : null), 
           color: "#10b981",
           text: workouts.map(w => `${w.kilojoules || '--'} kJ`)
         }
@@ -1538,6 +1547,8 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
       Plotly.newPlot('plotlyGlobalChart', traces, layout, config);
 
       const chartDiv = document.getElementById('plotlyGlobalChart');
+      if (chartDiv.removeAllListeners) chartDiv.removeAllListeners('plotly_hover');
+
       chartDiv.on('plotly_hover', function(data) {
         if (!data.points || data.points.length === 0) return;
         const pt = data.points[0];
@@ -1636,7 +1647,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // 6. COMPARE LAB
+    // 6. COMPARE LAB (WITH ZERO-POLLUTION DELTA GUARDS)
     // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
@@ -1671,20 +1682,29 @@ RULES: Clean plain English. NO LaTeX formulas.
       const getWPK = w => w.avg_power_w > 0 ? (w.avg_power_w / userW).toFixed(2) : '--';
       const getNP = w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0);
 
+      // Safe subtraction helper that avoids showing wild numbers when data is missing (Bug #5)
+      const diffStr = (v2, v1, unit = '') => {
+        if (v1 > 0 && v2 > 0) {
+          const diff = +(v2 - v1).toFixed(1);
+          return `<span class="${diff >= 0 ? 'delta-pos' : 'delta-neg'}">${diff >= 0 ? '+' : ''}${diff}${unit}</span>`;
+        }
+        return '--';
+      };
+
       const metrics = [
-        { name: "Distance", v1: `${w1.distance_km} km`, v2: `${w2.distance_km} km`, d: (w2.distance_km - w1.distance_km).toFixed(2) + ' km', pos: (w2.distance_km >= w1.distance_km), v3: w3 ? `${w3.distance_km} km` : null },
-        { name: "Duration", v1: w1.duration_str, v2: w2.duration_str, d: `${Math.round((w2.moving_sec - w1.moving_sec)/60)} min`, pos: (w2.moving_sec >= w1.moving_sec), v3: w3 ? w3.duration_str : null },
-        { name: "Average Speed", v1: `${w1.avg_speed_kmh} km/h`, v2: `${w2.avg_speed_kmh} km/h`, d: `${(w2.avg_speed_kmh - w1.avg_speed_kmh).toFixed(1)} km/h`, pos: (w2.avg_speed_kmh >= w1.avg_speed_kmh), v3: w3 ? `${w3.avg_speed_kmh} km/h` : null },
-        { name: "Peak Speed", v1: `${w1.max_speed_kmh} km/h`, v2: `${w2.max_speed_kmh} km/h`, d: `${(w2.max_speed_kmh - w1.max_speed_kmh).toFixed(1)} km/h`, pos: (w2.max_speed_kmh >= w1.max_speed_kmh), v3: w3 ? `${w3.max_speed_kmh} km/h` : null },
-        { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', d: `${w2.avg_hr - w1.avg_hr} bpm`, pos: (w2.avg_hr <= w1.avg_hr), v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
-        { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', d: `${w2.max_hr - w1.max_hr} bpm`, pos: (w2.max_hr <= w1.max_hr), v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
-        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', d: `${w2.avg_power_w - w1.avg_power_w} W`, pos: (w2.avg_power_w >= w1.avg_power_w), v3: w3 && w3.avg_power_w ? `${w3.avg_power_w} W` : '--' },
-        { name: "Normalized Power", v1: `${getNP(w1)} W`, v2: `${getNP(w2)} W`, d: `${getNP(w2) - getNP(w1)} W`, pos: (getNP(w2) >= getNP(w1)), v3: w3 ? `${getNP(w3)} W` : '--' },
-        { name: "Power to Weight", v1: `${getWPK(w1)} W/kg`, v2: `${getWPK(w2)} W/kg`, d: `${(getWPK(w2) - getWPK(w1)).toFixed(2)} W/kg`, pos: (getWPK(w2) >= getWPK(w1)), v3: w3 ? `${getWPK(w3)} W/kg` : '--' },
-        { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, d: `${w2.elevation_gain_m - w1.elevation_gain_m} m`, pos: (w2.elevation_gain_m >= w1.elevation_gain_m), v3: w3 ? `${w3.elevation_gain_m} m` : null },
-        { name: "Climbing VAM", v1: `${getVAM(w1)} m/h`, v2: `${getVAM(w2)} m/h`, d: `${getVAM(w2) - getVAM(w1)} m/h`, pos: (getVAM(w2) >= getVAM(w1)), v3: w3 ? `${getVAM(w3)} m/h` : null },
-        { name: "Mechanical Work", v1: `${w1.kilojoules} kJ`, v2: `${w2.kilojoules} kJ`, d: `${w2.kilojoules - w1.kilojoules} kJ`, pos: (w2.kilojoules >= w1.kilojoules), v3: w3 ? `${w3.kilojoules} kJ` : null },
-        { name: "Estimated Burn", v1: `${w1.calories} kcal`, v2: `${w2.calories} kcal`, d: `${w2.calories - w1.calories} kcal`, pos: (w2.calories >= w1.calories), v3: w3 ? `${w3.calories} kcal` : null }
+        { name: "Distance", v1: `${w1.distance_km} km`, v2: `${w2.distance_km} km`, dHtml: diffStr(w2.distance_km, w1.distance_km, ' km'), v3: w3 ? `${w3.distance_km} km` : null },
+        { name: "Duration", v1: w1.duration_str, v2: w2.duration_str, dHtml: diffStr(Math.round(w2.moving_sec/60), Math.round(w1.moving_sec/60), ' min'), v3: w3 ? w3.duration_str : null },
+        { name: "Average Speed", v1: `${w1.avg_speed_kmh} km/h`, v2: `${w2.avg_speed_kmh} km/h`, dHtml: diffStr(w2.avg_speed_kmh, w1.avg_speed_kmh, ' km/h'), v3: w3 ? `${w3.avg_speed_kmh} km/h` : null },
+        { name: "Peak Speed", v1: `${w1.max_speed_kmh} km/h`, v2: `${w2.max_speed_kmh} km/h`, dHtml: diffStr(w2.max_speed_kmh, w1.max_speed_kmh, ' km/h'), v3: w3 ? `${w3.max_speed_kmh} km/h` : null },
+        { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', dHtml: (w1.avg_hr > 0 && w2.avg_hr > 0) ? `<span class="${(w2.avg_hr - w1.avg_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.avg_hr - w1.avg_hr) >= 0 ? '+' : ''}${w2.avg_hr - w1.avg_hr} bpm</span>` : '--', v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
+        { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', dHtml: (w1.max_hr > 0 && w2.max_hr > 0) ? `<span class="${(w2.max_hr - w1.max_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.max_hr - w1.max_hr) >= 0 ? '+' : ''}${w2.max_hr - w1.max_hr} bpm</span>` : '--', v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
+        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', dHtml: diffStr(w2.avg_power_w, w1.avg_power_w, ' W'), v3: w3 && w3.avg_power_w ? `${w3.avg_power_w} W` : '--' },
+        { name: "Normalized Power", v1: `${getNP(w1)} W`, v2: `${getNP(w2)} W`, dHtml: diffStr(getNP(w2), getNP(w1), ' W'), v3: w3 ? `${getNP(w3)} W` : '--' },
+        { name: "Power to Weight", v1: `${getWPK(w1)} W/kg`, v2: `${getWPK(w2)} W/kg`, dHtml: diffStr(parseFloat(getWPK(w2)) || 0, parseFloat(getWPK(w1)) || 0, ' W/kg'), v3: w3 ? `${getWPK(w3)} W/kg` : '--' },
+        { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, dHtml: diffStr(w2.elevation_gain_m, w1.elevation_gain_m, ' m'), v3: w3 ? `${w3.elevation_gain_m} m` : null },
+        { name: "Climbing VAM", v1: `${getVAM(w1)} m/h`, v2: `${getVAM(w2)} m/h`, dHtml: diffStr(getVAM(w2), getVAM(w1), ' m/h'), v3: w3 ? `${getVAM(w3)} m/h` : null },
+        { name: "Mechanical Work", v1: `${w1.kilojoules} kJ`, v2: `${w2.kilojoules} kJ`, dHtml: diffStr(w2.kilojoules, w1.kilojoules, ' kJ'), v3: w3 ? `${w3.kilojoules} kJ` : null },
+        { name: "Estimated Burn", v1: `${w1.calories} kcal`, v2: `${w2.calories} kcal`, dHtml: diffStr(w2.calories, w1.calories, ' kcal'), v3: w3 ? `${w3.calories} kcal` : null }
       ];
 
       let head = `<tr><th>Metric</th><th>${w1.exercise_code.split('-')[0].trim()}</th><th>${w2.exercise_code.split('-')[0].trim()}</th><th>Delta (2 vs 1)</th>`;
@@ -1696,7 +1716,7 @@ RULES: Clean plain English. NO LaTeX formulas.
           <td>${m.name}</td>
           <td>${m.v1}</td>
           <td>${m.v2}</td>
-          <td class="${m.pos ? 'delta-pos' : 'delta-neg'}">${m.d.startsWith('-') ? '' : '+'}${m.d}</td>
+          <td>${m.dHtml}</td>
           ${w3 ? `<td>${m.v3 || '--'}</td>` : ''}
         </tr>
       `).join('');
@@ -2011,15 +2031,16 @@ RULES: NO LaTeX. Plain English only.
         <div class="telemetry-row"><span class="telemetry-name">Total Period Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
       `;
 
-      // Lab-Grade Physiological Biomarker Grid
-      const avgWatts = Math.round(workouts.reduce((a, b) => a + b.avg_power_w, 0) / workouts.length);
+      // Lab-Grade Physiological Biomarker Grid (Using True NP if available)
+      const validNP = workouts.map(w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0)).filter(p => p > 0);
+      const avgNP = validNP.length ? Math.round(validNP.reduce((a, b) => a + b, 0) / validNP.length) : 0;
       const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
-      const efMean = avgHR > 0 ? (avgWatts / avgHR).toFixed(2) : '--';
+      const efMean = (avgNP > 0 && avgHR > 0) ? (avgNP / avgHR).toFixed(2) : '--';
       const cardiacDecoupling = workouts.length >= 2 ? (workouts[workouts.length - 1].avg_hr - workouts[0].avg_hr) : 0;
 
       document.getElementById("labDiagnosticGrid").innerHTML = `
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Aerobic Efficiency (EF)</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Aerobic Efficiency (NP/HR)</div>
           <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${efMean} W/bpm</div>
         </div>
         <div class="lab-item">
@@ -2036,11 +2057,15 @@ RULES: NO LaTeX. Plain English only.
         </div>
       `;
 
+      // Render cached review ONLY if matching current timeframe (Bug #6)
       const cachedReport = await db.reports.get(1);
-      if (cachedReport && cachedReport.analysis_text) {
-        const box = document.getElementById("reportSummaryBox");
+      const box = document.getElementById("reportSummaryBox");
+      if (cachedReport && cachedReport.timeframe === reportTimeframe && cachedReport.analysis_text) {
         box.style.display = "block";
-        box.innerHTML = `<b>Clinical Longitudinal Review</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
+        box.innerHTML = `<b>Clinical Longitudinal Review (${cachedReport.timeframe.toUpperCase()})</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
+      } else {
+        box.style.display = "none";
+        box.innerHTML = "";
       }
     }
 
@@ -2072,7 +2097,7 @@ CLINICAL REPORT DIRECTIVES:
 - Write in an executive, medical sports-science diagnostic tone.
 - NO conversational chit-chat, NO friendly talk, and NO future unsolicited tips.
 - Focus strictly on:
-  1. Longitudinal Aerobic Adaptations & Efficiency Factor Shift (W/bpm)
+  1. Longitudinal Aerobic Adaptations & Efficiency Factor Shift (NP/HR)
   2. Cardiovascular Cost & Decoupling Under 114.8 kg Body Mass
   3. Mechanical Work Scalability (kJ) & Ascent Metabolic Penalty
   4. Clinical Summary of Recorded Athlete Notes
@@ -2082,7 +2107,7 @@ CLINICAL REPORT DIRECTIVES:
       document.getElementById("reportLoadingBanner").style.display = "none";
 
       if (report) {
-        await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeframe}`, created_at: new Date().toISOString(), analysis_text: report });
+        await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeframe}`, created_at: new Date().toISOString(), timeframe: reportTimeframe, analysis_text: report });
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
         box.innerHTML = `<b>Clinical Longitudinal Review (${startDate} to ${endDate})</b><br/><br/>` + cleanAiText(report);
@@ -2093,8 +2118,8 @@ CLINICAL REPORT DIRECTIVES:
       const statusDiv = document.getElementById("pdfDownloadStatus");
       const latestReport = await db.reports.get(1);
 
-      if (!latestReport || !latestReport.analysis_text) {
-        alert("Please tap 'Synthesize Clinical Review' first before exporting the PDF.");
+      if (!latestReport || latestReport.timeframe !== reportTimeframe || !latestReport.analysis_text) {
+        alert(`Please tap 'Synthesize Clinical Review' for ${reportTimeframe.toUpperCase()} first to compile the report.`);
         return;
       }
 
@@ -2117,7 +2142,7 @@ CLINICAL REPORT DIRECTIVES:
         doc.setFontSize(8.5);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(100, 116, 139);
-        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Period: ${startDate} to ${endDate} | Exported: ${new Date().toLocaleDateString()}`, 14, 24);
+        doc.text(`Athlete: Mustafa (190 cm, 114.8 kg) | Period: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}) | Exported: ${new Date().toLocaleDateString()}`, 14, 24);
 
         let startY = 30;
 
@@ -2215,13 +2240,26 @@ CLINICAL REPORT DIRECTIVES:
     }
 
     // --------------------------------------------------------
-    // 9. STRICT SINGLE-REQUEST API CLIENT (ZERO RETRY CASCADES)
+    // 9. CENTRALIZED API CLIENT (LOCK GUARD, TIMEOUT & HEADER-ONLY KEY)
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt) {
+      if (isRequestInProgress) {
+        console.warn("API request already in flight. Blocking duplicate tap.");
+        return null;
+      }
+
+      isRequestInProgress = true;
       const model = "gemini-3.8-flash";
+
+      // 25-Second AbortController (Bug #4)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        // Security Fix (Bug #1): Send key strictly via header, NOT in URL query parameter
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST",
+          signal: controller.signal,
           headers: { 
             "Content-Type": "application/json",
             "x-goog-api-key": key
@@ -2229,9 +2267,12 @@ CLINICAL REPORT DIRECTIVES:
           body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
         });
 
+        clearTimeout(timeoutId);
+
         if (res.ok) {
           const data = await res.json();
           if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+            isRequestInProgress = false;
             return data.candidates[0].content.parts[0].text;
           }
         }
@@ -2242,22 +2283,31 @@ CLINICAL REPORT DIRECTIVES:
           const match = msg.match(/retry in (\d+(\.\d+)?)s/);
           const waitSec = match ? Math.ceil(parseFloat(match[1])) : 45;
           alert(`Google AI Cooldown: Rate limit reached.\nPlease wait ${waitSec} seconds before analyzing another ride.`);
+          isRequestInProgress = false;
           return null;
         }
 
         if (res.status === 503 || res.status === 500) {
-          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
+          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
             body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
           });
           if (fallbackRes.ok) {
             const fbData = await fallbackRes.json();
+            isRequestInProgress = false;
             return fbData.candidates[0].content.parts[0].text;
           }
         }
       } catch (e) {
-        console.warn("Network error:", e.message);
+        if (e.name === 'AbortError') {
+          alert("Request timed out (25s). Check your connection and try again.");
+        } else {
+          console.warn("Network error:", e.message);
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        isRequestInProgress = false;
       }
 
       return null;
