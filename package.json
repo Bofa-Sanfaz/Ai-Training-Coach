@@ -1,7 +1,7 @@
 {
   "name": "ai-training-coach",
   "version": "1.0.0",
-  "description": "Offline-First AI Cycling and Running Coach",
+  "description": "Offline-First AI Cycling Coach",
   "main": "index.js",
   "scripts": {
     "build": "echo 'Assets compiled in www/'"
@@ -9,6 +9,7 @@
   "dependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/app": "^6.0.0",
+    "@capacitor/background-task": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/filesystem": "^6.0.0"
   },
