@@ -530,7 +530,6 @@
       margin: 10px 0;
     }
 
-    /* Clinical Lab Diagnostics */
     .lab-panel {
       background: #0f172a;
       color: #f8fafc;
@@ -622,7 +621,7 @@
     
     <div id="sessionLoadingBanner" class="loading-banner" style="display: none;">
       <div class="spinner-ring"></div>
-      <span id="sessionLoadingText">Calling Gemini for Ride comparative analysis...</span>
+      <span>Calling Gemini for ride comparative analysis...</span>
     </div>
     
     <div class="chat-container" id="chatThread"></div>
@@ -633,7 +632,7 @@
     </div>
   </div>
 
-  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS (WITH DISTANCE INCLUDED) -->
+  <!-- TAB 2: GLOBAL TELEMETRY GRAPHS -->
   <div id="tab_graphs" style="display: none;">
     <h4 style="margin-bottom: 8px;">Macro Progression Across Season</h4>
     <div class="pill-rack" id="globalMetricPills"></div>
@@ -688,7 +687,7 @@
     <div id="compareAIBox" class="chat-bubble chat-coach" style="display: none; margin-top: 8px;"></div>
   </div>
 
-  <!-- TAB 4: CHATS HUB WITH IN-CHAT DEBRIEF BUTTON -->
+  <!-- TAB 4: CHATS HUB -->
   <div id="tab_chats" style="display: none;">
     <div id="chatsListView">
       <h4 style="margin-bottom: 8px;">Coaching Communications</h4>
@@ -717,11 +716,10 @@
     </div>
   </div>
 
-  <!-- TAB 5: REPORTS (CLINICAL LAB DATA & TIMEFRAME SELECTOR) -->
+  <!-- TAB 5: REPORTS -->
   <div id="tab_reports" style="display: none;">
     <h4 style="margin-bottom: 6px;">Executive Clinical Physiology Report</h4>
     
-    <!-- Timeframe Filter -->
     <div class="pill-rack" style="margin-bottom: 8px;">
       <div class="metric-pill active" onclick="setReportTimeframe('7d', this)">1 Week (7D)</div>
       <div class="metric-pill" onclick="setReportTimeframe('30d', this)">1 Month (30D)</div>
@@ -733,7 +731,6 @@
       Period Range: Calculating...
     </div>
 
-    <!-- Lab-Grade Diagnostic Scorecard -->
     <div class="lab-panel">
       <div style="font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#38bdf8;">🔬 Physiological Stress & Biomarker Indicators</div>
       <div class="lab-grid" id="labDiagnosticGrid"></div>
@@ -793,7 +790,7 @@
         Authenticate with Strava via Google.
       </p>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()" style="display:flex; align-items:center; justify-content:center; gap:8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.2 13.828h4.172"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffffff"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1V9c-1.5 0-2.9-.6-4-1.6l-1.8-1.8c-.4-.4-.9-.6-1.4-.6-.6 0-1.1.2-1.5.6L6.5 9.4c-.4.4-.5.9-.5 1.4 0 .6.2 1.1.6 1.5l3.4 3.4v4.3h2v-5.1l-2.2-2.2 1-2.9zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
         Sign in to Strava via Google
       </button>
 
@@ -811,18 +808,17 @@
 
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS WITH PENDING QUEUE)
+    // 1. DATABASE SCHEMA (DEXIE.JS CLEAN VERSION 1)
     // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
-    db.version(2).stores({
+    db.version(1).stores({
       workouts: "++id, &strava_id, ride_number, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale",
       streams: "strava_id, stream_data",
       threads: "++id, ride_number, role, message, created_at",
       master_chat: "++id, role, message, created_at",
       graph_threads: "++id, metric_key, role, message, created_at",
       reports: "id, ref_code, created_at, analysis_text",
-      config: "key, val",
-      pending_tasks: "id, type, target_id, prompt, timestamp"
+      config: "key, val"
     });
 
     let currentWorkout = null;
@@ -830,6 +826,9 @@
     let activeChatStreamKey = 'MASTER';
     let reportTimeframe = '7d';
     let isRequestInProgress = false;
+
+    let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Power (Watts)", "Elevation (m)"];
+    let globalSelectedMetrics = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)"];
 
     function checkNetwork() {
       const pill = document.getElementById("networkStatus");
@@ -867,37 +866,8 @@
     }
 
     // --------------------------------------------------------
-    // 2. CAPACITOR LIFECYCLE & BACKGROUND PERSISTENCE
+    // 2. CAPACITOR DEEP LINK INTERCEPTOR
     // --------------------------------------------------------
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-      window.Capacitor.Plugins.App.addListener('appStateChange', async (state) => {
-        if (state.isActive) {
-          // Re-entering app: check if any pending task needs finalization
-          processPendingQueue();
-        }
-      });
-    }
-
-    async function processPendingQueue() {
-      const pending = await db.pending_tasks.toArray();
-      if (!pending || pending.length === 0) return;
-
-      for (const task of pending) {
-        if (task.type === 'ride_debrief') {
-          const w = await db.workouts.where('ride_number').equals(task.target_id).first();
-          if (w) {
-            const existing = await db.threads.where({ ride_number: w.ride_number, role: 'coach' }).first();
-            if (!existing) {
-              // Retry seamlessly
-              runSingleRideDebrief(w);
-            }
-          }
-        }
-      }
-      await db.pending_tasks.clear();
-    }
-
-    // Deep link handling
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
       const match = urlStr.match(/[?&]code=([^&]+)/);
@@ -935,15 +905,6 @@
         box.textContent += "Network exception: " + e.message;
       }
     }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-        window.Capacitor.Plugins.App.addListener('appUrlOpen', (data) => {
-          if (data && data.url) processIncomingUrl(data.url);
-        });
-      }
-      processPendingQueue();
-    });
 
     window.addEventListener('appUrlOpen', (e) => {
       if (e.detail && e.detail.url) processIncomingUrl(e.detail.url);
@@ -1016,7 +977,7 @@
     }
 
     // --------------------------------------------------------
-    // 4. IN-SESSION DETAIL (WITH DISTANCE IN DELTA CARD)
+    // 4. IN-SESSION DETAIL (DISTANCE IN DELTA CARD & WORKING CHARTS)
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1056,7 +1017,7 @@
       activeStream = cached ? cached.stream_data : null;
       renderCardiacZones(activeStream);
 
-      // Delta Table: Distance Included
+      // Delta Table: Including Distance Row
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
       if (allPrior.length > 0) {
         const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
@@ -1097,7 +1058,7 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      // UI Status Badge & Single-Shot Action Button
+      // UI Status Badge & Action Button
       const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
       const hasCoach = existing.some(t => t.role === 'coach');
 
@@ -1321,7 +1282,7 @@
     }
 
     // --------------------------------------------------------
-    // HIGH-DENSITY PRIOR CONTINUUM (NO TOKEN BLOAT)
+    // HIGH-DENSITY COMPACT CONTINUUM (ZERO TOKEN BLOAT)
     // --------------------------------------------------------
     async function buildCompactPriorContinuum(targetRideNumber) {
       const priorRides = await db.workouts
@@ -1341,7 +1302,7 @@
     }
 
     // --------------------------------------------------------
-    // ROBUST SINGLE-RIDE DEBRIEF (ZERO LOOPS & BACKGROUND SAFE)
+    // SINGLE-RIDE DEBRIEF (ZERO LOOPS & 1-TAP PROTECTION)
     // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
       if (isRequestInProgress) return;
@@ -1351,7 +1312,6 @@
 
       isRequestInProgress = true;
 
-      // Disable buttons to block duplicate concurrent requests
       const btn = document.querySelector("#sessionActionBox button");
       const hubBtn = document.querySelector("#hubActionBox button");
       [btn, hubBtn].forEach(b => {
@@ -1365,14 +1325,6 @@
       document.getElementById("sessionLoadingBanner").style.display = "flex";
       const hubBanner = document.getElementById("hubLoadingBanner");
       if (hubBanner) hubBanner.style.display = "flex";
-
-      // Save task to pending queue in case app is paused/closed mid-flight
-      await db.pending_tasks.put({
-        id: `debrief_${targetRide.ride_number}`,
-        type: 'ride_debrief',
-        target_id: targetRide.ride_number,
-        timestamp: Date.now()
-      });
 
       const userW = await getConfig("athlete_weight") || "114.8";
       const userH = await getConfig("athlete_height") || "190";
@@ -1407,7 +1359,6 @@ CRITICAL RULES:
       const reply = await callGeminiAPI(key, prompt);
 
       isRequestInProgress = false;
-      await db.pending_tasks.delete(`debrief_${targetRide.ride_number}`);
 
       document.getElementById("sessionLoadingBanner").style.display = "none";
       if (hubBanner) hubBanner.style.display = "none";
@@ -1584,9 +1535,9 @@ RULES: Clean plain English. NO LaTeX formulas. Factual comparative feedback.
       };
 
       const config = { responsive: false, displayModeBar: false, scrollZoom: false, staticPlot: false };
-      const chartDiv = document.getElementById('plotlyGlobalChart');
       Plotly.newPlot('plotlyGlobalChart', traces, layout, config);
 
+      const chartDiv = document.getElementById('plotlyGlobalChart');
       chartDiv.on('plotly_hover', function(data) {
         if (!data.points || data.points.length === 0) return;
         const pt = data.points[0];
@@ -1727,7 +1678,7 @@ RULES: Clean plain English. NO LaTeX formulas.
         { name: "Peak Speed", v1: `${w1.max_speed_kmh} km/h`, v2: `${w2.max_speed_kmh} km/h`, d: `${(w2.max_speed_kmh - w1.max_speed_kmh).toFixed(1)} km/h`, pos: (w2.max_speed_kmh >= w1.max_speed_kmh), v3: w3 ? `${w3.max_speed_kmh} km/h` : null },
         { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', d: `${w2.avg_hr - w1.avg_hr} bpm`, pos: (w2.avg_hr <= w1.avg_hr), v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
         { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', d: `${w2.max_hr - w1.max_hr} bpm`, pos: (w2.max_hr <= w1.max_hr), v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
-        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', d: `${w2.avg_power_w - w1.avg_power_w} W`, pos: (w2.avg_power_w >= w1.avg_power_w), v3: w3 ? `${w3.avg_power_w} W` : '--' },
+        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', d: `${w2.avg_power_w - w1.avg_power_w} W`, pos: (w2.avg_power_w >= w1.avg_power_w), v3: w3 && w3.avg_power_w ? `${w3.avg_power_w} W` : '--' },
         { name: "Normalized Power", v1: `${getNP(w1)} W`, v2: `${getNP(w2)} W`, d: `${getNP(w2) - getNP(w1)} W`, pos: (getNP(w2) >= getNP(w1)), v3: w3 ? `${getNP(w3)} W` : '--' },
         { name: "Power to Weight", v1: `${getWPK(w1)} W/kg`, v2: `${getWPK(w2)} W/kg`, d: `${(getWPK(w2) - getWPK(w1)).toFixed(2)} W/kg`, pos: (getWPK(w2) >= getWPK(w1)), v3: w3 ? `${getWPK(w3)} W/kg` : '--' },
         { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, d: `${w2.elevation_gain_m - w1.elevation_gain_m} m`, pos: (w2.elevation_gain_m >= w1.elevation_gain_m), v3: w3 ? `${w3.elevation_gain_m} m` : null },
@@ -1792,7 +1743,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 7. CHRONOLOGICAL CHATS HUB (IN-CHAT ACTION BUTTON)
+    // 7. CHATS HUB (IN-CHAT ACTION TRIGGER)
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -1917,7 +1868,6 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       }
     }
 
-    // MASTER AI COACH & CHAT DISPATCHER
     async function sendHubReply() {
       const input = document.getElementById("hubReplyInput");
       const text = input.value.trim();
@@ -2003,7 +1953,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 8. REPORTS (WITH LAB DATA, TIMEFRAME SELECTOR & SCOPE)
+    // 8. REPORTS (TIMEFRAME SELECTOR, DATE SCOPE, LAB SCORECARD)
     // --------------------------------------------------------
     function setReportTimeframe(tf, el) {
       reportTimeframe = tf;
@@ -2086,7 +2036,6 @@ RULES: NO LaTeX. Plain English only.
         </div>
       `;
 
-      // Render cached review
       const cachedReport = await db.reports.get(1);
       if (cachedReport && cachedReport.analysis_text) {
         const box = document.getElementById("reportSummaryBox");
@@ -2296,7 +2245,6 @@ CLINICAL REPORT DIRECTIVES:
           return null;
         }
 
-        // Single fallback if 3.8 is busy
         if (res.status === 503 || res.status === 500) {
           const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${key}`, {
             method: "POST",
