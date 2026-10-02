@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Ride Partner</title>
+  <title>Ride Partner V2</title>
   
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -686,7 +686,7 @@
       <div class="brand-logo">
         <svg viewBox="0 0 24 24"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1V9c-1.5 0-2.9-.6-4-1.6l-1.8-1.8c-.4-.4-.9-.6-1.4-.6-.6 0-1.1.2-1.5.6L6.5 9.4c-.4.4-.5.9-.5 1.4 0 .6.2 1.1.6 1.5l3.4 3.4v4.3h2v-5.1l-2.2-2.2 1-2.9zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
       </div>
-      <div class="brand-title">Ride Partner</div>
+      <div class="brand-title">Ride Partner V2</div>
     </div>
     <div id="networkStatus" class="network-pill status-online">● ONLINE</div>
   </div>
@@ -1695,7 +1695,7 @@
     }
 
     // --------------------------------------------------------
-    // OAUTH & DEEP LINK HANDLER
+    // OAUTH & DEEP LINK HANDLER (CONFIGURED FOR AICOACHV2)
     // --------------------------------------------------------
     let isOauthExchanging = false;
     async function processIncomingUrl(urlStr) {
@@ -1762,7 +1762,7 @@
 
     function startAutomaticOAuth() {
       const clientId = document.getElementById("cfg_client_id").value.trim() || "277202";
-      const redirectUri = encodeURIComponent("aicoach://aicoach.app");
+      const redirectUri = encodeURIComponent("aicoachv2://aicoach.app");
       const authUrl = `https://www.strava.com/oauth/mobile/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&approval_prompt=force&scope=read,activity:read_all,profile:read_all`;
       window.open(authUrl, "_system");
     }
@@ -2950,7 +2950,7 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
         if (lastPendingHubPayload && lastPendingHubPayload.streamKey === 'MASTER') {
           html += `
             <div class="retry-card">
-              <span>⚠️️ Message failed to send.</span>
+              <span>⚠️ Message failed to send.</span>
               <button class="btn btn-primary btn-small" onclick="retryHubMessage()">🔄 Retry</button>
             </div>
           `;
@@ -3866,7 +3866,7 @@ CLINICAL REPORT REQUIREMENTS:
     }
 
     // --------------------------------------------------------
-    // ROBUST STRAVA SYNC (FAST EXISTENCE CHECK & GUARDED RE-ENTRY)
+    // ROBUST STRAVA SYNC
     // --------------------------------------------------------
     async function syncStrava() {
       if (isSyncInProgress) return;
@@ -3968,7 +3968,6 @@ CLINICAL REPORT REQUIREMENTS:
           }
         }
 
-        // FAST STREAM EXISTENCE CHECK & ON-DEMAND METRICS CALCULATION
         const allSavedWorkouts = await db.workouts.toArray();
         for (const w of allSavedWorkouts) {
           const streamCount = await db.streams.where('strava_id').equals(w.strava_id).count();
@@ -3998,7 +3997,6 @@ CLINICAL REPORT REQUIREMENTS:
             }
           }
 
-          // Compute pre-computed zone metrics on-demand only if missing
           if (!w.zone_seconds || w.zone_seconds.every(v => v === 0)) {
             if (!streamData) {
               const strRow = await db.streams.get(w.strava_id);
