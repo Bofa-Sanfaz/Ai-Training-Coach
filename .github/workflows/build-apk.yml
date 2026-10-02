@@ -28,7 +28,7 @@ jobs:
           npm install
           npm install -g @capacitor/cli
 
-      - name: Initialize Android Native Project, Deep Link Scheme & Custom Bike Icon
+      - name: Initialize Android Native Project & Bump Version
         run: |
           npx cap add android || true
           npx cap sync android
@@ -52,10 +52,17 @@ jobs:
           sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner<\/string>/g' "$STRINGS"
           sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner<\/string>/g' "$STRINGS"
 
-          # 3. Bump versionCode to 2 so Android permits updating over the installed app
-          BUILD_GRADLE="android/app/build.gradle"
-          sed -i 's/versionCode 1/versionCode 2/g' "$BUILD_GRADLE"
-          sed -i 's/versionName "1.0"/versionName "1.1"/g' "$BUILD_GRADLE"
+          # 3. Robust Regex Version Bump via Node.js
+          node -e '
+            const fs = require("fs");
+            const file = "android/app/build.gradle";
+            let content = fs.readFileSync(file, "utf8");
+            content = content.replace(/versionCode\s+[0-9]+/g, "versionCode 2");
+            content = content.replace(/versionName\s+["\x27][^"\x27]+["\x27]/g, "versionName \"1.1\"");
+            fs.writeFileSync(file, content, "utf8");
+            console.log("Updated build.gradle verified:");
+            console.log(content.split("\n").filter(l => l.includes("versionCode") || l.includes("versionName")).join("\n"));
+          '
 
           # 4. Overwrite Default Capacitor Launcher Icons
           mkdir -p android/app/src/main/res/drawable
