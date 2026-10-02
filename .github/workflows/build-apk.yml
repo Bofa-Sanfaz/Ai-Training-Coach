@@ -52,7 +52,12 @@ jobs:
           sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner<\/string>/g' "$STRINGS"
           sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner<\/string>/g' "$STRINGS"
 
-          # 3. Overwrite Default Capacitor Launcher Icons with a Sporty Vector Bike Icon
+          # 3. Bump versionCode to 2 so Android permits updating over the installed app
+          BUILD_GRADLE="android/app/build.gradle"
+          sed -i 's/versionCode 1/versionCode 2/g' "$BUILD_GRADLE"
+          sed -i 's/versionName "1.0"/versionName "1.1"/g' "$BUILD_GRADLE"
+
+          # 4. Overwrite Default Capacitor Launcher Icons
           mkdir -p android/app/src/main/res/drawable
           cat << 'EOF' > android/app/src/main/res/drawable/ic_launcher_foreground.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
