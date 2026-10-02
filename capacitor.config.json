@@ -1,11 +1,6 @@
 {
-  "appId": "com.ridepartner.telemetry",
-  "appName": "Ride Partner",
+  "appId": "com.ridepartner.v2",
+  "appName": "Ride Partner V2",
   "webDir": "www",
-  "server": {
-    "androidScheme": "https"
-  },
-  "android": {
-    "backgroundColor": "#f8fafc"
-  }
+  "bundledWebRuntime": false
 }
