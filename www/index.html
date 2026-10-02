@@ -8,7 +8,7 @@
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
 
   <style>
     :root {
@@ -35,7 +35,8 @@
       background-color: var(--bg); 
       color: var(--text-main); 
       padding: 10px; 
-      padding-bottom: 95px; 
+      padding-top: max(10px, env(safe-area-inset-top));
+      padding-bottom: max(95px, calc(env(safe-area-inset-bottom) + 80px)); 
     }
 
     .app-header { 
@@ -173,6 +174,7 @@
     .badge-ok { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
     .badge-stale { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
     .badge-unreviewed { background: #fef08a; color: #854d0e; border: 1px solid #fde047; }
+    .badge-intent { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
 
     .btn { 
       width: 100%; 
@@ -263,39 +265,39 @@
     }
 
     .zone-chart-box {
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin: 8px 0;
+      background: #ffffff; 
+      border: 1px solid var(--border); 
+      border-radius: 10px; 
+      padding: 10px 12px; 
+      margin: 8px 0; 
     }
     .zone-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      font-size: 0.74rem;
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      margin-bottom: 6px; 
+      font-size: 0.74rem; 
     }
     .zone-tag {
-      width: 85px;
-      font-weight: 700;
+      width: 90px; 
+      font-weight: 700; 
       color: var(--text-muted); 
     }
     .zone-bar-bg {
-      flex: 1;
-      height: 8px;
-      background: #f1f5f9;
-      border-radius: 6px;
-      overflow: hidden;
+      flex: 1; 
+      height: 8px; 
+      background: #f1f5f9; 
+      border-radius: 6px; 
+      overflow: hidden; 
     }
     .zone-bar-fill {
-      height: 100%;
-      border-radius: 6px;
+      height: 100%; 
+      border-radius: 6px; 
     }
     .zone-val {
-      width: 55px;
-      text-align: right;
-      font-weight: 800;
+      width: 55px; 
+      text-align: right; 
+      font-weight: 800; 
       color: var(--text-main); 
     }
 
@@ -353,19 +355,19 @@
     }
 
     .stream-telemetry-banner {
-      background: #0f172a;
-      color: #f8fafc;
-      border-radius: 8px;
-      padding: 8px 12px;
-      margin: 6px 0 10px 0;
-      font-size: 0.76rem;
-      line-height: 1.45;
-      font-family: monospace;
-      border: 1px solid #1e293b;
+      background: #0f172a; 
+      color: #f8fafc; 
+      border-radius: 8px; 
+      padding: 8px 12px; 
+      margin: 6px 0 10px 0; 
+      font-size: 0.76rem; 
+      line-height: 1.45; 
+      font-family: monospace; 
+      border: 1px solid #1e293b; 
     }
     .stream-line {
-      display: flex;
-      justify-content: space-between;
+      display: flex; 
+      justify-content: space-between; 
     }
 
     .chat-container { 
@@ -404,17 +406,17 @@
     }
     
     .chat-attachment-img {
-      max-width: 100%;
-      max-height: 200px;
-      border-radius: 8px;
-      margin-top: 6px;
-      border: 1px solid var(--border);
-      display: block;
+      max-width: 100%; 
+      max-height: 200px; 
+      border-radius: 8px; 
+      margin-top: 6px; 
+      border: 1px solid var(--border); 
+      display: block; 
     }
 
     .reply-box { 
       display: flex; 
-      align-items: center;
+      align-items: center; 
       gap: 6px; 
       margin-top: 8px; 
     }
@@ -427,46 +429,46 @@
       background: #ffffff; 
     }
     .attach-btn {
-      background: #f1f5f9;
-      border: 1px solid var(--border);
-      color: var(--text-main);
-      padding: 8px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: #f1f5f9; 
+      border: 1px solid var(--border); 
+      color: var(--text-main); 
+      padding: 8px 10px; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-size: 0.95rem; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
     }
     .preview-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #fff;
-      border: 1px solid var(--border);
-      padding: 6px 10px;
-      border-radius: 8px;
-      margin-top: 6px;
-      font-size: 0.74rem;
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      background: #fff; 
+      border: 1px solid var(--border); 
+      padding: 6px 10px; 
+      border-radius: 8px; 
+      margin-top: 6px; 
+      font-size: 0.74rem; 
     }
     .preview-thumb {
-      width: 32px;
-      height: 32px;
-      border-radius: 4px;
-      object-fit: cover;
+      width: 32px; 
+      height: 32px; 
+      border-radius: 4px; 
+      object-fit: cover; 
     }
 
     .retry-card {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #991b1b;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 0.76rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 6px;
+      background: #fef2f2; 
+      border: 1px solid #fecaca; 
+      color: #991b1b; 
+      padding: 8px 12px; 
+      border-radius: 8px; 
+      font-size: 0.76rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-top: 6px; 
     }
 
     .input-box { 
@@ -478,14 +480,16 @@
       font-size: 0.84rem; 
       background: #ffffff; 
     }
+    
     .sticky-back { 
       position: sticky; 
-      top: 0; 
+      top: max(0px, env(safe-area-inset-top)); 
       z-index: 10; 
       background: rgba(248, 250, 252, 0.95); 
       backdrop-filter: blur(8px); 
-      padding: 4px 0 8px 0; 
+      padding: 6px 0 8px 0; 
     }
+
     .diag-box { 
       background: #0f172a; 
       color: #38bdf8; 
@@ -501,25 +505,25 @@
     }
 
     .loading-banner {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
-      color: #c2410c;
-      padding: 9px 12px;
-      border-radius: 10px;
-      font-size: 0.80rem;
-      font-weight: 700;
-      margin: 8px 0;
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      background: #fff7ed; 
+      border: 1px solid #fed7aa; 
+      color: #c2410c; 
+      padding: 9px 12px; 
+      border-radius: 10px; 
+      font-size: 0.80rem; 
+      font-weight: 700; 
+      margin: 8px 0; 
     }
     .spinner-ring {
-      width: 16px;
-      height: 16px;
-      border: 2.5px solid #fed7aa;
-      border-top: 2.5px solid #fc5200;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      width: 16px; 
+      height: 16px; 
+      border: 2.5px solid #fed7aa; 
+      border-top: 2.5px solid #fc5200; 
+      border-radius: 50%; 
+      animation: spin 0.8s linear infinite; 
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -527,61 +531,61 @@
     }
 
     .whatsapp-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      display: flex; 
+      flex-direction: column; 
+      gap: 6px; 
     }
     .chat-row {
-      display: flex;
-      align-items: center;
-      background: #ffffff;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-      gap: 10px;
+      display: flex; 
+      align-items: center; 
+      background: #ffffff; 
+      padding: 10px 12px; 
+      border-radius: 10px; 
+      border: 1px solid var(--border); 
+      cursor: pointer; 
+      gap: 10px; 
     }
     .chat-avatar {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.15rem;
-      background: #f1f5f9;
-      border: 1px solid #e2e8f0;
-      flex-shrink: 0;
+      width: 38px; 
+      height: 38px; 
+      border-radius: 50%; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 1.15rem; 
+      background: #f1f5f9; 
+      border: 1px solid #e2e8f0; 
+      flex-shrink: 0; 
     }
     .chat-row-body {
-      flex: 1;
-      overflow: hidden;
+      flex: 1; 
+      overflow: hidden; 
     }
     .chat-row-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2px;
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 2px; 
     }
     .chat-contact-name {
-      font-size: 0.84rem;
-      font-weight: 700;
-      color: #1e293b;
+      font-size: 0.84rem; 
+      font-weight: 700; 
+      color: #1e293b; 
     }
     .chat-timestamp {
-      font-size: 0.65rem;
+      font-size: 0.65rem; 
       color: var(--text-muted); 
     }
     .chat-snippet {
-      font-size: 0.74rem;
+      font-size: 0.74rem; 
       color: var(--text-muted); 
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: nowrap; 
+      overflow: hidden; 
+      text-overflow: ellipsis; 
     }
 
     .report-card {
-      background: #ffffff;
+      background: #ffffff; 
       border: 1px solid var(--border); 
       border-radius: 12px; 
       padding: 14px; 
@@ -589,47 +593,89 @@
     }
 
     .lab-panel {
-      background: #0f172a;
-      color: #f8fafc;
-      border-radius: 10px;
-      padding: 12px;
-      margin: 10px 0;
-      font-size: 0.76rem;
+      background: #0f172a; 
+      color: #f8fafc; 
+      border-radius: 10px; 
+      padding: 12px; 
+      margin: 10px 0; 
+      font-size: 0.76rem; 
     }
     .lab-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      margin-top: 8px;
+      display: grid; 
+      grid-template-columns: repeat(2, 1fr); 
+      gap: 8px; 
+      margin-top: 8px; 
     }
     .lab-item {
-      background: #1e293b;
-      padding: 8px;
-      border-radius: 6px;
-      border-left: 3px solid var(--primary);
+      background: #1e293b; 
+      padding: 8px; 
+      border-radius: 6px; 
+      border-left: 3px solid var(--primary); 
     }
 
     .model-selector-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 10px;
-      margin: 6px 0;
-      gap: 8px;
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      background: #ffffff; 
+      border: 1px solid var(--border); 
+      border-radius: 8px; 
+      padding: 6px 10px; 
+      margin: 6px 0; 
+      gap: 8px; 
     }
     .model-select-input {
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: var(--text-main);
-      outline: none;
-      cursor: pointer;
+      background: #f8fafc; 
+      border: 1px solid var(--border); 
+      border-radius: 6px; 
+      padding: 4px 8px; 
+      font-size: 0.74rem; 
+      font-weight: 700; 
+      color: var(--text-main); 
+      outline: none; 
+      cursor: pointer; 
+    }
+
+    .modal-overlay {
+      position: fixed; 
+      top: 0; left: 0; right: 0; bottom: 0; 
+      background: rgba(15, 23, 42, 0.65); 
+      backdrop-filter: blur(4px); 
+      z-index: 1000; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      padding: 16px; 
+    }
+    .modal-card {
+      background: #ffffff; 
+      border-radius: 16px; 
+      padding: 18px; 
+      width: 100%; 
+      max-width: 420px; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+      border: 1px solid var(--border); 
+    }
+    .intent-btn-grid {
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 8px; 
+      margin: 8px 0 12px 0; 
+    }
+    .selectable-pill {
+      border: 1.5px solid var(--border); 
+      background: #f8fafc; 
+      padding: 10px; 
+      border-radius: 10px; 
+      font-size: 0.78rem; 
+      font-weight: 700; 
+      text-align: center; 
+      cursor: pointer; 
+    }
+    .selectable-pill.selected {
+      border-color: var(--primary); 
+      background: #fff7ed; 
+      color: var(--primary); 
     }
   </style>
 </head>
@@ -656,7 +702,7 @@
 
   <!-- TAB 1: FEED -->
   <div id="tab_feed">
-    <button class="btn btn-primary" onclick="syncStrava()">Sync Rides from Strava</button>
+    <button id="btnSyncStrava" class="btn btn-primary" onclick="syncStrava()">Sync Rides from Strava</button>
     <div id="feedList"></div>
   </div>
 
@@ -664,13 +710,17 @@
   <div id="sessionDetail" style="display: none;">
     <div class="sticky-back" style="display:flex; justify-content:space-between; align-items:center;">
       <button class="btn btn-secondary btn-small" onclick="closeSessionDetail()">← Back to Rides</button>
-      <button class="btn btn-danger btn-small" onclick="resetActiveRideThread()">🗑️ Reset Thread</button>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-secondary btn-small" onclick="editCurrentRideIntent()">🎯 Edit Intent</button>
+        <button class="btn btn-danger btn-small" onclick="resetActiveRideThread()">🗑️ Reset Thread</button>
+      </div>
     </div>
-    <h3 id="det_title" style="margin: 4px 0 8px 0; font-size: 1.15rem;"></h3>
+    <h3 id="det_title" style="margin: 4px 0 2px 0; font-size: 1.15rem;"></h3>
+    <div id="det_intent_badge" style="margin-bottom: 8px;"></div>
     
     <div class="hero-grid" id="det_hero"></div>
 
-    <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Biometrics & Power Ratios</h4>
+    <h4 style="margin: 10px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Biometrics & Performance</h4>
     <div class="telemetry-grid" id="det_secondary"></div>
 
     <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Heart Rate Zone Distribution (207 bpm Max)</h4>
@@ -690,7 +740,7 @@
       </div>
       <div class="stream-line" style="margin-top: 4px; color: #94a3b8;">
         <span id="banner_line2_l">⚡ Speed: -- km/h</span>
-        <span id="banner_line2_r">❤️ HR: -- bpm | ⚡ Power: -- W | ⛰ Elev: -- m</span>
+        <span id="banner_line2_r">❤️ HR: -- bpm | ⛰ Elev: -- m</span>
       </div>
     </div>
 
@@ -860,7 +910,7 @@
 
   <!-- TAB 5: REPORTS -->
   <div id="tab_reports" style="display: none;">
-    <h4 style="margin-bottom: 6px;">Executive Clinical Physiology Report</h4>
+    <h4 style="margin-bottom: 6px;">Executive Physiology Report</h4>
     
     <div class="pill-rack" style="margin-bottom: 8px;">
       <div class="metric-pill active" onclick="setReportTimeframe('7d', this)">1 Week (7D)</div>
@@ -878,7 +928,7 @@
       <div class="lab-grid" id="labDiagnosticGrid"></div>
       
       <div style="margin-top:10px;">
-        <div style="font-size:0.68rem; color:#94a3b8; margin-bottom:4px; font-weight:700; text-transform:uppercase;">Estimated Lactate & Cardiovascular Strain Profile</div>
+        <div style="font-size:0.68rem; color:#94a3b8; margin-bottom:4px; font-weight:700; text-transform:uppercase;">True Time-In-Zone Distribution</div>
         <div id="reportLactateBars"></div>
       </div>
     </div>
@@ -887,9 +937,9 @@
     <div class="telemetry-grid" id="pr_grid"></div>
     
     <div class="report-card">
-      <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Clinical Longitudinal Review</h4>
+      <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Longitudinal Review</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">
-        Synthesizes a structured retrospective sports science review assessing cardiovascular drift, zone strain, and climbing VAM.
+        Synthesizes a structured retrospective review assessing cardiac drift, true zone strain, and climbing VAM.
       </p>
 
       <div class="model-selector-bar" style="margin-bottom:8px;">
@@ -903,7 +953,7 @@
         </select>
       </div>
 
-      <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize Clinical Review</button>
+      <button class="btn btn-primary" onclick="generateExecutiveReport()">Synthesize Review</button>
       
       <div id="reportLoadingBanner" class="loading-banner" style="display: none;">
         <div class="spinner-ring"></div>
@@ -915,7 +965,7 @@
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Official PDF Export</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
-        Saves the structured diagnostic report directly to your phone's storage.
+        Saves the diagnostic report directly to your phone's storage.
       </p>
       <button id="btnDownloadPdf" class="btn btn-primary" style="background:#0f172a;" onclick="triggerOfficialPdfDownload()">📥 Download Official A4 Report</button>
       <div id="pdfDownloadStatus" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-align:center; margin-top:8px;"></div>
@@ -933,7 +983,20 @@
         <input type="number" id="cfg_weight_input" class="input-box" placeholder="kg" step="0.1" style="width:90px;" />
         <button class="btn btn-primary btn-small" onclick="logAthleteWeight()" style="margin-top:4px;">Log</button>
       </div>
-      <div id="weightHistoryList" style="font-size:0.74rem; color:var(--text-muted); max-height:90px; overflow-y:auto;"></div>
+      <div id="weightHistoryList" style="font-size:0.74rem; color:var(--text-muted); max-height:120px; overflow-y:auto;"></div>
+    </div>
+
+    <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
+      <h5 style="font-size:0.84rem; color:var(--primary); margin-bottom:4px;">Database Backup & Migration</h5>
+      <p style="font-size:0.72rem; color:var(--text-muted); margin-bottom:8px;">
+        Export workouts and coaching history directly to JSON (sensitive keys safely excluded).
+      </p>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-small" style="flex:1;" onclick="exportDatabaseJson()">📤 Export JSON</button>
+        <button class="btn btn-secondary btn-small" style="flex:1;" onclick="document.getElementById('importDbFile').click()">📥 Restore JSON</button>
+      </div>
+      <input type="file" id="importDbFile" accept=".json" style="display:none;" onchange="importDatabaseJson(event)" />
+      <div id="backupStatusText" style="font-size:0.72rem; color:var(--primary); font-weight:700; margin-top:6px;"></div>
     </div>
 
     <label style="font-size:0.75rem; font-weight:700;">Athlete Height (cm)</label>
@@ -981,9 +1044,78 @@
     <div id="stravaDiagBox" class="diag-box" style="display: none;"></div>
   </div>
 
+  <!-- INTENT MODAL -->
+  <div id="rideIntentModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h4 id="intentModalTitle" style="font-size:1.0rem; color:var(--text-main);">Target Intent for Ride</h4>
+        <button class="btn btn-secondary btn-small" style="padding:2px 8px;" onclick="closeIntentModalQueue()">✕ Close</button>
+      </div>
+      <p id="intentModalSub" style="font-size:0.74rem; color:var(--text-muted); margin-bottom:12px;"></p>
+
+      <label style="font-size:0.74rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Ride Nature</label>
+      <div class="intent-btn-grid">
+        <div id="pillTypePlay" class="selectable-pill" onclick="selectRideType('PLAY')">🚴 Play / Commute</div>
+        <div id="pillTypeTraining" class="selectable-pill selected" onclick="selectRideType('TRAINING')">🎯 Structured Training</div>
+      </div>
+
+      <div id="trainingIntentFields">
+        <label style="font-size:0.74rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Target Zone</label>
+        <select id="modalTargetZone" class="input-box">
+          <option value="Zone 1 (Recovery)">Zone 1 (<135 bpm) — Active Recovery</option>
+          <option value="Zone 2 (Aerobic Base)" selected>Zone 2 (135–154 bpm) — Aerobic Base</option>
+          <option value="Zone 3 (Tempo)">Zone 3 (155–170 bpm) — Tempo Endurance</option>
+          <option value="Zone 4 (Threshold)">Zone 4 (171–188 bpm) — Sub-Threshold</option>
+          <option value="Zone 5 (VO2max)">Zone 5 (189–207 bpm) — VO2max</option>
+        </select>
+
+        <label style="font-size:0.74rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Execution Format</label>
+        <div class="intent-btn-grid">
+          <div id="pillFormatSteady" class="selectable-pill selected" onclick="selectRideFormat('STEADY')">⚡ Steady State / All-Out</div>
+          <div id="pillFormatInterval" class="selectable-pill" onclick="selectRideFormat('INTERVAL')">🔁 Intervals</div>
+        </div>
+
+        <div id="intervalConfigFields" style="display: none; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:8px;">
+          <label style="font-size:0.70rem; font-weight:700; color:var(--text-muted);">Switching Zones</label>
+          <input type="text" id="modalIntervalZones" class="input-box" placeholder="e.g. Z2 <-> Z4" value="Z2 <-> Z4" />
+          <label style="font-size:0.70rem; font-weight:700; color:var(--text-muted);">Work / Rest Duration</label>
+          <input type="text" id="modalIntervalFreq" class="input-box" placeholder="e.g. 4m on / 2m off" value="4m on / 2m off" />
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="btn btn-secondary" onclick="skipIntentModal()" style="margin-bottom:0;">No Intent / Skip</button>
+        <button class="btn btn-primary" onclick="saveActiveIntentAndNext()" style="margin-bottom:0;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // --------------------------------------------------------
-    // 1. DATABASE SCHEMA (DEXIE.JS CLEAN VERSION 1)
+    // PHYSIOLOGICAL CONFIGURATION CONSTANTS
+    // --------------------------------------------------------
+    const PHYSIO_CONFIG = {
+      max_hr: 207,
+      default_height_cm: 190,
+      default_weight_kg: 111.0,
+      zones: [
+        { name: "Z1 Recovery", min: 0, max: 134, color: "#94a3b8" },
+        { name: "Z2 Base Aerobic", min: 135, max: 154, color: "#16a34a" },
+        { name: "Z3 Tempo", min: 155, max: 170, color: "#eab308" },
+        { name: "Z4 Sub-Threshold", min: 171, max: 188, color: "#fc5200" },
+        { name: "Z5 VO2max / Anaerobic", min: 189, max: 207, color: "#ef4444" }
+      ],
+      getZoneIndex: function(hr) {
+        if (!hr || hr <= 0) return -1;
+        for (let i = 0; i < this.zones.length; i++) {
+          if (hr <= this.zones[i].max) return i;
+        }
+        return this.zones.length - 1;
+      }
+    };
+
+    // --------------------------------------------------------
+    // DATABASE SCHEMA (DEXIE VERSION 2)
     // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
     db.version(1).stores({
@@ -996,17 +1128,29 @@
       config: "key, val"
     });
 
+    db.version(2).stores({
+      workouts: "++id, &strava_id, ride_number, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale, intent_type",
+      threads: "++id, ride_number, role, [ride_number+role], created_at",
+      master_chat: "++id, role, created_at",
+      graph_threads: "++id, metric_key, role, created_at"
+    }).upgrade(tx => {});
+
     let currentWorkout = null;
     let activeStream = null;
     let activeChatStreamKey = 'MASTER';
     let reportTimeframe = '7d';
     let isRequestInProgress = false;
+    let isSyncInProgress = false;
 
-    // Retry Caches
     let lastPendingRidePayload = null;
     let lastPendingHubPayload = null;
     let currentRideAttachmentB64 = null;
     let currentHubAttachmentB64 = null;
+
+    let intentModalQueue = [];
+    let activeIntentItem = null;
+    let modalSelectedType = "TRAINING";
+    let modalSelectedFormat = "STEADY";
 
     let selectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Elevation (m)"];
     let globalSelectedMetrics = ["Speed (km/h)", "Heart Rate (bpm)", "Distance (km)"];
@@ -1025,21 +1169,29 @@
     window.addEventListener('offline', checkNetwork);
     checkNetwork();
 
-    // Deterministic Text Sanitizer: Cleans ASCII Tables and stray math/Markdown syntax
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     function cleanAiText(raw) {
       if (!raw) return "";
-      let clean = raw
-        .replace(/\r/g, '')
-        .replace(/%+/g, '')
-        .replace(/\$\\text\{([^}]+)\}\$/g, '$1')
-        .replace(/\$\\mathbf\{([^}]+)\}\$/g, '$1')
-        .replace(/\$\\sim\s*/g, '~')
-        .replace(/\\text\{([^}]+)\}/g, '$1')
-        .replace(/\\mathbf\{([^}]+)\}/g, '$1')
-        .replace(/\\div/g, '÷')
-        .replace(/\$([^\$]+)\$/g, '$1')
-        .replace(/\\/g, '');
+      let clean = raw.replace(/\r/g, '');
+      clean = clean.replace(/(?:^\s*[%|]{2,}.*$\n?)/gm, '');
+      clean = clean.replace(/\$\\text\{([^}]+)\}\$/g, '$1')
+                   .replace(/\$\\mathbf\{([^}]+)\}\$/g, '$1')
+                   .replace(/\$\\sim\s*/g, '~')
+                   .replace(/\\text\{([^}]+)\}/g, '$1')
+                   .replace(/\\mathbf\{([^}]+)\}/g, '$1')
+                   .replace(/\\div/g, '÷')
+                   .replace(/\$([^\$]+)\$/g, '$1');
 
+      clean = escapeHtml(clean);
       clean = clean.replace(/### (.*?)\n/g, '<h4 style="margin:10px 0 4px 0; color:var(--primary); font-size:0.90rem;">$1</h4>');
       clean = clean.replace(/## (.*?)\n/g, '<h3 style="margin:12px 0 4px 0; color:var(--text-main); font-size:1.00rem;">$1</h3>');
       clean = clean.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
@@ -1049,8 +1201,93 @@
       return clean;
     }
 
+    function parseZoneTag(str) {
+      if (!str) return "";
+      const match = str.match(/Zone\s*\d+/i);
+      return match ? match[0] : str.slice(0, 10);
+    }
+
+    function parseSafeDate(dStr) {
+      if (!dStr) return new Date();
+      return new Date(String(dStr).replace(' ', 'T'));
+    }
+
+    function safeMax(arr, fallback = 0) {
+      if (!arr || !arr.length) return fallback;
+      return arr.reduce((max, val) => val > max ? val : max, -Infinity);
+    }
+
+    function safeMin(arr, fallback = 0) {
+      if (!arr || !arr.length) return fallback;
+      return arr.reduce((min, val) => val < min ? val : min, Infinity);
+    }
+
+    async function computeRideMetrics(workout, streamData) {
+      if (!streamData || !streamData.heartrate || !streamData.time) return workout;
+      const hrs = streamData.heartrate.data;
+      const times = streamData.time.data;
+      let zSecs = [0, 0, 0, 0, 0];
+
+      for (let i = 0; i < hrs.length; i++) {
+        if (!hrs[i] || hrs[i] <= 0) continue;
+        const dt = (i > 0 && times[i] && times[i-1]) ? Math.min(Math.max(times[i] - times[i-1], 1), 10) : 1;
+        const zIdx = PHYSIO_CONFIG.getZoneIndex(hrs[i]);
+        if (zIdx >= 0) zSecs[zIdx] += dt;
+      }
+
+      const totalSec = times[times.length - 1];
+      const halfSec = totalSec / 2;
+      let h1Hrs = [], h2Hrs = [];
+      let h1Spd = [], h2Spd = [];
+      const spds = streamData.velocity_smooth ? streamData.velocity_smooth.data : [];
+
+      for (let i = 0; i < times.length; i++) {
+        if (times[i] <= halfSec) {
+          if (hrs[i] > 0) h1Hrs.push(hrs[i]);
+          if (spds[i] !== undefined) h1Spd.push(spds[i]);
+        } else {
+          if (hrs[i] > 0) h2Hrs.push(hrs[i]);
+          if (spds[i] !== undefined) h2Spd.push(spds[i]);
+        }
+      }
+
+      const avgH1 = h1Hrs.length ? Math.round(h1Hrs.reduce((a,b)=>a+b,0)/h1Hrs.length) : 0;
+      const avgH2 = h2Hrs.length ? Math.round(h2Hrs.reduce((a,b)=>a+b,0)/h2Hrs.length) : 0;
+      const spd1 = h1Spd.length ? +(h1Spd.reduce((a,b)=>a+b,0)/h1Spd.length * 3.6).toFixed(1) : 0;
+      const spd2 = h2Spd.length ? +(h2Spd.reduce((a,b)=>a+b,0)/h2Spd.length * 3.6).toFixed(1) : 0;
+
+      // Restrict drift exclusively to steady efforts >= 35 minutes
+      let isSteady = true;
+      if (workout.intent_type === 'PLAY') isSteady = false;
+      if (workout.intent_target) {
+        try {
+          const it = JSON.parse(workout.intent_target);
+          if (it.format === 'INTERVAL') isSteady = false;
+        } catch(e) {}
+      }
+
+      let driftBpm = null;
+      if (isSteady && totalSec >= 2100 && avgH1 > 0 && avgH2 > 0) {
+        driftBpm = avgH2 - avgH1;
+      }
+
+      const halvesStr = `[H1: ${spd1}km/h, ${avgH1}bpm -> H2: ${spd2}km/h, ${avgH2}bpm]`;
+
+      workout.zone_seconds = zSecs;
+      workout.cardiac_drift_bpm = driftBpm;
+      workout.halves_profile = halvesStr;
+
+      await db.workouts.update(workout.id, {
+        zone_seconds: zSecs,
+        cardiac_drift_bpm: driftBpm,
+        halves_profile: halvesStr
+      });
+
+      return workout;
+    }
+
     // --------------------------------------------------------
-    // 2. MODEL SYNCHRONIZATION
+    // MODEL SYNCHRONIZATION
     // --------------------------------------------------------
     async function syncModelSelection(modelName) {
       await setConfig("selected_gemini_model", modelName);
@@ -1068,7 +1305,7 @@
     }
 
     // --------------------------------------------------------
-    // 3. ATHLETE WEIGHT HISTORY ENGINE
+    // ATHLETE WEIGHT HISTORY ENGINE
     // --------------------------------------------------------
     async function getWeightHistory() {
       const raw = await getConfig("athlete_weight_history");
@@ -1082,30 +1319,30 @@
     }
 
     async function saveWeightHistory(arr) {
-      arr.sort((a, b) => new Date(a.date) - new Date(b.date));
+      arr.sort((a, b) => parseSafeDate(a.date) - parseSafeDate(b.date));
       await setConfig("athlete_weight_history", JSON.stringify(arr));
       renderWeightHistoryUI();
     }
 
     async function getAthleteWeightForDate(dateStr) {
       const history = await getWeightHistory();
-      if (!history.length) return 111.0;
-      const targetTime = dateStr ? new Date(dateStr).getTime() : Date.now();
+      if (!history.length) return PHYSIO_CONFIG.default_weight_kg;
+      const targetTime = dateStr ? parseSafeDate(dateStr).getTime() : Date.now();
       let matched = history[0].weight;
       for (const entry of history) {
-        if (new Date(entry.date).getTime() <= targetTime) {
+        if (parseSafeDate(entry.date).getTime() <= targetTime) {
           matched = entry.weight;
         } else {
           break;
         }
       }
-      return parseFloat(matched) || 111.0;
+      return parseFloat(matched) || PHYSIO_CONFIG.default_weight_kg;
     }
 
     async function getLatestWeight() {
       const history = await getWeightHistory();
-      if (!history.length) return 111.0;
-      return parseFloat(history[history.length - 1].weight) || 111.0;
+      if (!history.length) return PHYSIO_CONFIG.default_weight_kg;
+      return parseFloat(history[history.length - 1].weight) || PHYSIO_CONFIG.default_weight_kg;
     }
 
     async function logAthleteWeight() {
@@ -1114,10 +1351,21 @@
       if (!weightVal || isNaN(weightVal)) { alert("Enter a valid weight (kg)."); return; }
       
       const history = await getWeightHistory();
-      history.push({ date: dateVal, weight: weightVal });
+      const existingIdx = history.findIndex(h => h.date === dateVal);
+      if (existingIdx >= 0) {
+        history[existingIdx].weight = weightVal;
+      } else {
+        history.push({ date: dateVal, weight: weightVal });
+      }
       await saveWeightHistory(history);
       document.getElementById("cfg_weight_input").value = "";
-      alert(`Weight logged: ${weightVal} kg on ${dateVal}`);
+    }
+
+    async function deleteWeightEntry(dateStr) {
+      if (!confirm(`Remove weight entry for ${dateStr}?`)) return;
+      let history = await getWeightHistory();
+      history = history.filter(h => h.date !== dateStr);
+      await saveWeightHistory(history);
     }
 
     async function renderWeightHistoryUI() {
@@ -1125,15 +1373,135 @@
       if (!container) return;
       const history = await getWeightHistory();
       container.innerHTML = history.slice().reverse().map(h => `
-        <div style="display:flex; justify-content:space-between; padding:2px 0;">
-          <span>${h.date}</span>
-          <b>${h.weight} kg</b>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid #f1f5f9;">
+          <span>${escapeHtml(h.date)}</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <b>${h.weight} kg</b>
+            <span style="color:#ef4444; cursor:pointer; font-size:0.75rem;" onclick="deleteWeightEntry('${h.date}')">✕</span>
+          </div>
         </div>
       `).join('');
     }
 
     // --------------------------------------------------------
-    // 4. IMAGE ATTACHMENT COMPRESSION (1024px BASE64)
+    // DATABASE BACKUP & RESTORE
+    // --------------------------------------------------------
+    async function exportDatabaseJson() {
+      const statusBox = document.getElementById("backupStatusText");
+      statusBox.textContent = "Exporting database (secure backup)...";
+
+      const sensitiveKeys = ["gemini_api_key", "strava_client_secret", "strava_refresh_token"];
+      const rawConfig = await db.config.toArray();
+      const safeConfig = rawConfig.filter(c => !sensitiveKeys.includes(c.key));
+
+      const dump = {
+        app: "RidePartner",
+        version: 2,
+        exported_at: new Date().toISOString(),
+        workouts: await db.workouts.toArray(),
+        threads: await db.threads.toArray(),
+        master_chat: await db.master_chat.toArray(),
+        graph_threads: await db.graph_threads.toArray(),
+        reports: await db.reports.toArray(),
+        config: safeConfig
+      };
+
+      const compactJsonStr = JSON.stringify(dump);
+      const fileName = `RidePartner_Backup_${new Date().toISOString().slice(0,10)}.json`;
+
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+        let savedToDownloads = false;
+        try {
+          await window.Capacitor.Plugins.Filesystem.writeFile({
+            path: `Download/${fileName}`,
+            data: compactJsonStr,
+            directory: 'EXTERNAL_STORAGE',
+            encoding: 'utf8'
+          });
+          savedToDownloads = true;
+        } catch (err) {
+          try {
+            await window.Capacitor.Plugins.Filesystem.writeFile({
+              path: fileName,
+              data: compactJsonStr,
+              directory: 'DOCUMENTS',
+              encoding: 'utf8'
+            });
+          } catch(e) {
+            console.warn("Filesystem write error:", e);
+          }
+        }
+
+        const targetFolder = savedToDownloads ? "Downloads" : "Documents";
+        statusBox.innerHTML = `✓ Backup saved to ${targetFolder}: <b>${escapeHtml(fileName)}</b>`;
+        alert(`Backup exported successfully to ${targetFolder} folder:\n${fileName}`);
+        return;
+      }
+
+      const blob = new Blob([compactJsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      statusBox.textContent = `✓ Export generated: ${fileName}`;
+    }
+
+    async function importDatabaseJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!confirm("Restoring will clear and replace workout and coaching tables with this backup file. Keys and secrets will remain preserved. Proceed?")) {
+        event.target.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.workouts || !Array.isArray(data.workouts)) {
+            throw new Error("Invalid backup format: workouts table missing.");
+          }
+
+          const sensitiveKeys = ["gemini_api_key", "strava_client_secret", "strava_refresh_token", "strava_client_id"];
+          const currentConfig = await db.config.toArray();
+          const preservedTokens = currentConfig.filter(c => sensitiveKeys.includes(c.key));
+
+          await db.transaction('rw', db.workouts, db.threads, db.master_chat, db.graph_threads, db.reports, db.config, async () => {
+            await db.workouts.clear();
+            await db.threads.clear();
+            await db.master_chat.clear();
+            await db.graph_threads.clear();
+            await db.reports.clear();
+            await db.config.clear();
+
+            if (data.workouts.length) await db.workouts.bulkAdd(data.workouts);
+            if (data.threads && data.threads.length) await db.threads.bulkAdd(data.threads);
+            if (data.master_chat && data.master_chat.length) await db.master_chat.bulkAdd(data.master_chat);
+            if (data.graph_threads && data.graph_threads.length) await db.graph_threads.bulkAdd(data.graph_threads);
+            if (data.reports && data.reports.length) await db.reports.bulkAdd(data.reports);
+
+            if (data.config && data.config.length) await db.config.bulkPut(data.config);
+            if (preservedTokens.length) await db.config.bulkPut(preservedTokens);
+          });
+
+          alert("Database successfully restored!");
+          renderFeed();
+          loadSettings();
+        } catch(err) {
+          alert("Import failed: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    // --------------------------------------------------------
+    // IMAGE ATTACHMENT COMPRESSION
     // --------------------------------------------------------
     function handleImageSelection(event, context) {
       const file = event.target.files[0];
@@ -1191,18 +1559,158 @@
     }
 
     // --------------------------------------------------------
-    // 5. CAPACITOR DEEP LINK INTERCEPTOR & ON-LOAD MIGRATION
+    // INTENT WORKFLOW
     // --------------------------------------------------------
+    function openNextIntentModal() {
+      if (!intentModalQueue.length) {
+        document.getElementById("rideIntentModal").style.display = "none";
+        renderFeed();
+        return;
+      }
+
+      activeIntentItem = intentModalQueue.shift();
+      document.getElementById("rideIntentModal").style.display = "flex";
+      document.getElementById("intentModalTitle").textContent = `Configure ${activeIntentItem.exercise_code}`;
+      document.getElementById("intentModalSub").textContent = `${activeIntentItem.distance_km} km • ${activeIntentItem.duration_str} • ${activeIntentItem.avg_speed_kmh} km/h`;
+
+      selectRideType('TRAINING');
+      selectRideFormat('STEADY');
+    }
+
+    async function skipIntentModal() {
+      if (activeIntentItem) {
+        const existingCoach = await db.threads.where({ ride_number: activeIntentItem.ride_number, role: 'coach' }).first();
+        const isStaleNow = !!existingCoach;
+
+        await db.workouts.update(activeIntentItem.id, { 
+          intent_type: "NONE",
+          intent_target: null,
+          debrief_stale: isStaleNow
+        });
+
+        const detailView = document.getElementById("sessionDetail");
+        if (currentWorkout && currentWorkout.id === activeIntentItem.id && detailView.style.display !== 'none') {
+          currentWorkout.intent_type = "NONE";
+          currentWorkout.intent_target = null;
+          currentWorkout.debrief_stale = isStaleNow;
+          await openSession(currentWorkout.id);
+
+          if (isStaleNow) {
+            const actionBox = document.getElementById("sessionActionBox");
+            actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Re-Run Debrief with Updated Goal</button>`;
+            const badgeDiv = document.getElementById("det_status_badge");
+            if (badgeDiv) badgeDiv.innerHTML = `<span class="status-badge badge-stale">🟠 Context Update Available</span>`;
+          }
+        }
+      }
+      openNextIntentModal();
+    }
+
+    function closeIntentModalQueue() {
+      intentModalQueue = [];
+      document.getElementById("rideIntentModal").style.display = "none";
+    }
+
+    function editCurrentRideIntent() {
+      if (!currentWorkout) return;
+      activeIntentItem = currentWorkout;
+      intentModalQueue = [];
+      document.getElementById("rideIntentModal").style.display = "flex";
+      document.getElementById("intentModalTitle").textContent = `Edit Intent: ${currentWorkout.exercise_code}`;
+      document.getElementById("intentModalSub").textContent = `${currentWorkout.distance_km} km • ${currentWorkout.duration_str}`;
+
+      if (currentWorkout.intent_type === 'PLAY') {
+        selectRideType('PLAY');
+      } else if (currentWorkout.intent_target && currentWorkout.intent_type !== 'NONE') {
+        selectRideType('TRAINING');
+        try {
+          const it = JSON.parse(currentWorkout.intent_target);
+          document.getElementById("modalTargetZone").value = it.target_zone || "Zone 2 (Aerobic Base)";
+          selectRideFormat(it.format || 'STEADY');
+          document.getElementById("modalIntervalZones").value = it.interval_zones || "Z2 <-> Z4";
+          document.getElementById("modalIntervalFreq").value = it.interval_freq || "4m on / 2m off";
+        } catch(e) {}
+      } else {
+        selectRideType('TRAINING');
+        document.getElementById("modalTargetZone").value = "Zone 2 (Aerobic Base)";
+        selectRideFormat('STEADY');
+        document.getElementById("modalIntervalZones").value = "Z2 <-> Z4";
+        document.getElementById("modalIntervalFreq").value = "4m on / 2m off";
+      }
+    }
+
+    function selectRideType(type) {
+      modalSelectedType = type;
+      document.getElementById("pillTypePlay").className = `selectable-pill ${type === 'PLAY' ? 'selected' : ''}`;
+      document.getElementById("pillTypeTraining").className = `selectable-pill ${type === 'TRAINING' ? 'selected' : ''}`;
+      document.getElementById("trainingIntentFields").style.display = (type === 'TRAINING') ? 'block' : 'none';
+    }
+
+    function selectRideFormat(fmt) {
+      modalSelectedFormat = fmt;
+      document.getElementById("pillFormatSteady").className = `selectable-pill ${fmt === 'STEADY' ? 'selected' : ''}`;
+      document.getElementById("pillFormatInterval").className = `selectable-pill ${fmt === 'INTERVAL' ? 'selected' : ''}`;
+      document.getElementById("intervalConfigFields").style.display = (fmt === 'INTERVAL') ? 'block' : 'none';
+    }
+
+    async function saveActiveIntentAndNext() {
+      if (!activeIntentItem) return;
+
+      let intentData = { intent_type: modalSelectedType };
+
+      if (modalSelectedType === 'TRAINING') {
+        intentData.target_zone = document.getElementById("modalTargetZone").value;
+        intentData.format = modalSelectedFormat;
+        if (modalSelectedFormat === 'INTERVAL') {
+          intentData.interval_zones = document.getElementById("modalIntervalZones").value;
+          intentData.interval_freq = document.getElementById("modalIntervalFreq").value;
+        }
+      }
+
+      const existingCoach = await db.threads.where({ ride_number: activeIntentItem.ride_number, role: 'coach' }).first();
+      const isStaleNow = !!existingCoach;
+
+      await db.workouts.update(activeIntentItem.id, { 
+        intent_type: modalSelectedType,
+        intent_target: JSON.stringify(intentData),
+        debrief_stale: isStaleNow
+      });
+
+      const detailView = document.getElementById("sessionDetail");
+      if (currentWorkout && currentWorkout.id === activeIntentItem.id && detailView.style.display !== 'none') {
+        currentWorkout.intent_type = modalSelectedType;
+        currentWorkout.intent_target = JSON.stringify(intentData);
+        currentWorkout.debrief_stale = isStaleNow;
+        await openSession(currentWorkout.id);
+        
+        if (isStaleNow) {
+          const actionBox = document.getElementById("sessionActionBox");
+          actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Re-Run Debrief with Updated Goal</button>`;
+          const badgeDiv = document.getElementById("det_status_badge");
+          if (badgeDiv) badgeDiv.innerHTML = `<span class="status-badge badge-stale">🟠 Context Update Available</span>`;
+        }
+      }
+
+      openNextIntentModal();
+    }
+
+    // --------------------------------------------------------
+    // OAUTH & DEEP LINK HANDLER
+    // --------------------------------------------------------
+    let isOauthExchanging = false;
     async function processIncomingUrl(urlStr) {
       if (!urlStr || !urlStr.includes("code=")) return;
       const match = urlStr.match(/[?&]code=([^&]+)/);
       if (!match) return;
       const code = match[1];
 
+      if (isOauthExchanging) return;
+      isOauthExchanging = true;
+
       const box = document.getElementById("stravaDiagBox");
       if (box) {
         box.style.display = "block";
-        box.textContent = `Deep link detected: code=${code.substring(0, 6)}...\nExchanging with Strava API...\n`;
+        box.textContent = `Deep link detected: code=${code.substring(0, 6)}...\nExchanging token with Strava API...\n`;
       }
 
       const clientId = (await getConfig("strava_client_id") || "277202").trim();
@@ -1222,7 +1730,7 @@
         const data = await res.json();
         if (data.refresh_token) {
           await setConfig("strava_refresh_token", data.refresh_token);
-          alert("Strava authenticated successfully! Syncing rides now...");
+          alert("Strava authenticated successfully! Syncing rides...");
           switchTab('feed');
           syncStrava();
         } else {
@@ -1230,6 +1738,8 @@
         }
       } catch (e) {
         if (box) box.textContent += "Network exception: " + e.message;
+      } finally {
+        isOauthExchanging = false;
       }
     }
 
@@ -1240,20 +1750,10 @@
         });
       }
       
-      const isMigrated = await getConfig("migration_v2_stale_cleared");
-      if (!isMigrated) {
-        await db.workouts.toCollection().modify({ debrief_stale: false });
-        await setConfig("migration_v2_stale_cleared", "true");
-      }
-
       const savedModel = await getActiveModel();
       syncModelSelection(savedModel);
       renderWeightHistoryUI();
       document.getElementById("cfg_weight_date").value = new Date().toISOString().slice(0, 10);
-    });
-
-    window.addEventListener('appUrlOpen', (e) => {
-      if (e.detail && e.detail.url) processIncomingUrl(e.detail.url);
     });
 
     if (window.location.search && window.location.search.includes("code=")) {
@@ -1294,7 +1794,7 @@
     }
 
     // --------------------------------------------------------
-    // 6. FEED TAB
+    // FEED TAB
     // --------------------------------------------------------
     async function renderFeed() {
       const list = document.getElementById("feedList");
@@ -1305,25 +1805,38 @@
         return;
       }
 
-      list.innerHTML = items.map(r => `
+      list.innerHTML = items.map(r => {
+        let intentPill = "";
+        if (r.intent_type === 'PLAY') {
+          intentPill = `<span class="status-badge" style="background:#f1f5f9; color:#475569;">Play Ride</span>`;
+        } else if (r.intent_target && r.intent_type !== 'NONE') {
+          try {
+            const it = JSON.parse(r.intent_target);
+            const zTag = parseZoneTag(it.target_zone) || "Train";
+            intentPill = `<span class="status-badge badge-intent">${escapeHtml(zTag)}</span>`;
+          } catch(e) {}
+        }
+        return `
         <div class="workout-card" onclick="openSession(${r.id})">
           <div class="card-top">
-            <span class="card-title">${r.exercise_code}</span>
+            <span class="card-title">${escapeHtml(r.exercise_code)}</span>
+            ${intentPill}
           </div>
           <div class="metric-strip">
             <div class="metric-cell"><div class="metric-num">${r.distance_km} <span style="font-size:0.6rem">km</span></div><div class="metric-lbl">Dist</div></div>
-            <div class="metric-cell"><div class="metric-num">${r.duration_str || '--'}</div><div class="metric-lbl">Time</div></div>
+            <div class="metric-cell"><div class="metric-num">${escapeHtml(r.duration_str) || '--'}</div><div class="metric-lbl">Time</div></div>
             <div class="metric-cell"><div class="metric-num">${r.avg_speed_kmh} <span style="font-size:0.6rem">km/h</span></div><div class="metric-lbl">Speed</div></div>
             <div class="metric-cell"><div class="metric-num">${r.avg_power_w > 0 ? r.avg_power_w + 'W' : '--'}</div><div class="metric-lbl">Power</div></div>
             <div class="metric-cell"><div class="metric-num">${r.avg_hr > 0 ? r.avg_hr + '<span style="font-size:0.55rem">bpm</span>' : '--'}</div><div class="metric-lbl">HR</div></div>
             <div class="metric-cell"><div class="metric-num">${r.elevation_gain_m}m</div><div class="metric-lbl">Asc</div></div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     // --------------------------------------------------------
-    // 7. IN-SESSION DETAIL VIEW (NEW ZONES & DATED WEIGHT INTEGRATION)
+    // IN-SESSION DETAIL VIEW
     // --------------------------------------------------------
     async function openSession(id) {
       currentWorkout = await db.workouts.get(id);
@@ -1333,13 +1846,26 @@
       document.getElementById("sessionDetail").style.display = "block";
       document.getElementById("det_title").textContent = currentWorkout.exercise_code;
 
+      const badgeContainer = document.getElementById("det_intent_badge");
+      if (currentWorkout.intent_type === 'PLAY') {
+        badgeContainer.innerHTML = `<span class="status-badge" style="background:#f1f5f9; color:#475569;">Play Ride / Commute (Free-Form)</span>`;
+      } else if (currentWorkout.intent_target && currentWorkout.intent_type !== 'NONE') {
+        try {
+          const it = JSON.parse(currentWorkout.intent_target);
+          let extra = it.format === 'INTERVAL' ? ` | Intervals: ${it.interval_zones} (${it.interval_freq})` : ` | Steady State`;
+          badgeContainer.innerHTML = `<span class="status-badge badge-intent">Target: ${escapeHtml(it.target_zone)}${escapeHtml(extra)}</span>`;
+        } catch(e) { badgeContainer.innerHTML = ""; }
+      } else {
+        badgeContainer.innerHTML = "";
+      }
+
       const userW = await getAthleteWeightForDate(currentWorkout.date);
       const wpk = currentWorkout.avg_power_w > 0 ? (currentWorkout.avg_power_w / userW).toFixed(2) : null;
-      const pwrLabel = wpk ? `Power (${wpk} W/kg)` : 'Power';
+      const pwrLabel = wpk ? `Est. Power (${wpk} W/kg)` : 'Est. Power';
 
       document.getElementById("det_hero").innerHTML = `
         <div class="hero-box"><div class="hero-val">${currentWorkout.distance_km} km</div><div class="hero-lbl">Distance</div></div>
-        <div class="hero-box"><div class="hero-val">${currentWorkout.duration_str || '--'}</div><div class="hero-lbl">Duration</div></div>
+        <div class="hero-box"><div class="hero-val">${escapeHtml(currentWorkout.duration_str) || '--'}</div><div class="hero-lbl">Duration</div></div>
         <div class="hero-box"><div class="hero-val">${currentWorkout.avg_speed_kmh} km/h</div><div class="hero-lbl">Avg Speed</div></div>
         <div class="hero-box"><div class="hero-val">${currentWorkout.avg_power_w > 0 ? currentWorkout.avg_power_w + ' W' : '--'}</div><div class="hero-lbl">${pwrLabel}</div></div>
         <div class="hero-box"><div class="hero-val">${currentWorkout.avg_hr > 0 ? currentWorkout.avg_hr + ' bpm' : '--'}</div><div class="hero-lbl">Avg HR</div></div>
@@ -1347,21 +1873,25 @@
       `;
 
       const vam = currentWorkout.moving_sec > 0 ? Math.round(currentWorkout.elevation_gain_m / (currentWorkout.moving_sec / 3600)) : 0;
-      const npVal = currentWorkout.norm_power_w > 0 ? currentWorkout.norm_power_w : (currentWorkout.avg_power_w > 0 ? Math.round(currentWorkout.avg_power_w * 1.05) : 0);
-      const efVal = (npVal > 0 && currentWorkout.avg_hr > 0) ? (npVal / currentWorkout.avg_hr).toFixed(2) : '--';
+      const efVal = (currentWorkout.avg_power_w > 0 && currentWorkout.avg_hr > 0) ? (currentWorkout.avg_power_w / currentWorkout.avg_hr).toFixed(2) : '--';
 
       document.getElementById("det_secondary").innerHTML = `
-        <div class="telemetry-row"><span class="telemetry-name">Athlete Weight at Ride</span><span class="telemetry-val">${userW} kg</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Athlete Weight</span><span class="telemetry-val">${userW} kg</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Max Speed</span><span class="telemetry-val">${currentWorkout.max_speed_kmh || '--'} km/h</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Peak Heart Rate</span><span class="telemetry-val">${currentWorkout.max_hr || '--'} bpm</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Mechanical Work</span><span class="telemetry-val">${currentWorkout.kilojoules > 0 ? currentWorkout.kilojoules + ' kJ' : '--'}</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Work Done</span><span class="telemetry-val">${currentWorkout.kilojoules > 0 ? currentWorkout.kilojoules + ' kJ' : '--'}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Climbing VAM</span><span class="telemetry-val">${vam > 0 ? vam + ' m/h' : '--'}</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency (EF)</span><span class="telemetry-val">${efVal} W/bpm</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency</span><span class="telemetry-val">${efVal !== '--' ? efVal + ' W/bpm (Est)' : '--'}</span></div>
       `;
 
       const cached = await db.streams.get(currentWorkout.strava_id);
       activeStream = cached ? cached.stream_data : null;
-      renderCardiacZones(activeStream);
+
+      if (activeStream && (!currentWorkout.zone_seconds || currentWorkout.zone_seconds.every(v => v === 0))) {
+        currentWorkout = await computeRideMetrics(currentWorkout, activeStream);
+      }
+
+      renderCardiacZones(currentWorkout);
 
       // Delta Table
       const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
@@ -1395,23 +1925,21 @@
       document.getElementById("banner_line1_l").textContent = `⏱ Time: ${currentWorkout.duration_str}`;
       document.getElementById("banner_line1_r").textContent = `📏 Distance: ${currentWorkout.distance_km} km`;
       document.getElementById("banner_line2_l").textContent = `⚡ Avg: ${currentWorkout.avg_speed_kmh} km/h`;
-      document.getElementById("banner_line2_r").textContent = `❤️ HR: ${currentWorkout.avg_hr || '--'} bpm | ⚡ Power: ${currentWorkout.avg_power_w || '--'} W | ⛰ Elev: ${currentWorkout.elevation_gain_m} m`;
+      document.getElementById("banner_line2_r").textContent = `❤️ HR: ${currentWorkout.avg_hr || '--'} bpm | ⛰ Elev: ${currentWorkout.elevation_gain_m} m`;
 
       setupMetricPills();
       renderStreamPlotly();
 
-      const existing = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
-      const hasCoach = existing.some(t => t.role === 'coach');
-
+      const existingCoach = await db.threads.where({ ride_number: currentWorkout.ride_number, role: 'coach' }).first();
       const badgeDiv = document.getElementById("det_status_badge");
       const actionBox = document.getElementById("sessionActionBox");
 
-      if (!hasCoach) {
+      if (!existingCoach) {
         badgeDiv.innerHTML = `<span class="status-badge badge-unreviewed">🟡 Needs Analysis</span>`;
         actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Analyze Ride ${currentWorkout.ride_number} with AI Coach</button>`;
       } else if (currentWorkout.debrief_stale) {
         badgeDiv.innerHTML = `<span class="status-badge badge-stale">🟠 Context Update Available</span>`;
-        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate Ride ${currentWorkout.ride_number} (Timeline Fresh)</button>`;
+        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate Ride ${currentWorkout.ride_number} (Updated Goal)</button>`;
       } else {
         badgeDiv.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
         actionBox.innerHTML = "";
@@ -1420,36 +1948,23 @@
       renderChatThread();
     }
 
-    function renderCardiacZones(stream) {
+    function renderCardiacZones(workout) {
       const container = document.getElementById("det_zone_bars");
-      if (!stream || !stream.heartrate || !stream.heartrate.data.length) {
+      if (!workout.zone_seconds || !Array.isArray(workout.zone_seconds)) {
         container.innerHTML = "<div style='color:var(--text-muted); font-size:0.75rem;'>No continuous HR stream available for zone distribution.</div>";
         return;
       }
 
-      const hrs = stream.heartrate.data;
-      const totalPoints = hrs.length;
-      let z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0;
+      const totalDurationSec = workout.zone_seconds.reduce((a, b) => a + b, 0);
+      if (totalDurationSec === 0) {
+        container.innerHTML = "<div style='color:var(--text-muted); font-size:0.75rem;'>No continuous HR stream available for zone distribution.</div>";
+        return;
+      }
 
-      hrs.forEach(h => {
-        if (h < 135) z1++;
-        else if (h <= 154) z2++;
-        else if (h <= 170) z3++;
-        else if (h <= 188) z4++;
-        else z5++;
-      });
-
-      const zones = [
-        { name: "Z1 Recovery (<135)", count: z1, color: "#94a3b8" },
-        { name: "Z2 Base Aerobic (135-154)", count: z2, color: "#16a34a" },
-        { name: "Z3 Tempo (155-170)", count: z3, color: "#eab308" },
-        { name: "Z4 Sub-Threshold (171-188)", count: z4, color: "#fc5200" },
-        { name: "Z5 VO2max/Anaerobic (189-207)", count: z5, color: "#ef4444" }
-      ];
-
-      container.innerHTML = zones.map(z => {
-        const pct = Math.round((z.count / totalPoints) * 100);
-        const mins = Math.round(z.count / 60);
+      container.innerHTML = PHYSIO_CONFIG.zones.map((z, idx) => {
+        const sec = workout.zone_seconds[idx] || 0;
+        const pct = Math.round((sec / totalDurationSec) * 100);
+        const mins = Math.round(sec / 60);
         return `
           <div class="zone-row">
             <span class="zone-tag">${z.name}</span>
@@ -1498,8 +2013,13 @@
 
     function renderStreamPlotly() {
       const chartDiv = document.getElementById("plotlyDetailChart");
+      
+      if (window.Plotly && chartDiv) {
+        Plotly.purge(chartDiv);
+      }
+
       if (!activeStream) {
-        chartDiv.innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;'>Route stream data not cached. Tap Sync Rides while online.</div>";
+        chartDiv.innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);font-size:0.85rem;'>Route stream data not available for this session.</div>";
         return;
       }
       const times = activeStream.time ? activeStream.time.data.map(t => +(t / 60).toFixed(1)) : [];
@@ -1510,14 +2030,14 @@
       const alts = activeStream.altitude ? activeStream.altitude.data : [];
       const watts = activeStream.watts ? activeStream.watts.data : [];
 
-      const peakSpd = Math.max(...speeds, currentWorkout.max_speed_kmh || 35, 1);
-      const peakWatts = Math.max(...watts, currentWorkout.max_power_w || 350, 1);
+      const peakSpd = Math.max(safeMax(speeds, 0), currentWorkout.max_speed_kmh || 35, 1);
+      const peakWatts = Math.max(safeMax(watts, 0), currentWorkout.max_power_w || 350, 1);
 
       const traces = [];
 
       if (selectedMetrics.includes("Elevation (m)") && alts.length) {
-        const minA = Math.min(...alts);
-        const maxA = Math.max(...alts) || 1;
+        const minA = safeMin(alts, 0);
+        const maxA = safeMax(alts, 1);
         const normAlt = alts.map(a => Math.round(((a - minA) / (maxA - minA || 1)) * 40));
         traces.push({ 
           x: times, 
@@ -1533,7 +2053,7 @@
       }
 
       if (selectedMetrics.includes("Heart Rate (bpm)") && hrs.length) {
-        const normHR = hrs.map(h => Math.max(0, Math.min(100, Math.round(((h - 100) / (207 - 100)) * 100))));
+        const normHR = hrs.map(h => Math.max(0, Math.min(100, Math.round(((h - 100) / (PHYSIO_CONFIG.max_hr - 100)) * 100))));
         traces.push({ 
           x: times, 
           y: normHR, 
@@ -1551,7 +2071,7 @@
         traces.push({ 
           x: times, 
           y: normWatts, 
-          name: 'Power', 
+          name: 'Est. Power', 
           text: srcW.map(w => `${w} W`),
           hovertemplate: '%{text}<extra></extra>',
           type: 'scatter', 
@@ -1574,8 +2094,7 @@
 
       const layout = {
         margin: { l: 25, r: 20, t: 10, b: 25 },
-        template: 'plotly_white',
-        legend: { orientation: 'h', y: 1.15, x: 0 },
+        legend: { orientation: 'h', y: 1.15 },
         dragmode: false,
         hovermode: 'x unified',
         xaxis: { fixedrange: true, showgrid: true, gridcolor: '#f1f5f9', title: '' },
@@ -1583,7 +2102,7 @@
       };
 
       const config = { responsive: true, displayModeBar: false, scrollZoom: false, staticPlot: false };
-      Plotly.newPlot('plotlyDetailChart', traces, layout, config);
+      Plotly.react('plotlyDetailChart', traces, layout, config);
 
       if (chartDiv.removeAllListeners) chartDiv.removeAllListeners('plotly_hover');
 
@@ -1595,22 +2114,21 @@
         const dKm = dists[idx] ? `${dists[idx]} km` : '-- km';
         const curSpd = speeds[idx] ? `${speeds[idx]} km/h` : '-- km/h';
         const curHR = hrs[idx] ? `${hrs[idx]} bpm` : '-- bpm';
-        const curWatts = watts[idx] ? `${watts[idx]} W` : (currentWorkout.avg_power_w ? `${currentWorkout.avg_power_w} W` : '-- W');
         const curAlt = alts[idx] ? `${Math.round(alts[idx])} m` : '-- m';
 
         document.getElementById("banner_line1_l").textContent = `⏱ Time: ${tMin} min`;
         document.getElementById("banner_line1_r").textContent = `📏 Distance: ${dKm}`;
         document.getElementById("banner_line2_l").textContent = `⚡ Speed: ${curSpd}`;
-        document.getElementById("banner_line2_r").textContent = `❤️ HR: ${curHR} | ⚡ Power: ${curWatts} | ⛰ Elev: ${curAlt}`;
+        document.getElementById("banner_line2_r").textContent = `❤️ HR: ${curHR} | ⛰ Elev: ${curAlt}`;
       });
     }
 
     // --------------------------------------------------------
-    // 8. CHAT ENGINE & RESET FUNCTIONALITY
+    // CHAT ENGINE & RESET FUNCTIONALITY
     // --------------------------------------------------------
     async function resetActiveRideThread() {
       if (!currentWorkout) return;
-      if (!confirm(`Reset conversation thread for Ride ${currentWorkout.ride_number}? This will delete past coach messages for this ride and prepare a fresh timeline evaluation.`)) return;
+      if (!confirm(`Reset conversation thread for Ride ${currentWorkout.ride_number}? This will delete coach messages for this ride.`)) return;
       
       await db.threads.where("ride_number").equals(currentWorkout.ride_number).delete();
       await db.workouts.update(currentWorkout.id, { debrief_stale: false });
@@ -1618,8 +2136,11 @@
       lastPendingRidePayload = null;
       clearRideAttachment();
       
-      openSession(currentWorkout.id);
-      alert(`Thread for Ride ${currentWorkout.ride_number} reset.`);
+      await openSession(currentWorkout.id);
+
+      if (confirm(`Configure Ride ${currentWorkout.ride_number}'s target intent before re-evaluating?`)) {
+        editCurrentRideIntent();
+      }
     }
 
     async function resetCurrentHubThread() {
@@ -1636,35 +2157,45 @@
         lastPendingHubPayload = null;
         clearHubAttachment();
         openChatThread(activeChatStreamKey);
+
+        const w = await db.workouts.where("ride_number").equals(rNum).first();
+        if (w && confirm(`Configure Ride ${rNum}'s target intent before re-evaluating?`)) {
+          currentWorkout = w;
+          editCurrentRideIntent();
+        }
       }
     }
 
     async function renderChatThread() {
       const container = document.getElementById("chatThread");
-      const messages = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
+      if (!currentWorkout) {
+        container.innerHTML = "";
+        return;
+      }
 
+      const messages = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
+      let html = "";
       if (messages.length === 0) {
-        container.innerHTML = `
+        html = `
           <div class="chat-bubble chat-coach">
             <div class="chat-sender">AI Coach</div>
             Tap the button above to generate a debrief, or message coach below.
           </div>
         `;
-        return;
+      } else {
+        html = messages.map(m => `
+          <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
+            <div class="chat-sender">${m.role === 'coach' ? 'AI Coach' : 'Mustafa (Athlete)'}</div>
+            ${m.image_b64 ? `<img src="${m.image_b64}" class="chat-attachment-img" />` : ''}
+            ${cleanAiText(m.message)}
+          </div>
+        `).join('');
       }
 
-      let html = messages.map(m => `
-        <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
-          <div class="chat-sender">${m.role === 'coach' ? 'AI Coach' : 'Mustafa (Athlete)'}</div>
-          ${m.image_b64 ? `<img src="${m.image_b64}" class="chat-attachment-img" />` : ''}
-          ${cleanAiText(m.message)}
-        </div>
-      `).join('');
-
-      if (lastPendingRidePayload) {
+      if (lastPendingRidePayload && lastPendingRidePayload.ride_number === currentWorkout.ride_number) {
         html += `
           <div class="retry-card">
-            <span>⚠️ Last message failed to send due to network/traffic.</span>
+            <span>⚠️ Message failed to send.</span>
             <button class="btn btn-primary btn-small" onclick="retryRideMessage()">🔄 Retry</button>
           </div>
         `;
@@ -1674,7 +2205,7 @@
     }
 
     // --------------------------------------------------------
-    // 9. HIGH-RESOLUTION STREAM EXTRACTORS
+    // STREAM TIMELINE & TIMELINE EXTRACTORS
     // --------------------------------------------------------
     async function build1MinuteTelemetryTimeline(stravaId) {
       const cached = await db.streams.get(stravaId);
@@ -1717,30 +2248,6 @@
       return timeline.join('\n');
     }
 
-    // Master Coach Halves Extractor (H1 vs H2) for past rides
-    async function extractRideHalvesProfile(stravaId) {
-      const cached = await db.streams.get(stravaId);
-      if (!cached || !cached.stream_data || !cached.stream_data.time) return null;
-      const s = cached.stream_data;
-      const times = s.time.data;
-      const speeds = s.velocity_smooth ? s.velocity_smooth.data : [];
-      const hrs = s.heartrate ? s.heartrate.data : [];
-      const alts = s.altitude ? s.altitude.data : [];
-      const midIdx = Math.floor(times.length / 2);
-
-      const validHR1 = hrs.slice(0, midIdx).filter(h => h > 0);
-      const avgHR1 = validHR1.length ? Math.round(validHR1.reduce((a, b) => a + b, 0) / validHR1.length) : null;
-      const validHR2 = hrs.slice(midIdx).filter(h => h > 0);
-      const avgHR2 = validHR2.length ? Math.round(validHR2.reduce((a, b) => a + b, 0) / validHR2.length) : null;
-
-      const spd1 = midIdx > 0 ? +(speeds.slice(0, midIdx).reduce((a, b) => a + b, 0) / midIdx * 3.6).toFixed(1) : '--';
-      const spd2 = (times.length - midIdx) > 0 ? +(speeds.slice(midIdx).reduce((a, b) => a + b, 0) / (times.length - midIdx) * 3.6).toFixed(1) : '--';
-
-      const dAlt = (alts.length > midIdx) ? Math.round(alts[times.length - 1] - alts[0]) : 0;
-
-      return `[H1: ${spd1}km/h, ${avgHR1 || '--'}bpm -> H2: ${spd2}km/h, ${avgHR2 || '--'}bpm, net alt: ${dAlt}m]`;
-    }
-
     async function buildCompactPriorContinuum(targetRideNumber) {
       const priorRides = await db.workouts
         .where('ride_number').below(targetRideNumber)
@@ -1749,7 +2256,16 @@
       let lines = [];
       for (const p of priorRides) {
         const rWeight = await getAthleteWeightForDate(p.date);
-        let line = `• R${p.ride_number} (${p.date.slice(5,10)} | ${rWeight}kg): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.elevation_gain_m}m asc.`;
+        
+        let intentShort = p.intent_type === 'PLAY' ? '[Play]' : '';
+        if (p.intent_type !== 'PLAY' && p.intent_target && p.intent_type !== 'NONE') {
+          try {
+            const it = JSON.parse(p.intent_target);
+            const zTag = parseZoneTag(it.target_zone);
+            intentShort = `[${zTag || 'Train'}]`;
+          } catch(e) {}
+        }
+        let line = `• R${p.ride_number} (${p.date.slice(5,10)} | ${rWeight}kg ${intentShort}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.elevation_gain_m}m asc.`;
         const athleteMsg = await db.threads.where({ ride_number: p.ride_number, role: 'athlete' }).first();
         if (athleteMsg) {
           line += ` Note: "${athleteMsg.message.slice(0, 45)}"`;
@@ -1760,7 +2276,7 @@
     }
 
     // --------------------------------------------------------
-    // 10. SINGLE-RIDE DEBRIEF (1-MINUTE DATA & DATED WEIGHT)
+    // SINGLE-RIDE DEBRIEF
     // --------------------------------------------------------
     async function runSingleRideDebrief(targetRide) {
       if (isRequestInProgress) return;
@@ -1783,7 +2299,7 @@
       if (hubBanner) hubBanner.style.display = "flex";
 
       const userW = await getAthleteWeightForDate(targetRide.date);
-      const userH = (await getConfig("athlete_height")) || "190";
+      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
 
       const minuteTimeline = await build1MinuteTelemetryTimeline(targetRide.strava_id);
       const priorContinuum = await buildCompactPriorContinuum(targetRide.ride_number);
@@ -1793,34 +2309,45 @@
         .map(t => t.message)
         .join(" | ");
 
-      const prompt = `
-You are a cycling physiologist and clinical sports scientist coaching Mustafa (${userH} cm, ${userW} kg recorded at time of ride, XC Mountain Bike). Max HR benchmark: 207 bpm.
-RECALIBRATED CARDIAC ZONES: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
+      let intentContext = "INTENDED GOAL: None recorded (Routine log).";
+      if (targetRide.intent_type === 'PLAY') {
+        intentContext = "INTENDED GOAL: Play Ride / Commute (Free-form, non-structured session). Do NOT penalize for zone variability or lack of interval discipline.";
+      } else if (targetRide.intent_type !== 'PLAY' && targetRide.intent_target && targetRide.intent_type !== 'NONE') {
+        try {
+          const it = JSON.parse(targetRide.intent_target);
+          intentContext = `INTENDED GOAL: Structured Training Session.\n- Target Primary Zone: ${it.target_zone}\n- Execution Format: ${it.format}${it.format === 'INTERVAL' ? ` (Switching: ${it.interval_zones}, Pattern: ${it.interval_freq})` : ''}\nEvaluate how well actual telemetry executed this goal.`;
+        } catch(e) {}
+      }
 
-CRITICAL SENSOR ACCURACY NOTICE:
-Power figures are algorithmic calculations from GPS speed and elevation, NOT strain-gauge measurements. Do not treat power as ground truth or base conclusions on minor wattage variations. Prioritize heart rate response, cardiac drift, terrain gradient, and sustained velocity.
+      const prompt = `
+You are a cycling physiologist coaching Mustafa (${userH} cm, ${userW} kg at time of ride, XC Mountain Bike). Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
+CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
+
+CRITICAL SENSOR NOTICE:
+Power figures are algorithmic calculations from GPS speed and elevation, NOT direct crank strain-gauge data. Prioritize heart rate response, cardiac drift, terrain gradient, and sustained speed.
+
+ATHLETE'S PRE-RIDE OBJECTIVE:
+${intentContext}
 
 WORKOUT UNDER EVALUATION:
 - Ride: ${targetRide.exercise_code}
 - Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
 - Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm
-- Ascent: ${targetRide.elevation_gain_m} m | Athlete Mass: ${userW} kg
+- Ascent: ${targetRide.elevation_gain_m} m | Mass: ${userW} kg
 
-IN-RIDE 1-MINUTE GRANULAR TELEMETRY TIMELINE:
+IN-RIDE 1-MINUTE TELEMETRY TIMELINE:
 ${minuteTimeline}
 
-PRIOR RIDES IN THIS SERIES (COMPARE DIRECTLY AGAINST THESE):
+PRIOR RIDES IN THIS SERIES:
 ${priorContinuum || "First baseline ride recorded."}
 
-ATHLETE SENSATIONS/NOTES ON THIS RIDE:
+ATHLETE SENSATIONS/NOTES:
 ${athleteNotes || "None recorded."}
 
-CRITICAL REPORT DIRECTIVES:
-- Provide an authoritative sports-science retrospective debrief.
-- Contrast sub-threshold cardiac drift, climbing VAM, and sustained speed against previous rides.
-- NO formula derivations (e.g., F = m*g*sin theta).
-- NO ASCII tables, pipes (|), or percent-symbol table borders.
-- NO LaTeX math tags, backslashes, or dollar signs. Write clean conversational English with units (km/h, bpm, m).
+DIRECTIVES:
+- Compare actual heart rate execution against the athlete's intended goal.
+- Analyze intraday cardiac drift (late-ride decoupling on steady efforts).
+- NO formula derivations. NO ASCII tables or pipe borders. NO LaTeX or dollar signs.
 `;
 
       const reply = await callGeminiAPI(key, prompt, null);
@@ -1834,14 +2361,16 @@ CRITICAL REPORT DIRECTIVES:
         await db.workouts.update(targetRide.id, { debrief_stale: false });
         targetRide.debrief_stale = false;
         
-        document.getElementById("sessionActionBox").innerHTML = "";
-        const hubAct = document.getElementById("hubActionBox");
-        if (hubAct) hubAct.innerHTML = "";
+        if (currentWorkout && currentWorkout.ride_number === targetRide.ride_number) {
+          document.getElementById("sessionActionBox").innerHTML = "";
+          const badge = document.getElementById("det_status_badge");
+          if (badge) badge.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+          renderChatThread();
+        }
 
-        const badge = document.getElementById("det_status_badge");
-        if (badge) badge.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+        const hubAct = document.getElementById("hubActionBox");
+        if (hubAct && String(activeChatStreamKey) === String(targetRide.ride_number)) hubAct.innerHTML = "";
         
-        renderChatThread();
         if (document.getElementById("chatsThreadView").style.display === "block") {
           renderHubChat();
         }
@@ -1857,7 +2386,7 @@ CRITICAL REPORT DIRECTIVES:
     }
 
     // --------------------------------------------------------
-    // 11. IN-RIDE ATHLETE MESSAGING & RETRY
+    // IN-RIDE ATHLETE MESSAGING & RETRY
     // --------------------------------------------------------
     async function sendAthleteReply() {
       const input = document.getElementById("replyInput");
@@ -1889,22 +2418,43 @@ CRITICAL REPORT DIRECTIVES:
 
       document.getElementById("sessionLoadingBanner").style.display = "flex";
 
-      const userW = await getAthleteWeightForDate(currentWorkout.date);
+      const targetWorkout = await db.workouts.where("ride_number").equals(payload.ride_number).first();
+      const userW = await getAthleteWeightForDate(targetWorkout ? targetWorkout.date : null);
+      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+
+      let intentStr = "None recorded";
+      if (targetWorkout) {
+        if (targetWorkout.intent_type === 'PLAY') intentStr = "Play Ride / Commute";
+        else if (targetWorkout.intent_target && targetWorkout.intent_type !== 'NONE') {
+          try {
+            const it = JSON.parse(targetWorkout.intent_target);
+            intentStr = `${it.target_zone} (${it.format || 'Steady'})`;
+          } catch(e) {}
+        }
+      }
+
       const pastThreads = await db.threads.where("ride_number").equals(payload.ride_number).toArray();
-      const dialogueContext = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
+      let dialogueTurns = [];
+      if (pastThreads.length > 0) {
+        dialogueTurns.push(`${pastThreads[0].role.toUpperCase()}: ${pastThreads[0].message}`);
+        const recentTurns = pastThreads.slice(1).slice(-7);
+        recentTurns.forEach(t => dialogueTurns.push(`${t.role.toUpperCase()}: ${t.message}`));
+      }
+      const dialogueContext = dialogueTurns.join("\n");
 
       const prompt = `
 You are Mustafa's personal cycling coach.
-ATHLETE: 190 cm, ${userW} kg at time of this ride, XC Mountain Bike.
-WORKOUT: Ride ${payload.ride_number} (${currentWorkout.distance_km} km, ${currentWorkout.avg_speed_kmh} km/h, ${currentWorkout.avg_hr} bpm).
-CONVERSATION HISTORY:
+ATHLETE: ${userH} cm, ${userW} kg at time of this ride, XC Mountain Bike.
+WORKOUT: Ride ${payload.ride_number} (${targetWorkout ? targetWorkout.distance_km + 'km, ' + targetWorkout.avg_speed_kmh + 'km/h, ' + targetWorkout.avg_hr + 'bpm' : ''}).
+INTENDED TARGET: ${intentStr}
+CONVERSATION HISTORY (ANCHORED WITH INITIAL DEBRIEF):
 ${dialogueContext}
 
 CURRENT ATHLETE MESSAGE:
 ${payload.text}
-${payload.image_b64 ? "(Athlete attached a screenshot of a segment, heart-rate chart, or route map. Examine the attached visual data directly.)" : ""}
+${payload.image_b64 ? "(Athlete attached a screenshot. Examine visual curves directly.)" : ""}
 
-DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete directly.
+DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete directly.
 `;
 
       const aiResponse = await callGeminiAPI(key, prompt, payload.image_b64);
@@ -1924,6 +2474,7 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
           message: aiResponse, 
           created_at: new Date().toISOString() 
         });
+
         lastPendingRidePayload = null;
         renderChatThread();
       } else {
@@ -1937,7 +2488,7 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
     }
 
     // --------------------------------------------------------
-    // 12. GLOBAL TELEMETRY GRAPHS
+    // GLOBAL TELEMETRY GRAPHS
     // --------------------------------------------------------
     function setupGlobalMetricPills() {
       const available = ["Power Output (Watts)", "Speed (km/h)", "Heart Rate (bpm)", "Distance (km)", "Elevation Ascent (m)", "Work (kJ)"];
@@ -1960,25 +2511,27 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
       setupGlobalMetricPills();
       let workouts = await db.workouts.orderBy('ride_number').toArray();
 
+      const chartDiv = document.getElementById("plotlyGlobalChart");
       if (workouts.length < 2) {
-        document.getElementById("plotlyGlobalChart").innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 rides to plot progression.</div>";
+        if (window.Plotly && chartDiv) Plotly.purge(chartDiv);
+        chartDiv.innerHTML = "<div style='text-align:center;padding:40px;color:var(--text-muted);'>Log at least 2 rides to plot progression.</div>";
         return;
       }
 
       const xLabels = workouts.map(w => `R${w.ride_number}`);
       const traces = [];
 
-      const peakPwr = Math.max(...workouts.map(w => w.avg_power_w || 0), 350);
-      const peakSpd = Math.max(...workouts.map(w => w.avg_speed_kmh || 0), 35);
-      const peakDist = Math.max(...workouts.map(w => w.distance_km || 0), 40);
-      const peakAsc = Math.max(...workouts.map(w => w.elevation_gain_m || 0), 150);
-      const peakWork = Math.max(...workouts.map(w => w.kilojoules || 0), 1200);
+      const peakPwr = Math.max(safeMax(workouts.map(w => w.avg_power_w || 0), 0), 350);
+      const peakSpd = Math.max(safeMax(workouts.map(w => w.avg_speed_kmh || 0), 0), 35);
+      const peakDist = Math.max(safeMax(workouts.map(w => w.distance_km || 0), 0), 40);
+      const peakAsc = Math.max(safeMax(workouts.map(w => w.elevation_gain_m || 0), 0), 150);
+      const peakWork = Math.max(safeMax(workouts.map(w => w.kilojoules || 0), 0), 1200);
 
       const metricConfigs = {
         "Power Output (Watts)": { 
           y: workouts.map(w => w.avg_power_w ? Math.min(100, Math.round((w.avg_power_w / peakPwr) * 100)) : null), 
           color: "#fc5200",
-          text: workouts.map(w => `${w.avg_power_w || '--'} W`)
+          text: workouts.map(w => `${w.avg_power_w || '--'} W (Est)`)
         },
         "Speed (km/h)": { 
           y: workouts.map(w => Math.min(100, Math.round((w.avg_speed_kmh / peakSpd) * 100))), 
@@ -1986,7 +2539,7 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
           text: workouts.map(w => `${w.avg_speed_kmh} km/h`)
         },
         "Heart Rate (bpm)": { 
-          y: workouts.map(w => w.avg_hr ? Math.max(0, Math.min(100, Math.round(((w.avg_hr - 100) / (207 - 100)) * 100))) : null), 
+          y: workouts.map(w => w.avg_hr ? Math.max(0, Math.min(100, Math.round(((w.avg_hr - 100) / (PHYSIO_CONFIG.max_hr - 100)) * 100))) : null), 
           color: "#ef4444",
           text: workouts.map(w => `${w.avg_hr || '--'} bpm`)
         },
@@ -2023,15 +2576,12 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
 
       const totalDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
       const totalAsc = workouts.reduce((a, b) => a + b.elevation_gain_m, 0);
-      document.getElementById("global_banner_l").textContent = `Season: ${workouts.length} Rides Recorded`;
-      document.getElementById("global_banner_r").textContent = `Volume: ${totalDist} km | ${totalAsc} m Asc`;
 
       const dynamicWidth = Math.max(window.innerWidth - 24, workouts.length * 55);
 
       const layout = {
         width: dynamicWidth,
         margin: { l: 25, r: 20, t: 10, b: 35 },
-        template: 'plotly_white',
         legend: { orientation: 'h', y: 1.15 },
         dragmode: false,
         hovermode: 'x unified',
@@ -2040,9 +2590,8 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
       };
 
       const config = { responsive: false, displayModeBar: false, scrollZoom: false, staticPlot: false };
-      Plotly.newPlot('plotlyGlobalChart', traces, layout, config);
+      Plotly.react('plotlyGlobalChart', traces, layout, config);
 
-      const chartDiv = document.getElementById('plotlyGlobalChart');
       if (chartDiv.removeAllListeners) chartDiv.removeAllListeners('plotly_hover');
 
       chartDiv.on('plotly_hover', function(data) {
@@ -2085,10 +2634,11 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address the athlete d
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
       let workouts = await db.workouts.orderBy('ride_number').toArray();
+      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
       const summaryLogs = workouts.map(w => `${w.exercise_code}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m`).join('\n');
 
       const prompt = `
-You are an executive sports scientist reviewing athlete Mustafa (190 cm, XC Mountain Bike).
+You are an executive sports scientist reviewing athlete Mustafa (${userH} cm, XC Mountain Bike).
 Analyze macro progression trends across: ${globalSelectedMetrics.join(', ')}.
 
 WORKOUT LOG:
@@ -2121,7 +2671,7 @@ RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (
         const key = (await getConfig("gemini_api_key")).trim();
         if (key) {
           const pastThreads = await db.graph_threads.where("metric_key").equals(metricKey).toArray();
-          const dialogueContext = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
+          const dialogueContext = pastThreads.slice(-8).map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
           const prompt = `
 You are Mustafa's sports scientist discussing macro progression (${globalSelectedMetrics.join(', ')}).
@@ -2143,7 +2693,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     // --------------------------------------------------------
-    // 13. COMPARE LAB
+    // COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
       const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
@@ -2153,9 +2703,12 @@ RULES: Clean plain English. NO LaTeX formulas.
 
       if (workouts.length < 2) {
         document.getElementById("compareTableContainer").innerHTML = "<div style='color:var(--text-muted);padding:20px;text-align:center;'>Need at least 2 rides to compare.</div>";
+        s1.innerHTML = "";
+        s2.innerHTML = "";
+        s3.innerHTML = "";
         return;
       }
-      const opts = workouts.map(w => `<option value="${w.id}">${w.exercise_code.split('-')[0].trim()} (${w.distance_km} km)</option>`).join('');
+      const opts = workouts.map(w => `<option value="${w.id}">${escapeHtml(w.exercise_code.split('-')[0].trim())} (${w.distance_km} km)</option>`).join('');
       s1.innerHTML = opts;
       s2.innerHTML = opts;
       s3.innerHTML = `<option value="">(None - 1 to 1)</option>` + opts;
@@ -2164,19 +2717,34 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     async function renderComparison() {
-      const id1 = parseInt(document.getElementById("comp_s1").value);
-      const id2 = parseInt(document.getElementById("comp_s2").value);
-      const id3 = parseInt(document.getElementById("comp_s3").value);
+      const val1 = document.getElementById("comp_s1").value;
+      const val2 = document.getElementById("comp_s2").value;
+      const val3 = document.getElementById("comp_s3").value;
+
+      if (!val1 || !val2) return;
+
+      const id1 = parseInt(val1);
+      const id2 = parseInt(val2);
+      const id3 = val3 ? parseInt(val3) : null;
 
       const w1 = await db.workouts.get(id1);
       const w2 = await db.workouts.get(id2);
       const w3 = id3 ? await db.workouts.get(id3) : null;
       if (!w1 || !w2) return;
 
-      const userW = await getLatestWeight();
       const getVAM = w => w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
-      const getWPK = w => w.avg_power_w > 0 ? (w.avg_power_w / userW).toFixed(2) : '--';
-      const getNP = w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0);
+
+      const getIntentLabel = w => {
+        if (w.intent_type === 'PLAY') return 'Play Ride';
+        if (w.intent_type !== 'PLAY' && w.intent_target && w.intent_type !== 'NONE') {
+          try {
+            const it = JSON.parse(w.intent_target);
+            const zTag = parseZoneTag(it.target_zone);
+            return `${zTag || 'Train'} (${it.format || 'Steady'})`;
+          } catch(e) {}
+        }
+        return 'Routine';
+      };
 
       const diffStr = (v2, v1, unit = '') => {
         if (v1 > 0 && v2 > 0) {
@@ -2187,22 +2755,20 @@ RULES: Clean plain English. NO LaTeX formulas.
       };
 
       const metrics = [
+        { name: "Target Intent", v1: getIntentLabel(w1), v2: getIntentLabel(w2), dHtml: '--', v3: w3 ? getIntentLabel(w3) : null },
         { name: "Distance", v1: `${w1.distance_km} km`, v2: `${w2.distance_km} km`, dHtml: diffStr(w2.distance_km, w1.distance_km, ' km'), v3: w3 ? `${w3.distance_km} km` : null },
         { name: "Duration", v1: w1.duration_str, v2: w2.duration_str, dHtml: diffStr(Math.round(w2.moving_sec/60), Math.round(w1.moving_sec/60), ' min'), v3: w3 ? w3.duration_str : null },
         { name: "Average Speed", v1: `${w1.avg_speed_kmh} km/h`, v2: `${w2.avg_speed_kmh} km/h`, dHtml: diffStr(w2.avg_speed_kmh, w1.avg_speed_kmh, ' km/h'), v3: w3 ? `${w3.avg_speed_kmh} km/h` : null },
         { name: "Peak Speed", v1: `${w1.max_speed_kmh} km/h`, v2: `${w2.max_speed_kmh} km/h`, dHtml: diffStr(w2.max_speed_kmh, w1.max_speed_kmh, ' km/h'), v3: w3 ? `${w3.max_speed_kmh} km/h` : null },
         { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', dHtml: (w1.avg_hr > 0 && w2.avg_hr > 0) ? `<span class="${(w2.avg_hr - w1.avg_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.avg_hr - w1.avg_hr) >= 0 ? '+' : ''}${w2.avg_hr - w1.avg_hr} bpm</span>` : '--', v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
         { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', dHtml: (w1.max_hr > 0 && w2.max_hr > 0) ? `<span class="${(w2.max_hr - w1.max_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.max_hr - w1.max_hr) >= 0 ? '+' : ''}${w2.max_hr - w1.max_hr} bpm</span>` : '--', v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
-        { name: "Average Power", v1: w1.avg_power_w ? `${w1.avg_power_w} W` : '--', v2: w2.avg_power_w ? `${w2.avg_power_w} W` : '--', dHtml: diffStr(w2.avg_power_w, w1.avg_power_w, ' W'), v3: w3 ? `${w3.avg_power_w} W` : '--' },
-        { name: "Normalized Power", v1: `${getNP(w1)} W`, v2: `${getNP(w2)} W`, dHtml: diffStr(getNP(w2), getNP(w1), ' W'), v3: w3 ? `${getNP(w3)} W` : '--' },
-        { name: "Power to Weight", v1: `${getWPK(w1)} W/kg`, v2: `${getWPK(w2)} W/kg`, dHtml: diffStr(parseFloat(getWPK(w2)) || 0, parseFloat(getWPK(w1)) || 0, ' W/kg'), v3: w3 ? `${getWPK(w3)} W/kg` : '--' },
         { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, dHtml: diffStr(w2.elevation_gain_m, w1.elevation_gain_m, ' m'), v3: w3 ? `${w3.elevation_gain_m} m` : null },
         { name: "Climbing VAM", v1: `${getVAM(w1)} m/h`, v2: `${getVAM(w2)} m/h`, dHtml: diffStr(getVAM(w2), getVAM(w1), ' m/h'), v3: w3 ? `${getVAM(w3)} m/h` : null },
-        { name: "Mechanical Work", v1: `${w1.kilojoules} kJ`, v2: `${w2.kilojoules} kJ`, dHtml: diffStr(w2.kilojoules, w1.kilojoules, ' kJ'), v3: w3 ? `${w3.kilojoules} kJ` : null }
+        { name: "Work Done", v1: `${w1.kilojoules} kJ`, v2: `${w2.kilojoules} kJ`, dHtml: diffStr(w2.kilojoules, w1.kilojoules, ' kJ'), v3: w3 ? `${w3.kilojoules} kJ` : null }
       ];
 
-      let head = `<tr><th>Metric</th><th>${w1.exercise_code.split('-')[0].trim()}</th><th>${w2.exercise_code.split('-')[0].trim()}</th><th>Delta (2 vs 1)</th>`;
-      if (w3) head += `<th>${w3.exercise_code.split('-')[0].trim()}</th>`;
+      let head = `<tr><th>Metric</th><th>${escapeHtml(w1.exercise_code.split('-')[0].trim())}</th><th>${escapeHtml(w2.exercise_code.split('-')[0].trim())}</th><th>Delta (2 vs 1)</th>`;
+      if (w3) head += `<th>${escapeHtml(w3.exercise_code.split('-')[0].trim())}</th>`;
       head += `</tr>`;
 
       let body = metrics.map(m => `
@@ -2224,26 +2790,39 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     async function generateAIComparison() {
+      const val1 = document.getElementById("comp_s1")?.value;
+      const val2 = document.getElementById("comp_s2")?.value;
+      const val3 = document.getElementById("comp_s3")?.value;
+
+      if (!val1 || !val2) {
+        alert("Please select at least two rides to compare.");
+        return;
+      }
+
       if (!navigator.onLine) { alert("Connect to internet."); return; }
       const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
-      const id1 = parseInt(document.getElementById("comp_s1").value);
-      const id2 = parseInt(document.getElementById("comp_s2").value);
-      const id3 = parseInt(document.getElementById("comp_s3").value);
+      const id1 = parseInt(val1);
+      const id2 = parseInt(val2);
+      const id3 = val3 ? parseInt(val3) : null;
 
       const w1 = await db.workouts.get(id1);
       const w2 = await db.workouts.get(id2);
       const w3 = id3 ? await db.workouts.get(id3) : null;
+      if (!w1 || !w2) return;
+
       const sessions = [w1, w2];
       if (w3) sessions.push(w3);
 
-      const prompt = `
-You are an expert sports physiologist analyzing athlete Mustafa (190 cm).
-Compare these rides:
-${sessions.map(s => `${s.exercise_code}: ${s.distance_km} km | Speed: ${s.avg_speed_kmh} km/h | HR: ${s.avg_hr} bpm | Ascent: ${s.elevation_gain_m} m`).join('\n')}
+      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
 
-RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual performance differences.
+      const prompt = `
+You are an expert sports physiologist analyzing athlete Mustafa (${userH} cm).
+Compare these rides considering their intended objectives:
+${sessions.map(s => `${s.exercise_code} [Intent: ${s.intent_type === 'PLAY' ? 'Play' : (s.intent_target || 'None')}]: ${s.distance_km} km | Speed: ${s.avg_speed_kmh} km/h | HR: ${s.avg_hr} bpm | Ascent: ${s.elevation_gain_m} m`).join('\n')}
+
+RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiological responses.
 `;
       document.getElementById("compareLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt, null);
@@ -2257,7 +2836,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
     }
 
     // --------------------------------------------------------
-    // 14. CHATS HUB & MASTER COACH (WITH HALVES PROFILES & ELAPSED TIME DELTA)
+    // CHATS HUB & MASTER COACH
     // --------------------------------------------------------
     async function setupChatsHub() {
       document.getElementById("chatsListView").style.display = "block";
@@ -2275,19 +2854,18 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
               <span class="chat-contact-name">Master Season AI Coach</span>
               <span class="chat-timestamp">${lastMaster ? lastMaster.created_at.slice(5, 10) : 'Active'}</span>
             </div>
-            <div class="chat-snippet">${lastMaster ? lastMaster.message.slice(0, 60) : 'Full season history & long-term macro analysis...'}</div>
+            <div class="chat-snippet">${lastMaster ? escapeHtml(lastMaster.message.slice(0, 60)) : 'Full season history & long-term macro analysis...'}</div>
           </div>
         </div>
       `;
 
       for (const w of workouts) {
+        const coachMsg = await db.threads.where({ ride_number: w.ride_number, role: 'coach' }).first();
         const lastMsg = await db.threads.where("ride_number").equals(w.ride_number).reverse().first();
-        const hasCoach = lastMsg ? true : false;
-        const isStale = w.debrief_stale;
 
         let badgeHtml = `<span class="status-badge badge-unreviewed">🟡 New</span>`;
-        if (hasCoach && isStale) badgeHtml = `<span class="status-badge badge-stale">🟠 Update</span>`;
-        else if (hasCoach) badgeHtml = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
+        if (coachMsg && w.debrief_stale) badgeHtml = `<span class="status-badge badge-stale">🟠 Update</span>`;
+        else if (coachMsg) badgeHtml = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
 
         html += `
           <div class="chat-row" onclick="openChatThread(${w.ride_number})">
@@ -2300,7 +2878,7 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
                   <span class="chat-timestamp">${w.date.slice(5, 10)}</span>
                 </div>
               </div>
-              <div class="chat-snippet">${lastMsg ? lastMsg.message.slice(0, 55) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_hr || '--'} bpm`}</div>
+              <div class="chat-snippet">${lastMsg ? escapeHtml(lastMsg.message.slice(0, 55)) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_hr || '--'} bpm`}</div>
             </div>
           </div>
         `;
@@ -2319,13 +2897,12 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       if (streamKey !== 'MASTER') {
         const rNum = Number(streamKey);
         const w = await db.workouts.where("ride_number").equals(rNum).first();
-        const existing = await db.threads.where("ride_number").equals(rNum).toArray();
-        const hasCoach = existing.some(t => t.role === 'coach');
+        const existingCoach = await db.threads.where({ ride_number: rNum, role: 'coach' }).first();
 
-        if (!hasCoach) {
+        if (!existingCoach) {
           hubActionBox.innerHTML = `<button class="btn btn-primary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">⚡ Generate AI Debrief for Ride ${rNum}</button>`;
         } else if (w && w.debrief_stale) {
-          hubActionBox.innerHTML = `<button class="btn btn-secondary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">🔄 Re-Evaluate Ride ${rNum} (Fresh Data)</button>`;
+          hubActionBox.innerHTML = `<button class="btn btn-secondary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">🔄 Re-Evaluate Ride ${rNum} (Updated Goal)</button>`;
         } else {
           hubActionBox.innerHTML = "";
         }
@@ -2352,24 +2929,25 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
 
       if (activeChatStreamKey === "MASTER") {
         const messages = await db.master_chat.toArray();
+        let html = "";
         if (messages.length === 0) {
-          container.innerHTML = `
+          html = `
             <div class="chat-bubble chat-coach">
               <div class="chat-sender">Master AI Coach</div>
-              Hello Mustafa. I retain your full season trajectory (${await getLatestWeight()} kg active weight, ${(await getConfig("athlete_height")) || "190"} cm, XC MTB). Ask me anything about physiological adaptations, training load accumulation, or attach charts.
+              Hello Mustafa. I retain your full season trajectory (${await getLatestWeight()} kg active weight, ${(await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm} cm, XC MTB). Ask me anything about physiological adaptations, training load accumulation, or attach charts.
             </div>
           `;
-          return;
+        } else {
+          html = messages.map(m => `
+            <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
+              <div class="chat-sender">${m.role === 'coach' ? 'Master AI Coach' : 'Mustafa (Athlete)'}</div>
+              ${m.image_b64 ? `<img src="${m.image_b64}" class="chat-attachment-img" />` : ''}
+              ${cleanAiText(m.message)}
+            </div>
+          `).join('');
         }
-        let html = messages.map(m => `
-          <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
-            <div class="chat-sender">${m.role === 'coach' ? 'Master AI Coach' : 'Mustafa (Athlete)'}</div>
-            ${m.image_b64 ? `<img src="${m.image_b64}" class="chat-attachment-img" />` : ''}
-            ${cleanAiText(m.message)}
-          </div>
-        `).join('');
 
-        if (lastPendingHubPayload && activeChatStreamKey === 'MASTER') {
+        if (lastPendingHubPayload && lastPendingHubPayload.streamKey === 'MASTER') {
           html += `
             <div class="retry-card">
               <span>⚠️️ Message failed to send.</span>
@@ -2379,20 +2957,22 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
         }
         container.innerHTML = html;
       } else {
-        const messages = await db.threads.where("ride_number").equals(Number(activeChatStreamKey)).toArray();
+        const rNum = Number(activeChatStreamKey);
+        const messages = await db.threads.where("ride_number").equals(rNum).toArray();
+        let html = "";
         if (messages.length === 0) {
-          container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for Ride ${activeChatStreamKey}. Tap the button above to analyze or type below.</div>`;
-          return;
+          html = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for Ride ${activeChatStreamKey}. Tap the button above to analyze or type below.</div>`;
+        } else {
+          html = messages.map(m => `
+            <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
+              <div class="chat-sender">${m.role === 'coach' ? 'AI Coach' : 'Mustafa (Athlete)'}</div>
+              ${m.image_b64 ? `<img src="${m.image_b64}" class="chat-attachment-img" />` : ''}
+              ${cleanAiText(m.message)}
+            </div>
+          `).join('');
         }
-        let html = messages.map(m => `
-          <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
-            <div class="chat-sender">${m.role === 'coach' ? 'AI Coach' : 'Mustafa (Athlete)'}</div>
-            ${m.image_b64 ? `<img src="${m.image_b64}" class="chat-attachment-img" />` : ''}
-            ${cleanAiText(m.message)}
-          </div>
-        `).join('');
 
-        if (lastPendingHubPayload && activeChatStreamKey !== 'MASTER') {
+        if (lastPendingHubPayload && String(lastPendingHubPayload.streamKey) === String(activeChatStreamKey)) {
           html += `
             <div class="retry-card">
               <span>⚠️ Message failed to send.</span>
@@ -2437,68 +3017,68 @@ RULES: NO LaTeX. NO math formulas. Focus purely on deep comparison and factual p
       if (payload.streamKey === "MASTER") {
         const workouts = await db.workouts.orderBy('ride_number').toArray();
         const athleteW = await getLatestWeight();
-        const athleteH = (await getConfig("athlete_height")) || "190";
+        const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
 
-        // 1. Elapsed Time Since Last Chat Message
         const pastMessages = await db.master_chat.toArray();
         let timeElapsedContext = "First conversation initiated today.";
         let ridesSinceLastChat = [];
 
         if (pastMessages.length > 0) {
-          const lastMsgTime = new Date(pastMessages[pastMessages.length - 1].created_at).getTime();
+          const lastMsgTime = parseSafeDate(pastMessages[pastMessages.length - 1].created_at).getTime();
           const now = Date.now();
           const diffHours = Math.round((now - lastMsgTime) / 3600000);
           const diffDays = (diffHours / 24).toFixed(1);
 
           timeElapsedContext = `It has been ${diffDays} days (${diffHours} hours) since your last conversation with Mustafa.`;
-          ridesSinceLastChat = workouts.filter(w => new Date(w.date).getTime() > lastMsgTime);
+          ridesSinceLastChat = workouts.filter(w => parseSafeDate(w.date).getTime() > lastMsgTime);
         }
 
-        // 2. High-Density Macro Ledger with Halves Profile (H1 vs H2)
         let fullSeasonLedgerLines = [];
+        let totalZoneSecs = [0, 0, 0, 0, 0];
+
         for (const w of workouts) {
           const rWeight = await getAthleteWeightForDate(w.date);
-          const halves = await extractRideHalvesProfile(w.strava_id);
-          const halvesStr = halves ? `| Halves: ${halves}` : '';
-          fullSeasonLedgerLines.push(`• R${w.ride_number} (${w.date.slice(5,10)} | ${rWeight}kg): ${w.distance_km}km | ${w.avg_speed_kmh}km/h | HR: ${w.avg_hr||'--'}bpm | Asc: ${w.elevation_gain_m}m ${halvesStr}`);
+          const halvesStr = (w.halves_profile) ? `| Halves: ${w.halves_profile}` : '';
+          
+          let intentStr = w.intent_type === 'PLAY' ? '[Play]' : '';
+          if (w.intent_type !== 'PLAY' && w.intent_target && w.intent_type !== 'NONE') {
+            try {
+              const it = JSON.parse(w.intent_target);
+              const zTag = parseZoneTag(it.target_zone);
+              intentStr = `[${zTag || 'Train'}]`;
+            } catch(e) {}
+          }
+          fullSeasonLedgerLines.push(`• R${w.ride_number} (${w.date.slice(5,10)} | ${rWeight}kg ${intentStr}): ${w.distance_km}km | ${w.avg_speed_kmh}km/h | HR: ${w.avg_hr||'--'}bpm | Asc: ${w.elevation_gain_m}m ${halvesStr}`);
+
+          if (w.zone_seconds && Array.isArray(w.zone_seconds)) {
+            for (let i = 0; i < 5; i++) totalZoneSecs[i] += (w.zone_seconds[i] || 0);
+          }
         }
         const fullSeasonLedger = fullSeasonLedgerLines.join('\n');
-
-        // 3. Aggregate Macro Metrics (Time in Zones Across Season)
-        let totalSeasonMins = 0, z1Mins = 0, z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0;
-        workouts.forEach(w => {
-          const m = Math.round((w.moving_sec || 0) / 60);
-          totalSeasonMins += m;
-          if (w.avg_hr < 135) z1Mins += m;
-          else if (w.avg_hr <= 154) z2Mins += m;
-          else if (w.avg_hr <= 170) z3Mins += m;
-          else if (w.avg_hr <= 188) z4Mins += m;
-          else z5Mins += m;
-        });
 
         const totalWork = Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0));
         const totalDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
         const totalAsc = workouts.reduce((a, b) => a + b.elevation_gain_m, 0);
 
-        const dialogue = pastMessages.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
+        const dialogue = pastMessages.slice(-8).map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
         const prompt = `
-You are Mustafa's head cycling sports director and clinical exercise physiologist.
-ATHLETE BIO: ${athleteH} cm, ${athleteW} kg active mass, XC Mountain Biking. Max Heart Rate: 207 bpm.
+You are Mustafa's head cycling sports director and exercise physiologist.
+ATHLETE BIO: ${userH} cm, ${athleteW} kg active mass, XC Mountain Biking. Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
 CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
 
 CHRONOLOGICAL CONTEXT & TIME ELAPSED:
 ${timeElapsedContext}
 Rides completed since last conversation: ${ridesSinceLastChat.length ? ridesSinceLastChat.map(r => `Ride ${r.ride_number} (${r.distance_km}km on ${r.date.slice(5,10)})`).join(', ') : 'None.'}
 
-FULL SEASON MACRO ACCUMULATION (${workouts.length} TOTAL RIDES RETAINED):
+SEASON ACCUMULATION (${workouts.length} TOTAL RIDES RETAINED):
 - Total Distance: ${totalDist} km
 - Total Vertical Ascent: ${totalAsc} m
 - Total Mechanical Work: ${totalWork} kJ
-- Total Moving Duration: ${Math.round(totalSeasonMins/60)} hours
-- Season Zone Distribution: Z1: ${z1Mins}m | Z2: ${z2Mins}m | Z3: ${z3Mins}m | Z4: ${z4Mins}m | Z5: ${z5Mins}m
+- True Time-In-Zone Accumulation (Sensor Time Deltas):
+  Z1: ${Math.round(totalZoneSecs[0]/60)}m | Z2: ${Math.round(totalZoneSecs[1]/60)}m | Z3: ${Math.round(totalZoneSecs[2]/60)}m | Z4: ${Math.round(totalZoneSecs[3]/60)}m | Z5: ${Math.round(totalZoneSecs[4]/60)}m
 
-SEASON WORKOUT LEDGER (INCLUDES HISTORICAL HALVES BIOMECHANICAL SHIFT):
+SEASON WORKOUT LEDGER:
 ${fullSeasonLedger}
 
 CONVERSATION HISTORY:
@@ -2506,13 +3086,12 @@ ${dialogue}
 
 CURRENT ATHLETE INQUIRY:
 ${payload.text}
-${payload.image_b64 ? "(Athlete attached a screenshot of a segment, heart-rate chart, or workout graph. Examine the visual data directly.)" : ""}
+${payload.image_b64 ? "(Athlete attached a screenshot. Examine visual data directly.)" : ""}
 
 DIRECTIVES:
-- Maintain full longitudinal memory of all 32+ rides.
-- Note any gap in days and acknowledge recently completed sessions.
-- Provide authoritative, high-level sports science and physiological insights.
-- NO formula derivations. NO ASCII tables or pipe dividers. NO LaTeX or dollar signs.
+- Maintain full longitudinal memory of all recorded rides.
+- Factor in whether sessions were 'Play' vs 'Structured Training'.
+- NO formula derivations. NO ASCII tables. NO LaTeX or dollar signs.
 `;
 
         const reply = await callGeminiAPI(key, prompt, payload.image_b64);
@@ -2539,13 +3118,33 @@ DIRECTIVES:
         const rNum = Number(payload.streamKey);
         const w = await db.workouts.where("ride_number").equals(rNum).first();
         const userW = await getAthleteWeightForDate(w ? w.date : null);
+        const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+
+        let intentStr = "None recorded";
+        if (w) {
+          if (w.intent_type === 'PLAY') intentStr = "Play Ride / Commute";
+          else if (w.intent_target && w.intent_type !== 'NONE') {
+            try {
+              const it = JSON.parse(w.intent_target);
+              intentStr = `${it.target_zone} (${it.format || 'Steady'})`;
+            } catch(e) {}
+          }
+        }
+
         const pastThreads = await db.threads.where("ride_number").equals(rNum).toArray();
-        const dialogue = pastThreads.map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
+        let dialogueTurns = [];
+        if (pastThreads.length > 0) {
+          dialogueTurns.push(`${pastThreads[0].role.toUpperCase()}: ${pastThreads[0].message}`);
+          const recentTurns = pastThreads.slice(1).slice(-7);
+          recentTurns.forEach(t => dialogueTurns.push(`${t.role.toUpperCase()}: ${t.message}`));
+        }
+        const dialogue = dialogueTurns.join("\n");
 
         const prompt = `
 You are Mustafa's personal cycling coach.
-WORKOUT: Ride ${rNum} (${w ? w.distance_km + 'km, ' + w.avg_speed_kmh + 'km/h, ' + userW + 'kg' : ''})
-CONVERSATION:
+WORKOUT: Ride ${rNum} (${w ? w.distance_km + 'km, ' + w.avg_speed_kmh + 'km/h, ' + userW + 'kg, ' + userH + 'cm' : ''})
+INTENDED TARGET: ${intentStr}
+CONVERSATION HISTORY (ANCHORED WITH INITIAL DEBRIEF):
 ${dialogue}
 
 ATHLETE MESSAGE:
@@ -2571,6 +3170,7 @@ RULES: NO LaTeX. Plain English only.
             message: reply, 
             created_at: new Date().toISOString() 
           });
+
           lastPendingHubPayload = null;
           renderHubChat();
         } else {
@@ -2580,7 +3180,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // 15. REPORTS & CLINICAL A4 PDF ENGINE
+    // REPORTS & PDF ENGINE
     // --------------------------------------------------------
     function setReportTimeframe(tf, el) {
       reportTimeframe = tf;
@@ -2595,102 +3195,112 @@ RULES: NO LaTeX. Plain English only.
 
       if (reportTimeframe === 'all') return workouts;
 
-      const latestDate = new Date(workouts[workouts.length - 1].date);
+      const now = new Date();
       let days = 7;
       if (reportTimeframe === '30d') days = 30;
       if (reportTimeframe === '365d') days = 365;
 
-      const cutoff = new Date(latestDate);
-      cutoff.setDate(cutoff.getDate() - days);
-
-      return workouts.filter(w => new Date(w.date) >= cutoff);
+      const cutoff = new Date(now.getTime() - (days * 86400000));
+      return workouts.filter(w => parseSafeDate(w.date).getTime() >= cutoff.getTime());
     }
 
     async function renderReports() {
-      const workouts = await getScopedWorkouts();
+      const allWorkouts = await db.workouts.orderBy('date').toArray();
+      const scopedWorkouts = await getScopedWorkouts();
       const scopeHeader = document.getElementById("reportScopeDateHeader");
 
-      if (workouts.length === 0) {
+      if (allWorkouts.length > 0) {
+        const prDist = allWorkouts.reduce((p, c) => (c.distance_km > p.distance_km) ? c : p, allWorkouts[0]);
+        const prSpd = allWorkouts.reduce((p, c) => (c.max_speed_kmh > p.max_speed_kmh) ? c : p, allWorkouts[0]);
+        const prAsc = allWorkouts.reduce((p, c) => (c.elevation_gain_m > p.elevation_gain_m) ? c : p, allWorkouts[0]);
+        const calcVAM = w => w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
+        const prVAM = allWorkouts.reduce((p, c) => (calcVAM(c) > calcVAM(p)) ? c : p, allWorkouts[0]);
+
+        document.getElementById("pr_grid").innerHTML = `
+          <div class="telemetry-row"><span class="telemetry-name">All-Time Longest</span><span class="telemetry-val">${prDist.distance_km} km</span></div>
+          <div class="telemetry-row"><span class="telemetry-name">All-Time Peak Speed</span><span class="telemetry-val">${prSpd.max_speed_kmh} km/h</span></div>
+          <div class="telemetry-row"><span class="telemetry-name">All-Time Max Ascent</span><span class="telemetry-val">${prAsc.elevation_gain_m} m</span></div>
+          <div class="telemetry-row"><span class="telemetry-name">All-Time Best VAM</span><span class="telemetry-val">${calcVAM(prVAM)} m/h</span></div>
+        `;
+      }
+
+      if (scopedWorkouts.length === 0) {
         scopeHeader.textContent = "Period Range: No recorded workouts found in this timeframe.";
-        document.getElementById("pr_grid").innerHTML = `<div style="grid-column: span 2; text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No rides stored in selected scope.</div>`;
         document.getElementById("labDiagnosticGrid").innerHTML = "<div style='color:#94a3b8; padding:8px;'>No data available.</div>";
         document.getElementById("reportLactateBars").innerHTML = "";
+        const box = document.getElementById("reportSummaryBox");
+        if (box) { box.style.display = "none"; box.innerHTML = ""; }
         return;
       }
 
-      const startDate = workouts[0].date.split(' ')[0];
-      const endDate = workouts[workouts.length - 1].date.split(' ')[0];
-      scopeHeader.textContent = `Period Range: ${startDate} to ${endDate} (${workouts.length} Sessions Analyzed)`;
+      const startDate = scopedWorkouts[0].date.split(' ')[0];
+      const endDate = scopedWorkouts[scopedWorkouts.length - 1].date.split(' ')[0];
+      scopeHeader.textContent = `Period Range: ${startDate} to ${endDate} (${scopedWorkouts.length} Sessions Analyzed)`;
 
-      const maxDist = workouts.reduce((p, c) => (c.distance_km > p.distance_km) ? c : p, workouts[0]);
-      const maxSpd = workouts.reduce((p, c) => (c.max_speed_kmh > p.max_speed_kmh) ? c : p, workouts[0]);
-      const maxPwr = workouts.reduce((p, c) => (c.avg_power_w > p.avg_power_w) ? c : p, workouts[0]);
-      const maxAsc = workouts.reduce((p, c) => (c.elevation_gain_m > p.elevation_gain_m) ? c : p, workouts[0]);
-      const calcVAM = w => w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
-      const maxVAM = workouts.reduce((p, c) => (calcVAM(c) > calcVAM(p)) ? c : p, workouts[0]);
+      let scopedZoneSecs = [0, 0, 0, 0, 0];
+      let validDrifts = [];
 
-      document.getElementById("pr_grid").innerHTML = `
-        <div class="telemetry-row"><span class="telemetry-name">Longest Distance</span><span class="telemetry-val">${maxDist.distance_km} km</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Peak Speed</span><span class="telemetry-val">${maxSpd.max_speed_kmh} km/h</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Peak Power</span><span class="telemetry-val">${maxPwr.avg_power_w > 0 ? maxPwr.avg_power_w + ' W' : '--'}</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Highest Ascent</span><span class="telemetry-val">${maxAsc.elevation_gain_m} m</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Best Climbing VAM</span><span class="telemetry-val">${calcVAM(maxVAM)} m/h</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Total Period Work</span><span class="telemetry-val">${Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0))} kJ</span></div>
-      `;
+      for (const w of scopedWorkouts) {
+        if (w.zone_seconds && Array.isArray(w.zone_seconds)) {
+          for (let i = 0; i < 5; i++) scopedZoneSecs[i] += (w.zone_seconds[i] || 0);
+        }
+        if (w.cardiac_drift_bpm !== undefined && w.cardiac_drift_bpm !== null) {
+          validDrifts.push(w.cardiac_drift_bpm);
+        }
+      }
 
-      const validNP = workouts.map(w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0)).filter(p => p > 0);
-      const avgNP = validNP.length ? Math.round(validNP.reduce((a, b) => a + b, 0) / validNP.length) : 0;
-      const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
-      const efMean = (avgNP > 0 && avgHR > 0) ? (avgNP / avgHR).toFixed(2) : '--';
-      const cardiacDecoupling = workouts.length >= 2 ? (workouts[workouts.length - 1].avg_hr - workouts[0].avg_hr) : 0;
+      const meanDrift = validDrifts.length ? +(validDrifts.reduce((a,b)=>a+b,0)/validDrifts.length).toFixed(1) : null;
+      const totSec = scopedZoneSecs.reduce((a,b)=>a+b,0);
+      
+      let dominantZoneLabel = "--";
+      if (totSec > 0) {
+        const maxBucketSecs = safeMax(scopedZoneSecs, 0);
+        const dominantZoneIndex = scopedZoneSecs.indexOf(maxBucketSecs);
+        dominantZoneLabel = PHYSIO_CONFIG.zones[dominantZoneIndex].name;
+      }
+
+      const validRidesWithBoth = scopedWorkouts.filter(w => w.avg_power_w > 0 && w.avg_hr > 0);
+      const efMean = validRidesWithBoth.length
+        ? (validRidesWithBoth.reduce((acc, w) => acc + (w.avg_power_w / w.avg_hr), 0) / validRidesWithBoth.length).toFixed(2)
+        : '--';
+
+      const totWork = Math.round(scopedWorkouts.reduce((a, b) => a + b.kilojoules, 0));
+
+      let driftDisplayHtml = "--";
+      if (meanDrift !== null) {
+        const color = meanDrift <= 3 ? '#4ade80' : '#f87171';
+        driftDisplayHtml = `<span style="color:${color};">${meanDrift > 0 ? '+' : ''}${meanDrift} bpm</span>`;
+      }
 
       document.getElementById("labDiagnosticGrid").innerHTML = `
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Aerobic Efficiency (NP/HR)</div>
-          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${efMean} W/bpm</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Aerobic Efficiency</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${efMean !== '--' ? efMean + ' W/bpm (Est)' : '--'}</div>
         </div>
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Net Cardiac Drift (ΔHR)</div>
-          <div style="font-size:1.05rem; font-weight:800; color:${cardiacDecoupling <= 0 ? '#4ade80' : '#f87171'};">${cardiacDecoupling > 0 ? '+' : ''}${cardiacDecoupling} bpm</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Mean Intraday Drift (H2-H1)</div>
+          <div style="font-size:1.05rem; font-weight:800;">${driftDisplayHtml}</div>
         </div>
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Threshold Strain Index</div>
-          <div style="font-size:1.05rem; font-weight:800; color:#fbbf24;">${avgHR >= 171 ? 'Zone 4+ Threshold' : 'Zone 2/3 Steady'}</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Dominant Zone Strain</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#fbbf24;">${escapeHtml(dominantZoneLabel)}</div>
         </div>
         <div class="lab-item">
-          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Total Period Volume</div>
-          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1)} km</div>
+          <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Period Volume / Work</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${scopedWorkouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1)} km | ${totWork} kJ</div>
         </div>
       `;
 
-      let totalMins = 0, z1Mins = 0, z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0;
-      workouts.forEach(w => {
-        const mins = Math.round((w.moving_sec || 0) / 60);
-        totalMins += mins;
-        if (w.avg_hr < 135) z1Mins += mins;
-        else if (w.avg_hr <= 154) z2Mins += mins;
-        else if (w.avg_hr <= 170) z3Mins += mins;
-        else if (w.avg_hr <= 188) z4Mins += mins;
-        else z5Mins += mins;
-      });
-
-      const zBars = [
-        { label: "Z1 Recovery (<135 bpm)", mins: z1Mins, color: "#94a3b8" },
-        { label: "Z2 Base Aerobic (135-154 bpm)", mins: z2Mins, color: "#16a34a" },
-        { label: "Z3 Tempo (155-170 bpm)", mins: z3Mins, color: "#eab308" },
-        { label: "Z4 Sub-Threshold (171-188 bpm)", mins: z4Mins, color: "#fc5200" },
-        { label: "Z5 VO2max/Anaerobic (189-207 bpm)", mins: z5Mins, color: "#ef4444" }
-      ];
-
-      document.getElementById("reportLactateBars").innerHTML = zBars.map(z => {
-        const pct = totalMins > 0 ? Math.round((z.mins / totalMins) * 100) : 0;
+      document.getElementById("reportLactateBars").innerHTML = PHYSIO_CONFIG.zones.map((z, idx) => {
+        const mins = Math.round(scopedZoneSecs[idx] / 60);
+        const pct = totSec > 0 ? Math.round((scopedZoneSecs[idx] / totSec) * 100) : 0;
         return `
           <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:0.70rem;">
-            <span style="width:145px; color:#cbd5e1;">${z.label}</span>
+            <span style="width:145px; color:#cbd5e1;">${z.name}</span>
             <div style="flex:1; height:6px; background:#1e293b; border-radius:4px; overflow:hidden;">
               <div style="width:${pct}%; height:100%; background:${z.color};"></div>
             </div>
-            <span style="width:55px; text-align:right; font-weight:700; color:#f8fafc;">${z.mins}m (${pct}%)</span>
+            <span style="width:55px; text-align:right; font-weight:700; color:#f8fafc;">${mins}m (${pct}%)</span>
           </div>
         `;
       }).join('');
@@ -2699,7 +3309,7 @@ RULES: NO LaTeX. Plain English only.
       const box = document.getElementById("reportSummaryBox");
       if (cachedReport && cachedReport.timeframe === reportTimeframe && cachedReport.analysis_text) {
         box.style.display = "block";
-        box.innerHTML = `<b>Clinical Longitudinal Review (${cachedReport.timeframe.toUpperCase()})</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
+        box.innerHTML = `<b>Longitudinal Review (${cachedReport.timeframe.toUpperCase()})</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
       } else {
         box.style.display = "none";
         box.innerHTML = "";
@@ -2717,16 +3327,40 @@ RULES: NO LaTeX. Plain English only.
       const startDate = workouts[0].date.split(' ')[0];
       const endDate = workouts[workouts.length - 1].date.split(' ')[0];
       const athleteW = await getLatestWeight();
-      const athleteH = (await getConfig("athlete_height")) || "190";
+      const athleteH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+
+      let scopedZoneSecs = [0, 0, 0, 0, 0];
+      let validDrifts = [];
+      workouts.forEach(w => {
+        if (w.zone_seconds) {
+          for (let i = 0; i < 5; i++) scopedZoneSecs[i] += (w.zone_seconds[i] || 0);
+        }
+        if (w.cardiac_drift_bpm !== undefined && w.cardiac_drift_bpm !== null) validDrifts.push(w.cardiac_drift_bpm);
+      });
+      const meanDrift = validDrifts.length ? +(validDrifts.reduce((a,b)=>a+b,0)/validDrifts.length).toFixed(1) : null;
+      const driftText = meanDrift !== null ? `${meanDrift} bpm` : "n/a (no steady rides over 35 min with valid continuous HR)";
 
       const athleteReplies = await db.threads.where("role").equals("athlete").toArray();
       const qualitativeNotes = athleteReplies.map(r => `- Ride ${r.ride_number}: "${r.message}"`).join("\n");
-      const telemetryTable = workouts.map(w => `Ride ${w.ride_number} (${w.date.slice(5,10)}): ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m`).join("\n");
+      const telemetryTable = workouts.map(w => {
+        let it = w.intent_type === 'PLAY' ? '[Play]' : '';
+        if (w.intent_type !== 'PLAY' && w.intent_target && w.intent_type !== 'NONE') {
+          try {
+            const zTag = parseZoneTag(JSON.parse(w.intent_target).target_zone);
+            it = `[${zTag || 'Train'}]`;
+          } catch(e) {}
+        }
+        return `Ride ${w.ride_number} (${w.date.slice(5,10)} ${it}): ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m`;
+      }).join("\n");
 
       const prompt = `
-You are an executive head clinical sports scientist and exercise physiologist reviewing athlete Mustafa (${athleteH} cm, ${athleteW} kg active mass, XC Mountain Bike). Max HR: 207 bpm.
+You are an executive head sports scientist reviewing athlete Mustafa (${athleteH} cm, ${athleteW} kg active mass, XC Mountain Bike). Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
 CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
 EVALUATION TIMEFRAME SCOPE: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}).
+
+EMPIRICAL COMPUTED TIME-IN-ZONE ACCUMULATION FOR THIS PERIOD:
+Z1: ${Math.round(scopedZoneSecs[0]/60)}m | Z2: ${Math.round(scopedZoneSecs[1]/60)}m | Z3: ${Math.round(scopedZoneSecs[2]/60)}m | Z4: ${Math.round(scopedZoneSecs[3]/60)}m | Z5: ${Math.round(scopedZoneSecs[4]/60)}m
+Mean Intraday Cardiac Drift (H2 - H1 decoupling on steady rides >= 35min): ${driftText}
 
 TELEMETRY LEDGER:
 ${telemetryTable}
@@ -2736,15 +3370,17 @@ ${qualitativeNotes || "No specific discomfort notes recorded."}
 
 CLINICAL REPORT REQUIREMENTS:
 - Structure into four clear, analytical sections:
-  1. Aerobic Base & Sub-Threshold Lactate Dynamics
-  2. Cardiac Drift & Decoupling Under Current Body Mass
+  1. Aerobic Base & Sub-Threshold Dynamics
+  2. Intraday Cardiac Drift & Decoupling Under Current Body Mass
   3. Climbing VAM (m/h) & Terrain Ascent Adaptation
   4. Athlete Subjective Feedback & Recovery Synthesis
+- You MUST evaluate the empirical time-in-zone numbers and mean drift values provided above.
+- If drift is marked 'n/a', explain that insufficient long steady rides occurred rather than hallucinating zero drift.
 - STRICT FORMATTING RULES:
-  - NO formula derivations (e.g., F = m*g*sin theta).
+  - NO formula derivations.
   - NO ASCII tables, pipes (|), or repeated % symbols.
   - NO LaTeX syntax, dollar signs ($), or math backslashes.
-  - Write pure professional sports-science text formatted in paragraphs and bullet points.
+  - Use clean standard ASCII characters.
 `;
       const banner = document.getElementById("reportLoadingBanner");
       banner.style.display = "flex";
@@ -2756,7 +3392,7 @@ CLINICAL REPORT REQUIREMENTS:
         await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeframe}`, created_at: new Date().toISOString(), timeframe: reportTimeframe, analysis_text: report });
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
-        box.innerHTML = `<b>Clinical Longitudinal Review (${startDate} to ${endDate})</b><br/><br/>` + cleanAiText(report);
+        box.innerHTML = `<b>Longitudinal Review (${startDate} to ${endDate})</b><br/><br/>` + cleanAiText(report);
       }
     }
 
@@ -2765,11 +3401,11 @@ CLINICAL REPORT REQUIREMENTS:
       const latestReport = await db.reports.get(1);
 
       if (!latestReport || latestReport.timeframe !== reportTimeframe || !latestReport.analysis_text) {
-        alert(`Please tap 'Synthesize Clinical Review' for ${reportTimeframe.toUpperCase()} first to compile the report.`);
+        alert(`Please tap 'Synthesize Review' for ${reportTimeframe.toUpperCase()} first to compile the report.`);
         return;
       }
 
-      statusDiv.textContent = "Compiling clean lab-grade PDF report...";
+      statusDiv.textContent = "Compiling clean PDF report...";
 
       try {
         const { jsPDF } = window.jspdf;
@@ -2783,9 +3419,8 @@ CLINICAL REPORT REQUIREMENTS:
         const startDate = workouts[0].date.split(' ')[0];
         const endDate = workouts[workouts.length - 1].date.split(' ')[0];
         const athleteW = await getLatestWeight();
-        const athleteH = (await getConfig("athlete_height")) || "190";
+        const athleteH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
 
-        // 1. TOP HEADER BAND
         doc.setFillColor(15, 23, 42);
         doc.rect(0, 0, pageWidth, 28, 'F');
         doc.setFillColor(252, 82, 0);
@@ -2794,30 +3429,29 @@ CLINICAL REPORT REQUIREMENTS:
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
         doc.setTextColor(255, 255, 255);
-        doc.text("RIDE PARTNER — CLINICAL PHYSIOLOGY REPORT", margin, 14);
+        doc.text("RIDE PARTNER -- PHYSIOLOGY REPORT", margin, 14);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`ATHLETE: Mustafa (${athleteH} cm | ${athleteW} kg | XC MTB)   •   PERIOD: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()})   •   ISSUED: ${new Date().toLocaleDateString()}`, margin, 21);
+        doc.text(`ATHLETE: Mustafa (${athleteH} cm | ${athleteW} kg | XC MTB)  *  PERIOD: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()})  *  ISSUED: ${new Date().toLocaleDateString()}`, margin, 21);
 
         let y = 35;
 
-        // 2. LAB SCORECARD
-        const validNP = workouts.map(w => w.norm_power_w > 0 ? w.norm_power_w : (w.avg_power_w > 0 ? Math.round(w.avg_power_w * 1.05) : 0)).filter(p => p > 0);
-        const avgNP = validNP.length ? Math.round(validNP.reduce((a, b) => a + b, 0) / validNP.length) : 0;
         const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
-        const efVal = (avgNP > 0 && avgHR > 0) ? (avgNP / avgHR).toFixed(2) : '--';
-        const dHRVal = workouts.length >= 2 ? (workouts[workouts.length - 1].avg_hr - workouts[0].avg_hr) : 0;
+        const validRidesWithBoth = workouts.filter(w => w.avg_power_w > 0 && w.avg_hr > 0);
+        const efVal = validRidesWithBoth.length
+          ? (validRidesWithBoth.reduce((acc, w) => acc + (w.avg_power_w / w.avg_hr), 0) / validRidesWithBoth.length).toFixed(2)
+          : '--';
         const totWork = Math.round(workouts.reduce((a, b) => a + b.kilojoules, 0));
         const totDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
 
         const cardWidth = (contentWidth - 9) / 4;
         const cardHeight = 16;
         const cards = [
-          { label: "AEROBIC EFFICIENCY", val: `${efVal} W/bpm`, color: [37, 99, 235] },
-          { label: "NET CARDIAC DRIFT", val: `${dHRVal > 0 ? '+' : ''}${dHRVal} bpm`, color: dHRVal <= 0 ? [22, 163, 74] : [220, 38, 38] },
-          { label: "TOTAL MECHANICAL WORK", val: `${totWork} kJ`, color: [252, 82, 0] },
+          { label: "EST. AEROBIC EFFICIENCY", val: `${efVal !== '--' ? efVal + ' W/bpm' : '--'}`, color: [37, 99, 235] },
+          { label: "MEAN HEART RATE", val: `${avgHR} bpm`, color: [22, 163, 74] },
+          { label: "TOTAL WORK DONE", val: `${totWork} kJ`, color: [252, 82, 0] },
           { label: "PERIOD ACCUMULATION", val: `${totDist} km`, color: [15, 23, 42] }
         ];
 
@@ -2842,36 +3476,25 @@ CLINICAL REPORT REQUIREMENTS:
 
         y += cardHeight + 8;
 
-        // 3. RECALIBRATED METABOLIC STRAIN BARS
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
-        doc.text("CARDIOVASCULAR & METABOLIC STRAIN PROFILE (MAX 207 BPM)", margin, y);
+        doc.text("CARDIOVASCULAR TIME-IN-ZONE ACCUMULATION (MAX 207 BPM)", margin, y);
         y += 4;
 
-        let totalMins = 0, z1Mins = 0, z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0;
-        workouts.forEach(w => {
-          const m = Math.round((w.moving_sec || 0) / 60);
-          totalMins += m;
-          if (w.avg_hr < 135) z1Mins += m;
-          else if (w.avg_hr <= 154) z2Mins += m;
-          else if (w.avg_hr <= 170) z3Mins += m;
-          else if (w.avg_hr <= 188) z4Mins += m;
-          else z5Mins += m;
-        });
-
-        const zonePdfBars = [
-          { name: "Z1 Recovery (<135 bpm)", mins: z1Mins, rgb: [148, 163, 184] },
-          { name: "Z2 Base Aerobic (135-154 bpm)", mins: z2Mins, rgb: [22, 163, 74] },
-          { name: "Z3 Tempo (155-170 bpm)", mins: z3Mins, rgb: [234, 179, 8] },
-          { name: "Z4 Sub-Threshold (171-188 bpm)", mins: z4Mins, rgb: [252, 82, 0] },
-          { name: "Z5 VO2max/Anaerobic (189-207 bpm)", mins: z5Mins, rgb: [239, 68, 68] }
-        ];
-
+        let scopedSecs = [0, 0, 0, 0, 0];
+        for (const w of workouts) {
+          if (w.zone_seconds && Array.isArray(w.zone_seconds)) {
+            for (let i = 0; i < 5; i++) scopedSecs[i] += (w.zone_seconds[i] || 0);
+          }
+        }
+        const totS = scopedSecs.reduce((a,b)=>a+b,0);
         const barMaxWidth = contentWidth - 85;
-        zonePdfBars.forEach(z => {
-          const pct = totalMins > 0 ? (z.mins / totalMins) : 0;
+
+        PHYSIO_CONFIG.zones.forEach((z, idx) => {
+          const pct = totS > 0 ? (scopedSecs[idx] / totS) : 0;
           const fillWidth = Math.max(1, Math.round(barMaxWidth * pct));
+          const mins = Math.round(scopedSecs[idx] / 60);
 
           doc.setFont("helvetica", "normal");
           doc.setFontSize(6.5);
@@ -2880,20 +3503,26 @@ CLINICAL REPORT REQUIREMENTS:
 
           doc.setFillColor(241, 245, 249);
           doc.roundedRect(margin + 60, y, barMaxWidth, 4, 1.5, 1.5, 'F');
-          doc.setFillColor(...z.rgb);
+          
+          let rgb = [148, 163, 184];
+          if (idx === 1) rgb = [22, 163, 74];
+          if (idx === 2) rgb = [234, 179, 8];
+          if (idx === 3) rgb = [252, 82, 0];
+          if (idx === 4) rgb = [239, 68, 68];
+
+          doc.setFillColor(...rgb);
           doc.roundedRect(margin + 60, y, fillWidth, 4, 1.5, 1.5, 'F');
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(6.5);
           doc.setTextColor(15, 23, 42);
-          doc.text(`${z.mins} min (${Math.round(pct * 100)}%)`, margin + 63 + barMaxWidth, y + 3);
+          doc.text(`${mins} min (${Math.round(pct * 100)}%)`, margin + 63 + barMaxWidth, y + 3);
 
           y += 5.5;
         });
 
         y += 4;
 
-        // 4. CLEAN PARSED CLINICAL NARRATIVE
         doc.setFillColor(252, 82, 0);
         doc.rect(margin, y, contentWidth, 0.7, 'F');
         y += 5;
@@ -2901,13 +3530,17 @@ CLINICAL REPORT REQUIREMENTS:
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
         doc.setTextColor(15, 23, 42);
-        doc.text("CLINICAL LONGITUDINAL ASSESSMENT", margin, y);
+        doc.text("LONGITUDINAL PHYSIOLOGICAL ASSESSMENT", margin, y);
         y += 5;
 
         const rawNarrative = latestReport.analysis_text
           .replace(/\r/g, '')
-          .replace(/%+/g, '')
-          .replace(/[*#$|]/g, '');
+          .replace(/(?:^\s*[%|]{2,}.*$\n?)/gm, '')
+          .replace(/[→]/g, '->')
+          .replace(/[≥]/g, '>=')
+          .replace(/[≤]/g, '<=')
+          .replace(/[≈]/g, '~')
+          .replace(/[*#$]/g, '');
 
         const narrativeLines = rawNarrative.split('\n');
         doc.setFont("helvetica", "normal");
@@ -2926,14 +3559,20 @@ CLINICAL REPORT REQUIREMENTS:
             y = 20;
           }
 
-          const isHeader = /^[0-9]+\.\s+[A-Z\s]+/.test(line) || /^[A-Z\s]{4,}:/.test(line);
+          const isHeader = /^[1-4]\.\s+[A-Za-z\s]{5,}/.test(line);
           if (isHeader) {
             y += 2;
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7.5);
             doc.setTextColor(252, 82, 0);
-            doc.text(line, margin, y);
-            y += 3.8;
+            
+            const splitH = doc.splitTextToSize(line, contentWidth - 4);
+            splitH.forEach(hLine => {
+              if (y > pageHeight - 20) { doc.addPage(); y = 20; }
+              doc.text(hLine, margin, y);
+              y += 3.8;
+            });
+
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7.2);
             doc.setTextColor(30, 41, 59);
@@ -2950,7 +3589,6 @@ CLINICAL REPORT REQUIREMENTS:
           }
         }
 
-        // 5. SESSION TELEMETRY LEDGER TABLE
         if (y > pageHeight - 65) {
           doc.addPage();
           y = 20;
@@ -2999,7 +3637,6 @@ CLINICAL REPORT REQUIREMENTS:
           }
         });
 
-        // 6. PAGE NUMBERING & FOOTER
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
           doc.setPage(i);
@@ -3009,32 +3646,42 @@ CLINICAL REPORT REQUIREMENTS:
           doc.setFont("helvetica", "normal");
           doc.setFontSize(6.5);
           doc.setTextColor(148, 163, 184);
-          doc.text("CONFIDENTIAL — PHYSIOLOGICAL PERFORMANCE RECORD", margin, pageHeight - 7);
+          doc.text("PERFORMANCE RECORD", margin, pageHeight - 7);
           doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin - 15, pageHeight - 7);
         }
 
-        const fileName = `Mustafa_Clinical_Report_${startDate}_to_${endDate}.pdf`;
-        const base64Data = doc.output('datauristring').split(',')[1];
+        const fileName = `Mustafa_Physiology_Report_${startDate}_to_${endDate}.pdf`;
 
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-          await window.Capacitor.Plugins.Filesystem.writeFile({
-            path: `Download/${fileName}`,
-            data: base64Data,
-            directory: 'EXTERNAL_STORAGE'
-          }).catch(async () => {
-            await window.Capacitor.Plugins.Filesystem.writeFile({
-              path: fileName,
-              data: base64Data,
-              directory: 'DOCUMENTS'
-            });
-          });
+          const base64Data = doc.output('datauristring').split(',')[1];
+          let savedToDownloads = false;
 
-          statusDiv.innerHTML = `✓ Saved to Downloads: <b>${fileName}</b>`;
-          alert(`PDF Report downloaded successfully:\n${fileName}`);
+          try {
+            await window.Capacitor.Plugins.Filesystem.writeFile({
+              path: `Download/${fileName}`,
+              data: base64Data,
+              directory: 'EXTERNAL_STORAGE'
+            });
+            savedToDownloads = true;
+          } catch(e) {
+            try {
+              await window.Capacitor.Plugins.Filesystem.writeFile({
+                path: fileName,
+                data: base64Data,
+                directory: 'DOCUMENTS'
+              });
+            } catch(err2) {
+              console.warn("Filesystem PDF save error:", err2);
+            }
+          }
+
+          const targetFolder = savedToDownloads ? "Downloads" : "Documents";
+          statusDiv.innerHTML = `✓ Saved to ${targetFolder}: <b>${escapeHtml(fileName)}</b>`;
+          alert(`PDF Report downloaded successfully to ${targetFolder} folder:\n${fileName}`);
           return;
         }
 
-        const pdfDataUri = `data:application/pdf;base64,${base64Data}`;
+        const pdfDataUri = doc.output('datauristring');
         const dlLink = document.createElement('a');
         dlLink.href = pdfDataUri;
         dlLink.download = fileName;
@@ -3042,14 +3689,14 @@ CLINICAL REPORT REQUIREMENTS:
         dlLink.click();
         document.body.removeChild(dlLink);
 
-        statusDiv.innerHTML = `✓ Download initiated: <b>${fileName}</b>`;
+        statusDiv.innerHTML = `✓ Download initiated: <b>${escapeHtml(fileName)}</b>`;
       } catch (err) {
         statusDiv.textContent = "Download failed: " + err.message;
       }
     }
 
     // --------------------------------------------------------
-    // 16. CENTRALIZED MULTIMODAL API CLIENT
+    // CENTRALIZED GEMINI CLIENT
     // --------------------------------------------------------
     async function callGeminiAPI(key, prompt, imageB64) {
       if (isRequestInProgress) {
@@ -3073,24 +3720,38 @@ CLINICAL REPORT REQUIREMENTS:
         });
       }
 
+      const requestBody = JSON.stringify({ 
+        contents: [{ role: "user", parts: parts }],
+        generationConfig: { maxOutputTokens: 8192 }
+      });
+
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST",
           signal: controller.signal,
           headers: { 
             "Content-Type": "application/json",
             "x-goog-api-key": key
           },
-          body: JSON.stringify({ contents: [{ role: "user", parts: parts }] })
+          body: requestBody
         });
 
         clearTimeout(timeoutId);
 
         if (res.ok) {
           const data = await res.json();
-          if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+          if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+            const finishReason = data.candidates[0].finishReason;
+            if (finishReason === "MAX_TOKENS") {
+              alert("Warning: Response reached token limit and was partially truncated.");
+            }
             isRequestInProgress = false;
-            return data.candidates[0].content.parts[0].text;
+            return data.candidates[0].content.parts.map(p => p.text || "").join("");
+          } else {
+            const reason = data.candidates?.[0]?.finishReason || "EMPTY/SAFETY";
+            alert(`AI response blocked or empty (${reason}). Try modifying the message.`);
+            isRequestInProgress = false;
+            return null;
           }
         }
 
@@ -3106,15 +3767,23 @@ CLINICAL REPORT REQUIREMENTS:
 
         if (res.status === 503 || res.status === 500) {
           const fallbackModel = (model === "gemini-3.8-flash") ? "gemini-3.7-flash" : "gemini-3.6-flash";
-          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${key}`, {
+          const fallbackController = new AbortController();
+          const fallbackTimeout = setTimeout(() => fallbackController.abort(), 60000);
+
+          const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent`, {
             method: "POST",
+            signal: fallbackController.signal,
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-            body: JSON.stringify({ contents: [{ role: "user", parts: parts }] })
+            body: requestBody
           });
+          clearTimeout(fallbackTimeout);
+
           if (fallbackRes.ok) {
             const fbData = await fallbackRes.json();
-            isRequestInProgress = false;
-            return fbData.candidates[0].content.parts[0].text;
+            if (fbData.candidates?.[0]?.content?.parts) {
+              isRequestInProgress = false;
+              return fbData.candidates[0].content.parts.map(p => p.text || "").join("");
+            }
           }
         }
 
@@ -3147,7 +3816,7 @@ CLINICAL REPORT REQUIREMENTS:
     }
 
     async function loadSettings() {
-      document.getElementById("cfg_height").value = await getConfig("athlete_height") || "190";
+      document.getElementById("cfg_height").value = await getConfig("athlete_height") || PHYSIO_CONFIG.default_height_cm;
       document.getElementById("cfg_model").value = await getActiveModel();
       document.getElementById("cfg_client_id").value = await getConfig("strava_client_id") || "277202";
       document.getElementById("cfg_client_secret").value = await getConfig("strava_client_secret");
@@ -3196,8 +3865,17 @@ CLINICAL REPORT REQUIREMENTS:
       }
     }
 
+    // --------------------------------------------------------
+    // ROBUST STRAVA SYNC (FAST EXISTENCE CHECK & GUARDED RE-ENTRY)
+    // --------------------------------------------------------
     async function syncStrava() {
+      if (isSyncInProgress) return;
       if (!navigator.onLine) { alert("Connect to internet to sync with Strava."); return; }
+
+      const syncBtn = document.getElementById("btnSyncStrava");
+      if (syncBtn) { syncBtn.disabled = true; syncBtn.style.opacity = "0.5"; syncBtn.textContent = "Syncing..."; }
+      isSyncInProgress = true;
+
       const clientId = (await getConfig("strava_client_id") || "277202").trim();
       const clientSecret = (await getConfig("strava_client_secret")).trim();
       let refreshToken = (await getConfig("strava_refresh_token")).trim();
@@ -3205,6 +3883,8 @@ CLINICAL REPORT REQUIREMENTS:
       if (!clientId || !clientSecret || !refreshToken) {
         alert("Please go to Profile and sign in to Strava first.");
         switchTab('settings');
+        if (syncBtn) { syncBtn.disabled = false; syncBtn.style.opacity = "1"; syncBtn.textContent = "Sync Rides from Strava"; }
+        isSyncInProgress = false;
         return;
       }
 
@@ -3217,46 +3897,51 @@ CLINICAL REPORT REQUIREMENTS:
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
           alert("Strava Auth Error: " + (tokenData.message || JSON.stringify(tokenData)));
+          if (syncBtn) { syncBtn.disabled = false; syncBtn.style.opacity = "1"; syncBtn.textContent = "Sync Rides from Strava"; }
+          isSyncInProgress = false;
           return;
         }
         await setConfig("strava_refresh_token", tokenData.refresh_token);
 
-        const actRes = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=60", {
-          headers: { Authorization: `Bearer ${tokenData.access_token}` }
-        });
-        const acts = await actRes.json();
-
-        if (!Array.isArray(acts)) {
-          alert("Strava Activities Error: " + JSON.stringify(acts));
-          return;
+        let acts = [];
+        for (let page = 1; page <= 2; page++) {
+          const actRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=30`, {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` }
+          });
+          const pageActs = await actRes.json();
+          if (Array.isArray(pageActs)) {
+            acts = acts.concat(pageActs);
+            if (pageActs.length < 30) break;
+          } else break;
         }
 
         const rideActs = acts.filter(a => ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide'].includes(a.type || 'Ride'));
-        let existingRidesCount = await db.workouts.count();
-        let addedCount = 0;
+        rideActs.sort((a, b) => parseSafeDate(a.start_date_local) - parseSafeDate(b.start_date_local));
 
-        for (let i = rideActs.length - 1; i >= 0; i--) {
-          const a = rideActs[i];
+        const lastWorkout = await db.workouts.orderBy('ride_number').last();
+        let maxRideNum = lastWorkout ? lastWorkout.ride_number : 0;
+        let newlyAddedWorkouts = [];
+
+        for (const a of rideActs) {
           const exists = await db.workouts.where("strava_id").equals(a.id).first();
           if (!exists) {
-            existingRidesCount++;
-            addedCount++;
-
-            const currentRideNum = existingRidesCount;
+            maxRideNum++;
+            const currentRideNum = maxRideNum;
             const seqStr = String(currentRideNum).padStart(3, '0');
-            const dt = new Date(a.start_date_local.replace('Z', ''));
-            const dateStr = dt.toISOString().slice(0, 10);
-            const code = `Ride ${seqStr} - ${dateStr}`;
+            
+            const localDateStr = a.start_date_local ? a.start_date_local.slice(0, 10) : new Date().toISOString().slice(0, 10);
+            const localDateTime = a.start_date_local ? a.start_date_local.replace('T', ' ').slice(0, 16) : localDateStr;
+            const code = `Ride ${seqStr} - ${localDateStr}`;
 
             const m = Math.floor(a.moving_time / 60);
             const s = a.moving_time % 60;
             const durStr = m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}:${s < 10 ? '0' : ''}${s}`;
 
-            await db.workouts.add({
+            const newWorkoutObj = {
               strava_id: a.id,
               ride_number: currentRideNum,
               exercise_code: code,
-              date: a.start_date_local.replace('T', ' ').slice(0, 16),
+              date: localDateTime,
               distance_km: +(a.distance / 1000).toFixed(2),
               duration_str: durStr,
               moving_sec: a.moving_time || 0,
@@ -3270,23 +3955,76 @@ CLINICAL REPORT REQUIREMENTS:
               elevation_gain_m: Math.round(a.total_elevation_gain || 0),
               kilojoules: Math.round(a.kilojoules || 0),
               calories: a.calories || Math.round((a.kilojoules || 0) * 1.05),
-              debrief_stale: false
-            });
+              debrief_stale: false,
+              intent_type: null,
+              zone_seconds: [0, 0, 0, 0, 0],
+              cardiac_drift_bpm: null,
+              halves_profile: ""
+            };
 
-            try {
-              const strRes = await fetch(`https://www.strava.com/api/v3/activities/${a.id}/streams?keys=time,distance,altitude,heartrate,velocity_smooth,watts,cadence&key_by_type=true`, {
-                headers: { Authorization: `Bearer ${tokenData.access_token}` }
-              });
-              if (strRes.ok) {
-                const sData = await strRes.json();
-                await db.streams.put({ strava_id: a.id, stream_data: sData });
-              }
-            } catch (e) {}
+            const insertedId = await db.workouts.add(newWorkoutObj);
+            newWorkoutObj.id = insertedId;
+            newlyAddedWorkouts.push(newWorkoutObj);
           }
         }
-        alert(`Stored ${addedCount} new bike sessions.`);
+
+        // FAST STREAM EXISTENCE CHECK & ON-DEMAND METRICS CALCULATION
+        const allSavedWorkouts = await db.workouts.toArray();
+        for (const w of allSavedWorkouts) {
+          const streamCount = await db.streams.where('strava_id').equals(w.strava_id).count();
+          let streamData = null;
+
+          if (streamCount === 0) {
+            try {
+              const strRes = await fetch(`https://www.strava.com/api/v3/activities/${w.strava_id}/streams?keys=time,distance,altitude,heartrate,velocity_smooth,watts,cadence&key_by_type=true`, {
+                headers: { Authorization: `Bearer ${tokenData.access_token}` }
+              });
+
+              if (strRes.status === 429) {
+                console.warn("Strava rate limit reached. Halting backfill loop.");
+                break;
+              }
+
+              if (strRes.ok) {
+                const sData = await strRes.json();
+                await db.streams.put({ strava_id: w.strava_id, stream_data: sData });
+                streamData = sData;
+              } else if (strRes.status === 404) {
+                await db.streams.put({ strava_id: w.strava_id, stream_data: null });
+              }
+              await new Promise(r => setTimeout(r, 250));
+            } catch(e) {
+              console.warn("Stream backfill error:", e.message);
+            }
+          }
+
+          // Compute pre-computed zone metrics on-demand only if missing
+          if (!w.zone_seconds || w.zone_seconds.every(v => v === 0)) {
+            if (!streamData) {
+              const strRow = await db.streams.get(w.strava_id);
+              if (strRow) streamData = strRow.stream_data;
+            }
+            if (streamData) {
+              await computeRideMetrics(w, streamData);
+            }
+          }
+        }
+
         renderFeed();
-      } catch (err) { alert("Sync failed: " + err.message); }
+
+        if (newlyAddedWorkouts.length > 0) {
+          intentModalQueue = newlyAddedWorkouts;
+          openNextIntentModal();
+        } else {
+          alert("All rides and telemetry streams up to date.");
+        }
+
+      } catch (err) { 
+        alert("Sync failed: " + err.message); 
+      } finally {
+        if (syncBtn) { syncBtn.disabled = false; syncBtn.style.opacity = "1"; syncBtn.textContent = "Sync Rides from Strava"; }
+        isSyncInProgress = false;
+      }
     }
 
     renderFeed();
