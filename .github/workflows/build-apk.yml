@@ -28,43 +28,31 @@ jobs:
           npm install
           npm install -g @capacitor/cli
 
-      - name: Initialize Android Native Project & Bump Version
+      - name: Clean Native Android Directory
         run: |
-          npx cap add android || true
+          rm -rf android
+
+      - name: Initialize Android Native Project as Separate V2 App
+        run: |
+          npx cap add android
           npx cap sync android
-          
-          # 1. Inject Deep Link Scheme
+
+          # 1. Inject Deep Link Scheme for V2
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if grep -q "aicoach" "$MANIFEST"; then
-            echo "Deep link scheme already present"
-          else
-            sed -i '/<\/activity>/i \
-            <intent-filter>\
-                <action android:name="android.intent.action.VIEW" />\
-                <category android:name="android.intent.category.DEFAULT" />\
-                <category android:name="android.intent.category.BROWSABLE" />\
-                <data android:scheme="aicoach" android:host="aicoach.app" />\
-            </intent-filter>' "$MANIFEST"
-          fi
+          sed -i '/<\/activity>/i \
+          <intent-filter>\
+              <action android:name="android.intent.action.VIEW" />\
+              <category android:name="android.intent.category.DEFAULT" />\
+              <category android:name="android.intent.category.BROWSABLE" />\
+              <data android:scheme="aicoachv2" android:host="aicoach.app" />\
+          </intent-filter>' "$MANIFEST"
 
-          # 2. Update Native App Name
+          # 2. Set App Display Name
           STRINGS="android/app/src/main/res/values/strings.xml"
-          sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner<\/string>/g' "$STRINGS"
-          sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner<\/string>/g' "$STRINGS"
+          sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner V2<\/string>/g' "$STRINGS"
+          sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner V2<\/string>/g' "$STRINGS"
 
-          # 3. Robust Regex Version Bump via Node.js
-          node -e '
-            const fs = require("fs");
-            const file = "android/app/build.gradle";
-            let content = fs.readFileSync(file, "utf8");
-            content = content.replace(/versionCode\s+[0-9]+/g, "versionCode 2");
-            content = content.replace(/versionName\s+["\x27][^"\x27]+["\x27]/g, "versionName \"1.1\"");
-            fs.writeFileSync(file, content, "utf8");
-            console.log("Updated build.gradle verified:");
-            console.log(content.split("\n").filter(l => l.includes("versionCode") || l.includes("versionName")).join("\n"));
-          '
-
-          # 4. Overwrite Default Capacitor Launcher Icons
+          # 3. Vector Icons
           mkdir -p android/app/src/main/res/drawable
           cat << 'EOF' > android/app/src/main/res/drawable/ic_launcher_foreground.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -93,6 +81,10 @@ jobs:
           </vector>
           EOF
 
+          # 4. Generate persistent keystore for V2
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=RidePartnerV2,O=SportsScience,C=TR"
+
       - name: Build Android Debug APK
         run: |
           cd android
@@ -102,5 +94,5 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ride_Partner_Release
+          name: Ride_Partner_V2_Release
           path: android/app/build/outputs/apk/debug/app-debug.apk
