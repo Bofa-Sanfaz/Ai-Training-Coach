@@ -5,12 +5,17 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,7 +57,16 @@ jobs:
           sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">Ride Partner V2<\/string>/g' "$STRINGS"
           sed -i 's/<string name="title_activity_main">.*<\/string>/<string name="title_activity_main">Ride Partner V2<\/string>/g' "$STRINGS"
 
-          # 3. Vector Icons
+          # 3. Dynamic Version Code (Increments automatically on every GitHub build)
+          node -e '
+            const fs = require("fs");
+            const file = "android/app/build.gradle";
+            let content = fs.readFileSync(file, "utf8");
+            content = content.replace(/versionCode\s+[0-9]+/g, "versionCode ${{ github.run_number }}");
+            fs.writeFileSync(file, content, "utf8");
+          '
+
+          # 4. Overwrite Launcher Icons with Custom Bike Vector
           mkdir -p android/app/src/main/res/drawable
           cat << 'EOF' > android/app/src/main/res/drawable/ic_launcher_foreground.xml
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -81,9 +95,23 @@ jobs:
           </vector>
           EOF
 
-          # 4. Generate persistent keystore for V2
+      - name: Ensure Persistent Signing Keystore
+        run: |
           mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=RidePartnerV2,O=SportsScience,C=TR"
+          if [ -f "persistent-keystore.jks" ]; then
+            echo "Reusing existing persistent keystore from repository..."
+            cp persistent-keystore.jks ~/.android/debug.keystore
+          else
+            echo "Generating persistent keystore for V2 for the first time..."
+            keytool -genkeypair -v -keystore persistent-keystore.jks -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=RidePartnerV2,O=SportsScience,C=TR"
+            cp persistent-keystore.jks ~/.android/debug.keystore
+
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add persistent-keystore.jks
+            git commit -m "chore: persist signing keystore for future seamless updates [skip ci]" || true
+            git push origin main || true
+          fi
 
       - name: Build Android Debug APK
         run: |
