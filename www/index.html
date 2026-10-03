@@ -5,10 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Ride Partner V2</title>
   
+  <!-- CDN Scripts with robust offline fallbacks -->
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <script>window.Plotly || document.write('<script src="js/plotly.min.js"><\/script>')</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>window.jspdf || document.write('<script src="js/jspdf.umd.min.js"><\/script>')</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script>window.jspdf?.autotable || document.write('<script src="js/jspdf.plugin.autotable.min.js"><\/script>')</script>
   <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+  <script>window.Dexie || document.write('<script src="js/dexie.min.js"><\/script>')</script>
 
   <style>
     :root {
@@ -712,7 +717,7 @@
       <button class="btn btn-secondary btn-small" onclick="closeSessionDetail()">← Back to Rides</button>
       <div style="display:flex; gap:6px;">
         <button class="btn btn-secondary btn-small" onclick="editCurrentRideIntent()">🎯 Edit Intent</button>
-        <button class="btn btn-danger btn-small" onclick="resetActiveRideThread()">🗑️ Reset Thread</button>
+        <button class="btn btn-danger btn-small" onclick="resetActiveRideThread()">🗑 Reset Thread</button>
       </div>
     </div>
     <h3 id="det_title" style="margin: 4px 0 2px 0; font-size: 1.15rem;"></h3>
@@ -726,7 +731,7 @@
     <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Heart Rate Zone Distribution (207 bpm Max)</h4>
     <div class="zone-chart-box" id="det_zone_bars"></div>
 
-    <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Delta vs Last 5 Rides</h4>
+    <h4 style="margin: 12px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">Delta vs Last 5 Rides (Same Intent)</h4>
     <div id="det_delta"></div>
 
     <h4 style="margin: 14px 0 4px 0; font-size: 0.86rem; color: var(--text-muted); text-transform: uppercase;">In-Ride Route Stream Studio</h4>
@@ -928,7 +933,7 @@
       <div class="lab-grid" id="labDiagnosticGrid"></div>
       
       <div style="margin-top:10px;">
-        <div style="font-size:0.68rem; color:#94a3b8; margin-bottom:4px; font-weight:700; text-transform:uppercase;">True Time-In-Zone Distribution</div>
+        <div style="font-size:0.68rem; color:#94a3b8; margin-bottom:4px; font-weight:700; text-transform:uppercase;">True Moving Time-In-Zone Distribution</div>
         <div id="reportLactateBars"></div>
       </div>
     </div>
@@ -939,7 +944,7 @@
     <div class="report-card">
       <h4 style="font-size:0.88rem; margin-bottom:4px; color:var(--text-main);">Longitudinal Review</h4>
       <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">
-        Synthesizes a structured retrospective review assessing cardiac drift, true zone strain, and climbing VAM.
+        Synthesizes a structured retrospective review assessing period-over-period adaptation, cardiac drift, true moving zone strain, and climbing VAM.
       </p>
 
       <div class="model-selector-bar" style="margin-bottom:8px;">
@@ -976,20 +981,38 @@
   <div id="tab_settings" style="display: none;">
     <h4 style="margin-bottom: 10px;">Athlete Profile & Credentials</h4>
     
+    <!-- Current Training Goal Section -->
     <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
-      <h5 style="font-size:0.84rem; color:var(--primary); margin-bottom:6px;">Dated Weight Progression</h5>
+      <h5 style="font-size:0.84rem; color:var(--primary); margin-bottom:6px;">Current Training Objective / Phase</h5>
+      <p style="font-size:0.72rem; color:var(--text-muted); margin-bottom:8px;">
+        Define your broad athletic focus. Changing this saves a new dated phase to coach prompts.
+      </p>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <input type="text" id="cfg_goal_input" class="input-box" placeholder="e.g. Building Aerobic Base, Gran Fondo Prep, Intervals" style="margin:0;" />
+        <div style="display:flex; gap:6px;">
+          <input type="date" id="cfg_goal_date" class="input-box" style="flex:1; margin:0;" />
+          <button class="btn btn-primary btn-small" onclick="saveTrainingGoal()" style="margin:0; width:90px;">Set Phase</button>
+        </div>
+      </div>
+      <div id="goalHistoryList" style="font-size:0.74rem; color:var(--text-muted); max-height:85px; overflow-y:auto; margin-top:8px;"></div>
+    </div>
+
+    <!-- Weight Progression -->
+    <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
+      <h5 style="font-size:0.84rem; color:var(--primary); margin-bottom:6px;">Dated Weight Progression (kg)</h5>
       <div style="display:flex; gap:6px; margin-bottom:8px;">
         <input type="date" id="cfg_weight_date" class="input-box" style="flex:1;" />
         <input type="number" id="cfg_weight_input" class="input-box" placeholder="kg" step="0.1" style="width:90px;" />
         <button class="btn btn-primary btn-small" onclick="logAthleteWeight()" style="margin-top:4px;">Log</button>
       </div>
-      <div id="weightHistoryList" style="font-size:0.74rem; color:var(--text-muted); max-height:120px; overflow-y:auto;"></div>
+      <div id="weightHistoryList" style="font-size:0.74rem; color:var(--text-muted); max-height:110px; overflow-y:auto;"></div>
     </div>
 
+    <!-- Database Backup -->
     <div style="background:#fff; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
       <h5 style="font-size:0.84rem; color:var(--primary); margin-bottom:4px;">Database Backup & Migration</h5>
       <p style="font-size:0.72rem; color:var(--text-muted); margin-bottom:8px;">
-        Export workouts and coaching history directly to JSON (sensitive keys safely excluded).
+        Export workouts and coaching history directly to JSON (sensitive tokens excluded).
       </p>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-secondary btn-small" style="flex:1;" onclick="exportDatabaseJson()">📤 Export JSON</button>
@@ -1000,7 +1023,7 @@
     </div>
 
     <label style="font-size:0.75rem; font-weight:700;">Athlete Height (cm)</label>
-    <input type="number" id="cfg_height" class="input-box" value="190" step="0.5" />
+    <input type="number" id="cfg_height" class="input-box" placeholder="Optional / Not Set" step="0.5" />
     
     <label style="font-size:0.75rem; font-weight:700;">Default Gemini Model</label>
     <select id="cfg_model" class="input-box" onchange="syncModelSelection(this.value)">
@@ -1062,7 +1085,7 @@
       <div id="trainingIntentFields">
         <label style="font-size:0.74rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Target Zone</label>
         <select id="modalTargetZone" class="input-box">
-          <option value="Zone 1 (Recovery)">Zone 1 (<135 bpm) — Active Recovery</option>
+          <option value="Zone 1 (Recovery)">Zone 1 (&lt;135 bpm) — Active Recovery</option>
           <option value="Zone 2 (Aerobic Base)" selected>Zone 2 (135–154 bpm) — Aerobic Base</option>
           <option value="Zone 3 (Tempo)">Zone 3 (155–170 bpm) — Tempo Endurance</option>
           <option value="Zone 4 (Threshold)">Zone 4 (171–188 bpm) — Sub-Threshold</option>
@@ -1077,7 +1100,7 @@
 
         <div id="intervalConfigFields" style="display: none; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:8px;">
           <label style="font-size:0.70rem; font-weight:700; color:var(--text-muted);">Switching Zones</label>
-          <input type="text" id="modalIntervalZones" class="input-box" placeholder="e.g. Z2 <-> Z4" value="Z2 <-> Z4" />
+          <input type="text" id="modalIntervalZones" class="input-box" placeholder="e.g. Z2 &lt;-&gt; Z4" value="Z2 &lt;-&gt; Z4" />
           <label style="font-size:0.70rem; font-weight:700; color:var(--text-muted);">Work / Rest Duration</label>
           <input type="text" id="modalIntervalFreq" class="input-box" placeholder="e.g. 4m on / 2m off" value="4m on / 2m off" />
         </div>
@@ -1096,8 +1119,6 @@
     // --------------------------------------------------------
     const PHYSIO_CONFIG = {
       max_hr: 207,
-      default_height_cm: 190,
-      default_weight_kg: 111.0,
       zones: [
         { name: "Z1 Recovery", min: 0, max: 134, color: "#94a3b8" },
         { name: "Z2 Base Aerobic", min: 135, max: 154, color: "#16a34a" },
@@ -1115,7 +1136,7 @@
     };
 
     // --------------------------------------------------------
-    // DATABASE SCHEMA (DEXIE VERSION 2)
+    // DATABASE SCHEMA (DEXIE VERSION 3 WITH STRAVA_ID INDEX ON THREADS)
     // --------------------------------------------------------
     const db = new Dexie("RidePartnerDB");
     db.version(1).stores({
@@ -1132,8 +1153,21 @@
       workouts: "++id, &strava_id, ride_number, exercise_code, date, distance_km, avg_power_w, max_power_w, norm_power_w, avg_hr, max_hr, avg_speed_kmh, max_speed_kmh, elevation_gain_m, kilojoules, calories, duration_str, moving_sec, debrief_stale, intent_type",
       threads: "++id, ride_number, role, [ride_number+role], created_at",
       master_chat: "++id, role, created_at",
-      graph_threads: "++id, metric_key, role, created_at"
+      graph_threads: "++id, metric_key, role, created_at",
+      reports: "id, ref_code, created_at, timeframe, analysis_text, ride_count, date_range"
     }).upgrade(tx => {});
+
+    db.version(3).stores({
+      threads: "++id, strava_id, ride_number, role, [strava_id+role], created_at"
+    }).upgrade(async tx => {
+      const workouts = await tx.table('workouts').toArray();
+      const rToS = new Map(workouts.map(w => [w.ride_number, w.strava_id]));
+      await tx.table('threads').toCollection().modify(t => {
+        if (!t.strava_id && t.ride_number && rToS.has(t.ride_number)) {
+          t.strava_id = rToS.get(t.ride_number);
+        }
+      });
+    });
 
     let currentWorkout = null;
     let activeStream = null;
@@ -1207,9 +1241,62 @@
       return match ? match[0] : str.slice(0, 10);
     }
 
+    // Returns a Date parsed accurately preserving local timestamps (YYYY-MM-DD or YYYY-MM-DD HH:MM)
     function parseSafeDate(dStr) {
       if (!dStr) return new Date();
-      return new Date(String(dStr).replace(' ', 'T'));
+      const s = String(dStr).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const [y, m, d] = s.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      }
+      return new Date(s.replace(' ', 'T'));
+    }
+
+    function formatLocalDate(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatFullDateWithDay(dStr) {
+      if (!dStr) return "Unknown Date & Time";
+      const d = parseSafeDate(dStr);
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const parts = String(dStr).trim().split(' ');
+      const datePart = parts[0];
+      const timePart = parts[1] ? ` at ${parts[1]}` : '';
+      return `${datePart} (${dayName})${timePart}`;
+    }
+
+    function formatRecoveryGap(msGap) {
+      if (msGap <= 0) return "0 min recovery gap";
+      const hours = msGap / 3600000;
+      if (hours < 24) {
+        return `${hours.toFixed(1)} hour(s) recovery gap`;
+      }
+      const days = (hours / 24).toFixed(1);
+      return `${days} day(s) (${Math.round(hours)} hrs) recovery gap`;
+    }
+
+    function formatFullZoneSummary(zSecs) {
+      if (!zSecs || !Array.isArray(zSecs)) return "No zone data";
+      return PHYSIO_CONFIG.zones.map((z, idx) => `${z.name.split(' ')[0]}:${Math.round((zSecs[idx] || 0) / 60)}m`).join(', ');
+    }
+
+    function getCleanIntentLabel(w) {
+      if (!w) return "No intent specified";
+      if (w.intent_type === 'PLAY') return "Play / Commute (Free-form)";
+      if (w.intent_target && w.intent_type !== 'NONE') {
+        try {
+          const it = JSON.parse(w.intent_target);
+          if (it.format === 'INTERVAL') {
+            return `${it.target_zone || 'Intervals'}, Switching: ${it.interval_zones || 'N/A'} (${it.interval_freq || 'Interval Pattern'})`;
+          }
+          return `${it.target_zone || 'Structured Training'}, Steady State`;
+        } catch(e) {}
+      }
+      return "No intent specified";
     }
 
     function safeMax(arr, fallback = 0) {
@@ -1222,65 +1309,189 @@
       return arr.reduce((min, val) => val < min ? val : min, Infinity);
     }
 
+    // --------------------------------------------------------
+    // ATHLETE TRAINING GOAL HISTORY ENGINE
+    // --------------------------------------------------------
+    async function getTrainingGoalHistory() {
+      const raw = await getConfig("athlete_goal_history");
+      if (!raw) return [];
+      try { return JSON.parse(raw); } catch (e) { return []; }
+    }
+
+    async function saveTrainingGoalHistory(arr) {
+      arr.sort((a, b) => parseSafeDate(a.effective_date) - parseSafeDate(b.effective_date));
+      await setConfig("athlete_goal_history", JSON.stringify(arr));
+      renderGoalHistoryUI();
+    }
+
+    async function getActiveTrainingGoalForDate(dateStr) {
+      const history = await getTrainingGoalHistory();
+      if (!history.length) return "Not Set / Unspecified";
+      const targetTime = dateStr ? parseSafeDate(dateStr).getTime() : Date.now();
+      let matched = null;
+      for (const entry of history) {
+        if (parseSafeDate(entry.effective_date).getTime() <= targetTime) {
+          matched = entry.goal;
+        } else {
+          break;
+        }
+      }
+      return matched || "Not Set / Unspecified";
+    }
+
+    async function saveTrainingGoal() {
+      const goalVal = document.getElementById("cfg_goal_input").value.trim();
+      const dateVal = document.getElementById("cfg_goal_date").value || formatLocalDate(new Date());
+      if (!goalVal) { alert("Please type your new objective/phase."); return; }
+
+      const history = await getTrainingGoalHistory();
+      const existingIdx = history.findIndex(h => h.effective_date === dateVal);
+      if (existingIdx >= 0) {
+        history[existingIdx].goal = goalVal;
+      } else {
+        history.push({ effective_date: dateVal, goal: goalVal });
+      }
+      await saveTrainingGoalHistory(history);
+      document.getElementById("cfg_goal_input").value = "";
+      alert(`Training Objective active from ${dateVal}: "${goalVal}"`);
+    }
+
+    async function deleteTrainingGoalEntry(dateStr) {
+      if (!confirm(`Remove objective starting ${dateStr}?`)) return;
+      let history = await getTrainingGoalHistory();
+      history = history.filter(h => h.effective_date !== dateStr);
+      await saveTrainingGoalHistory(history);
+    }
+
+    async function renderGoalHistoryUI() {
+      const container = document.getElementById("goalHistoryList");
+      if (!container) return;
+      const history = await getTrainingGoalHistory();
+      if (!history.length) {
+        container.innerHTML = `<span style="font-size:0.72rem; color:var(--text-muted);">No training phase defined. Add your current athletic objective above.</span>`;
+        return;
+      }
+      container.innerHTML = history.slice().reverse().map(h => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid #f1f5f9;">
+          <span><b>${escapeHtml(h.effective_date)}</b>: ${escapeHtml(h.goal)}</span>
+          <span style="color:#ef4444; cursor:pointer; font-size:0.75rem; margin-left:8px;" onclick="deleteTrainingGoalEntry('${h.effective_date}')">✕</span>
+        </div>
+      `).join('');
+    }
+
+    // --------------------------------------------------------
+    // PRECOMPUTED RIDE METRICS ENGINE
+    // --------------------------------------------------------
     async function computeRideMetrics(workout, streamData) {
       if (!streamData || !streamData.heartrate || !streamData.time) return workout;
       const hrs = streamData.heartrate.data;
       const times = streamData.time.data;
+      const moving = streamData.moving ? streamData.moving.data : null;
+      const grades = streamData.grade_smooth ? streamData.grade_smooth.data : null;
+      const alts = streamData.altitude ? streamData.altitude.data : null;
+      const spds = streamData.velocity_smooth ? streamData.velocity_smooth.data : [];
+
       let zSecs = [0, 0, 0, 0, 0];
 
+      // Zone Time strictly filtered by moving=true
       for (let i = 0; i < hrs.length; i++) {
+        if (moving && moving[i] === false) continue;
         if (!hrs[i] || hrs[i] <= 0) continue;
         const dt = (i > 0 && times[i] && times[i-1]) ? Math.min(Math.max(times[i] - times[i-1], 1), 10) : 1;
         const zIdx = PHYSIO_CONFIG.getZoneIndex(hrs[i]);
         if (zIdx >= 0) zSecs[zIdx] += dt;
       }
 
-      const totalSec = times[times.length - 1];
-      const halfSec = totalSec / 2;
-      let h1Hrs = [], h2Hrs = [];
-      let h1Spd = [], h2Spd = [];
-      const spds = streamData.velocity_smooth ? streamData.velocity_smooth.data : [];
+      // True Climbing VAM (>3% grade moving climb rate)
+      let climbingSec = 0;
+      let climbingAscentM = 0;
+      if (grades && alts) {
+        for (let i = 1; i < times.length; i++) {
+          if (moving && moving[i] === false) continue;
+          if (grades[i] > 3.0) {
+            const dt = times[i] - times[i-1];
+            if (dt > 0 && dt <= 10) {
+              climbingSec += dt;
+              const dAlt = alts[i] - alts[i-1];
+              if (dAlt > 0) climbingAscentM += dAlt;
+            }
+          }
+        }
+      }
+      let climbingVAM = null;
+      if (climbingSec >= 120 && climbingAscentM > 5) {
+        climbingVAM = Math.round(climbingAscentM / (climbingSec / 3600));
+      }
+
+      // Halves Profile & Cardiac HR Drift based purely on moving time (skipping initial 12 min moving time)
+      let movingSecAccum = 0;
+      let movingSamples = [];
 
       for (let i = 0; i < times.length; i++) {
-        if (times[i] <= halfSec) {
-          if (hrs[i] > 0) h1Hrs.push(hrs[i]);
-          if (spds[i] !== undefined) h1Spd.push(spds[i]);
-        } else {
-          if (hrs[i] > 0) h2Hrs.push(hrs[i]);
-          if (spds[i] !== undefined) h2Spd.push(spds[i]);
+        const isMoving = moving ? moving[i] !== false : (spds[i] !== undefined && spds[i] > 0.5);
+        const dt = (i > 0) ? Math.min(Math.max(times[i] - times[i-1], 1), 10) : 1;
+        if (isMoving) {
+          movingSecAccum += dt;
+          movingSamples.push({
+            mSec: movingSecAccum,
+            hr: hrs[i],
+            spd: spds[i] !== undefined ? spds[i] * 3.6 : 0
+          });
+        }
+      }
+
+      const warmupMovingSec = 720; // 12 min of moving time
+      let h1Hrs = [], h2Hrs = [];
+      let h1Spd = [], h2Spd = [];
+
+      if (movingSecAccum > (warmupMovingSec + 600)) {
+        const midpoint = warmupMovingSec + ((movingSecAccum - warmupMovingSec) / 2);
+        for (const s of movingSamples) {
+          if (s.mSec < warmupMovingSec) continue;
+          if (s.mSec <= midpoint) {
+            if (s.hr > 0) h1Hrs.push(s.hr);
+            if (s.spd > 0) h1Spd.push(s.spd);
+          } else {
+            if (s.hr > 0) h2Hrs.push(s.hr);
+            if (s.spd > 0) h2Spd.push(s.spd);
+          }
         }
       }
 
       const avgH1 = h1Hrs.length ? Math.round(h1Hrs.reduce((a,b)=>a+b,0)/h1Hrs.length) : 0;
       const avgH2 = h2Hrs.length ? Math.round(h2Hrs.reduce((a,b)=>a+b,0)/h2Hrs.length) : 0;
-      const spd1 = h1Spd.length ? +(h1Spd.reduce((a,b)=>a+b,0)/h1Spd.length * 3.6).toFixed(1) : 0;
-      const spd2 = h2Spd.length ? +(h2Spd.reduce((a,b)=>a+b,0)/h2Spd.length * 3.6).toFixed(1) : 0;
+      const spd1 = h1Spd.length ? +(h1Spd.reduce((a,b)=>a+b,0)/h1Spd.length).toFixed(1) : 0;
+      const spd2 = h2Spd.length ? +(h2Spd.reduce((a,b)=>a+b,0)/h2Spd.length).toFixed(1) : 0;
 
-      // Restrict drift exclusively to steady efforts >= 35 minutes
-      let isSteady = true;
-      if (workout.intent_type === 'PLAY') isSteady = false;
-      if (workout.intent_target) {
-        try {
-          const it = JSON.parse(workout.intent_target);
-          if (it.format === 'INTERVAL') isSteady = false;
-        } catch(e) {}
+      // Fix: Only diagnose steady state drift if structured training intent and not intervals
+      let isSteady = false;
+      if (workout.intent_type === 'TRAINING' && workout.intent_target) {
+        try { isSteady = JSON.parse(workout.intent_target).format !== 'INTERVAL'; } catch(e) {}
       }
 
       let driftBpm = null;
-      if (isSteady && totalSec >= 2100 && avgH1 > 0 && avgH2 > 0) {
+      let driftDecouplingPct = null;
+      if (isSteady && movingSecAccum >= 1800 && avgH1 > 0 && avgH2 > 0 && spd1 > 0 && spd2 > 0) {
         driftBpm = avgH2 - avgH1;
+        const eff1 = spd1 / avgH1;
+        const eff2 = spd2 / avgH2;
+        driftDecouplingPct = +(((eff1 - eff2) / eff1) * 100).toFixed(1);
       }
 
       const halvesStr = `[H1: ${spd1}km/h, ${avgH1}bpm -> H2: ${spd2}km/h, ${avgH2}bpm]`;
 
       workout.zone_seconds = zSecs;
       workout.cardiac_drift_bpm = driftBpm;
+      workout.cardiac_decoupling_pct = driftDecouplingPct;
       workout.halves_profile = halvesStr;
+      workout.climbing_vam = climbingVAM;
 
       await db.workouts.update(workout.id, {
         zone_seconds: zSecs,
         cardiac_drift_bpm: driftBpm,
-        halves_profile: halvesStr
+        cardiac_decoupling_pct: driftDecouplingPct,
+        halves_profile: halvesStr,
+        climbing_vam: climbingVAM
       });
 
       return workout;
@@ -1309,13 +1520,8 @@
     // --------------------------------------------------------
     async function getWeightHistory() {
       const raw = await getConfig("athlete_weight_history");
-      if (!raw) {
-        return [
-          { date: "2026-08-01", weight: 114.8 },
-          { date: "2026-10-01", weight: 111.0 }
-        ];
-      }
-      try { return JSON.parse(raw); } catch (e) { return [{ date: "2026-10-01", weight: 111.0 }]; }
+      if (!raw) return [];
+      try { return JSON.parse(raw); } catch (e) { return []; }
     }
 
     async function saveWeightHistory(arr) {
@@ -1326,9 +1532,9 @@
 
     async function getAthleteWeightForDate(dateStr) {
       const history = await getWeightHistory();
-      if (!history.length) return PHYSIO_CONFIG.default_weight_kg;
+      if (!history.length) return null;
       const targetTime = dateStr ? parseSafeDate(dateStr).getTime() : Date.now();
-      let matched = history[0].weight;
+      let matched = null;
       for (const entry of history) {
         if (parseSafeDate(entry.date).getTime() <= targetTime) {
           matched = entry.weight;
@@ -1336,17 +1542,26 @@
           break;
         }
       }
-      return parseFloat(matched) || PHYSIO_CONFIG.default_weight_kg;
+      return matched !== null ? parseFloat(matched) : parseFloat(history[0].weight);
     }
 
     async function getLatestWeight() {
       const history = await getWeightHistory();
-      if (!history.length) return PHYSIO_CONFIG.default_weight_kg;
-      return parseFloat(history[history.length - 1].weight) || PHYSIO_CONFIG.default_weight_kg;
+      if (!history.length) return null;
+      return parseFloat(history[history.length - 1].weight) || null;
+    }
+
+    async function getWeightPromptSummary() {
+      const history = await getWeightHistory();
+      if (!history.length) return "Not Logged / Unspecified";
+      if (history.length === 1) return `${history[0].weight} kg (Baseline Logged on ${history[0].date})`;
+      const first = history[0];
+      const last = history[history.length - 1];
+      return `${first.weight} kg (${first.date}) -> ${last.weight} kg (${last.date})`;
     }
 
     async function logAthleteWeight() {
-      const dateVal = document.getElementById("cfg_weight_date").value || new Date().toISOString().slice(0, 10);
+      const dateVal = document.getElementById("cfg_weight_date").value || formatLocalDate(new Date());
       const weightVal = parseFloat(document.getElementById("cfg_weight_input").value);
       if (!weightVal || isNaN(weightVal)) { alert("Enter a valid weight (kg)."); return; }
       
@@ -1372,6 +1587,10 @@
       const container = document.getElementById("weightHistoryList");
       if (!container) return;
       const history = await getWeightHistory();
+      if (!history.length) {
+        container.innerHTML = `<span style="font-size:0.72rem; color:var(--text-muted);">No custom weight entries logged. Add your current mass above.</span>`;
+        return;
+      }
       container.innerHTML = history.slice().reverse().map(h => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid #f1f5f9;">
           <span>${escapeHtml(h.date)}</span>
@@ -1396,7 +1615,7 @@
 
       const dump = {
         app: "RidePartner",
-        version: 2,
+        version: 3,
         exported_at: new Date().toISOString(),
         workouts: await db.workouts.toArray(),
         threads: await db.threads.toArray(),
@@ -1407,10 +1626,10 @@
       };
 
       const compactJsonStr = JSON.stringify(dump);
-      const fileName = `RidePartner_Backup_${new Date().toISOString().slice(0,10)}.json`;
+      const fileName = `RidePartner_Backup_${formatLocalDate(new Date())}.json`;
 
       if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-        let savedToDownloads = false;
+        let savedPath = null;
         try {
           await window.Capacitor.Plugins.Filesystem.writeFile({
             path: `Download/${fileName}`,
@@ -1418,7 +1637,7 @@
             directory: 'EXTERNAL_STORAGE',
             encoding: 'utf8'
           });
-          savedToDownloads = true;
+          savedPath = "Downloads";
         } catch (err) {
           try {
             await window.Capacitor.Plugins.Filesystem.writeFile({
@@ -1427,15 +1646,19 @@
               directory: 'DOCUMENTS',
               encoding: 'utf8'
             });
+            savedPath = "Documents";
           } catch(e) {
             console.warn("Filesystem write error:", e);
           }
         }
 
-        const targetFolder = savedToDownloads ? "Downloads" : "Documents";
-        statusBox.innerHTML = `✓ Backup saved to ${targetFolder}: <b>${escapeHtml(fileName)}</b>`;
-        alert(`Backup exported successfully to ${targetFolder} folder:\n${fileName}`);
-        return;
+        if (savedPath) {
+          statusBox.innerHTML = `✓ Backup saved to ${savedPath}: <b>${escapeHtml(fileName)}</b>`;
+          alert(`Backup exported successfully to ${savedPath} folder:\n${fileName}`);
+          return;
+        } else {
+          statusBox.textContent = "⚠ Mobile storage write failed. Triggering browser fallback...";
+        }
       }
 
       const blob = new Blob([compactJsonStr], { type: "application/json" });
@@ -1570,7 +1793,7 @@
 
       activeIntentItem = intentModalQueue.shift();
       document.getElementById("rideIntentModal").style.display = "flex";
-      document.getElementById("intentModalTitle").textContent = `Configure ${activeIntentItem.exercise_code}`;
+      document.getElementById("intentModalTitle").textContent = `Configure ${activeIntentItem.exercise_code || 'Ride ' + activeIntentItem.ride_number}`;
       document.getElementById("intentModalSub").textContent = `${activeIntentItem.distance_km} km • ${activeIntentItem.duration_str} • ${activeIntentItem.avg_speed_kmh} km/h`;
 
       selectRideType('TRAINING');
@@ -1579,7 +1802,7 @@
 
     async function skipIntentModal() {
       if (activeIntentItem) {
-        const existingCoach = await db.threads.where({ ride_number: activeIntentItem.ride_number, role: 'coach' }).first();
+        const existingCoach = await db.threads.where("strava_id").equals(Number(activeIntentItem.strava_id)).and(t => t.role === 'coach').first();
         const isStaleNow = !!existingCoach;
 
         await db.workouts.update(activeIntentItem.id, { 
@@ -1588,11 +1811,15 @@
           debrief_stale: isStaleNow
         });
 
+        let wObj = await db.workouts.get(activeIntentItem.id);
+        const strRow = await db.streams.get(activeIntentItem.strava_id);
+        if (strRow && strRow.stream_data) {
+          wObj = await computeRideMetrics(wObj, strRow.stream_data);
+        }
+
         const detailView = document.getElementById("sessionDetail");
         if (currentWorkout && currentWorkout.id === activeIntentItem.id && detailView.style.display !== 'none') {
-          currentWorkout.intent_type = "NONE";
-          currentWorkout.intent_target = null;
-          currentWorkout.debrief_stale = isStaleNow;
+          currentWorkout = wObj;
           await openSession(currentWorkout.id);
 
           if (isStaleNow) {
@@ -1616,7 +1843,7 @@
       activeIntentItem = currentWorkout;
       intentModalQueue = [];
       document.getElementById("rideIntentModal").style.display = "flex";
-      document.getElementById("intentModalTitle").textContent = `Edit Intent: ${currentWorkout.exercise_code}`;
+      document.getElementById("intentModalTitle").textContent = `Edit Intent: ${currentWorkout.exercise_code || 'Ride ' + currentWorkout.ride_number}`;
       document.getElementById("intentModalSub").textContent = `${currentWorkout.distance_km} km • ${currentWorkout.duration_str}`;
 
       if (currentWorkout.intent_type === 'PLAY') {
@@ -1667,7 +1894,7 @@
         }
       }
 
-      const existingCoach = await db.threads.where({ ride_number: activeIntentItem.ride_number, role: 'coach' }).first();
+      const existingCoach = await db.threads.where("strava_id").equals(Number(activeIntentItem.strava_id)).and(t => t.role === 'coach').first();
       const isStaleNow = !!existingCoach;
 
       await db.workouts.update(activeIntentItem.id, { 
@@ -1676,11 +1903,15 @@
         debrief_stale: isStaleNow
       });
 
+      let wObj = await db.workouts.get(activeIntentItem.id);
+      const strRow = await db.streams.get(activeIntentItem.strava_id);
+      if (strRow && strRow.stream_data) {
+        wObj = await computeRideMetrics(wObj, strRow.stream_data);
+      }
+
       const detailView = document.getElementById("sessionDetail");
       if (currentWorkout && currentWorkout.id === activeIntentItem.id && detailView.style.display !== 'none') {
-        currentWorkout.intent_type = modalSelectedType;
-        currentWorkout.intent_target = JSON.stringify(intentData);
-        currentWorkout.debrief_stale = isStaleNow;
+        currentWorkout = wObj;
         await openSession(currentWorkout.id);
         
         if (isStaleNow) {
@@ -1695,7 +1926,7 @@
     }
 
     // --------------------------------------------------------
-    // OAUTH & DEEP LINK HANDLER (CONFIGURED FOR AICOACHV2)
+    // OAUTH & DEEP LINK HANDLER
     // --------------------------------------------------------
     let isOauthExchanging = false;
     async function processIncomingUrl(urlStr) {
@@ -1753,7 +1984,10 @@
       const savedModel = await getActiveModel();
       syncModelSelection(savedModel);
       renderWeightHistoryUI();
-      document.getElementById("cfg_weight_date").value = new Date().toISOString().slice(0, 10);
+      renderGoalHistoryUI();
+      const todayStr = formatLocalDate(new Date());
+      document.getElementById("cfg_weight_date").value = todayStr;
+      document.getElementById("cfg_goal_date").value = todayStr;
     });
 
     if (window.location.search && window.location.search.includes("code=")) {
@@ -1826,7 +2060,7 @@
             <div class="metric-cell"><div class="metric-num">${r.distance_km} <span style="font-size:0.6rem">km</span></div><div class="metric-lbl">Dist</div></div>
             <div class="metric-cell"><div class="metric-num">${escapeHtml(r.duration_str) || '--'}</div><div class="metric-lbl">Time</div></div>
             <div class="metric-cell"><div class="metric-num">${r.avg_speed_kmh} <span style="font-size:0.6rem">km/h</span></div><div class="metric-lbl">Speed</div></div>
-            <div class="metric-cell"><div class="metric-num">${r.avg_power_w > 0 ? r.avg_power_w + 'W' : '--'}</div><div class="metric-lbl">Power</div></div>
+            <div class="metric-cell"><div class="metric-num">${r.avg_power_w > 0 ? r.avg_power_w + 'W' : '--'}</div><div class="metric-lbl">Power (Est)</div></div>
             <div class="metric-cell"><div class="metric-num">${r.avg_hr > 0 ? r.avg_hr + '<span style="font-size:0.55rem">bpm</span>' : '--'}</div><div class="metric-lbl">HR</div></div>
             <div class="metric-cell"><div class="metric-num">${r.elevation_gain_m}m</div><div class="metric-lbl">Asc</div></div>
           </div>
@@ -1860,8 +2094,9 @@
       }
 
       const userW = await getAthleteWeightForDate(currentWorkout.date);
-      const wpk = currentWorkout.avg_power_w > 0 ? (currentWorkout.avg_power_w / userW).toFixed(2) : null;
+      const wpk = (userW && currentWorkout.avg_power_w > 0) ? (currentWorkout.avg_power_w / userW).toFixed(2) : null;
       const pwrLabel = wpk ? `Est. Power (${wpk} W/kg)` : 'Est. Power';
+      const weightDisplay = userW ? `${userW} kg` : 'Not Set';
 
       document.getElementById("det_hero").innerHTML = `
         <div class="hero-box"><div class="hero-val">${currentWorkout.distance_km} km</div><div class="hero-lbl">Distance</div></div>
@@ -1872,35 +2107,51 @@
         <div class="hero-box"><div class="hero-val">${currentWorkout.elevation_gain_m} m</div><div class="hero-lbl">Ascent</div></div>
       `;
 
-      const vam = currentWorkout.moving_sec > 0 ? Math.round(currentWorkout.elevation_gain_m / (currentWorkout.moving_sec / 3600)) : 0;
-      const efVal = (currentWorkout.avg_power_w > 0 && currentWorkout.avg_hr > 0) ? (currentWorkout.avg_power_w / currentWorkout.avg_hr).toFixed(2) : '--';
+      const grossAscRate = currentWorkout.moving_sec > 0 ? Math.round(currentWorkout.elevation_gain_m / (currentWorkout.moving_sec / 3600)) : 0;
+      const vamDisplay = currentWorkout.climbing_vam ? `${currentWorkout.climbing_vam} m/h (Climb >3%)` : (grossAscRate > 0 ? `${grossAscRate} m/h (Gross Ascent Rate)` : '--');
+
+      const decouplingDisplay = currentWorkout.cardiac_decoupling_pct !== null && currentWorkout.cardiac_decoupling_pct !== undefined ? `${currentWorkout.cardiac_decoupling_pct > 0 ? '+' : ''}${currentWorkout.cardiac_decoupling_pct}% decoupling` : (currentWorkout.cardiac_drift_bpm !== null ? `${currentWorkout.cardiac_drift_bpm > 0 ? '+' : ''}${currentWorkout.cardiac_drift_bpm} bpm drift` : '--');
 
       document.getElementById("det_secondary").innerHTML = `
-        <div class="telemetry-row"><span class="telemetry-name">Athlete Weight</span><span class="telemetry-val">${userW} kg</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Athlete Weight</span><span class="telemetry-val">${weightDisplay}</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Max Speed</span><span class="telemetry-val">${currentWorkout.max_speed_kmh || '--'} km/h</span></div>
         <div class="telemetry-row"><span class="telemetry-name">Peak Heart Rate</span><span class="telemetry-val">${currentWorkout.max_hr || '--'} bpm</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Work Done</span><span class="telemetry-val">${currentWorkout.kilojoules > 0 ? currentWorkout.kilojoules + ' kJ' : '--'}</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Climbing VAM</span><span class="telemetry-val">${vam > 0 ? vam + ' m/h' : '--'}</span></div>
-        <div class="telemetry-row"><span class="telemetry-name">Aerobic Efficiency</span><span class="telemetry-val">${efVal !== '--' ? efVal + ' W/bpm (Est)' : '--'}</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Est. Work Done</span><span class="telemetry-val">${currentWorkout.kilojoules > 0 ? currentWorkout.kilojoules + ' kJ' : '--'}</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Climbing VAM</span><span class="telemetry-val">${vamDisplay}</span></div>
+        <div class="telemetry-row"><span class="telemetry-name">Aerobic Decoupling</span><span class="telemetry-val">${decouplingDisplay}</span></div>
       `;
 
       const cached = await db.streams.get(currentWorkout.strava_id);
       activeStream = cached ? cached.stream_data : null;
 
-      if (activeStream && (!currentWorkout.zone_seconds || currentWorkout.zone_seconds.every(v => v === 0))) {
+      if (activeStream && (!currentWorkout.zone_seconds || currentWorkout.zone_seconds.every(v => v === 0) || currentWorkout.climbing_vam === undefined)) {
         currentWorkout = await computeRideMetrics(currentWorkout, activeStream);
       }
 
       renderCardiacZones(currentWorkout);
 
-      // Delta Table
-      const allPrior = await db.workouts.where('date').below(currentWorkout.date).reverse().limit(5).toArray();
-      if (allPrior.length > 0) {
-        const avgDistPrior = (allPrior.reduce((a, b) => a + b.distance_km, 0) / allPrior.length).toFixed(2);
-        const avgSpdPrior = (allPrior.reduce((a, b) => a + b.avg_speed_kmh, 0) / allPrior.length).toFixed(1);
-        const validHRPrior = allPrior.filter(x => x.avg_hr > 0);
-        const avgHRPrior = validHRPrior.length ? Math.round(validHRPrior.reduce((a, b) => a + b.avg_hr, 0) / validHRPrior.length) : 0;
-        const avgAscPrior = Math.round(allPrior.reduce((a, b) => a + b.elevation_gain_m, 0) / allPrior.length);
+      // Delta Table: filtered strictly by SAME INTENT TYPE with duration-weighted averages
+      let priorQuery = db.workouts.where('date').below(currentWorkout.date).reverse();
+      const allPriorSameIntent = (await priorQuery.toArray())
+        .filter(w => (w.intent_type || 'NONE') === (currentWorkout.intent_type || 'NONE'))
+        .slice(0, 5);
+
+      if (allPriorSameIntent.length > 0) {
+        const totalDist = allPriorSameIntent.reduce((a, b) => a + b.distance_km, 0);
+        const totalSec = allPriorSameIntent.reduce((a, b) => a + (b.moving_sec || 0), 0);
+        const avgDistPrior = (totalDist / allPriorSameIntent.length).toFixed(2);
+        
+        const avgSpdPrior = totalSec > 0 ? +((totalDist / (totalSec / 3600))).toFixed(1) : +(allPriorSameIntent.reduce((a,b)=>a+b.avg_speed_kmh,0)/allPriorSameIntent.length).toFixed(1);
+
+        let sumDurationHR = 0, sumDurationSecHR = 0;
+        allPriorSameIntent.forEach(w => {
+          if (w.avg_hr > 0 && w.moving_sec > 0) {
+            sumDurationHR += (w.avg_hr * w.moving_sec);
+            sumDurationSecHR += w.moving_sec;
+          }
+        });
+        const avgHRPrior = sumDurationSecHR > 0 ? Math.round(sumDurationHR / sumDurationSecHR) : 0;
+        const avgAscPrior = Math.round(allPriorSameIntent.reduce((a, b) => a + b.elevation_gain_m, 0) / allPriorSameIntent.length);
 
         const dDist = (currentWorkout.distance_km - avgDistPrior).toFixed(2);
         const dSpd = (currentWorkout.avg_speed_kmh - avgSpdPrior).toFixed(1);
@@ -1909,17 +2160,17 @@
 
         document.getElementById("det_delta").innerHTML = `
           <table class="delta-table">
-            <thead><tr><th>Metric</th><th>This Ride</th><th>Prior 5 Avg</th><th>Delta</th></tr></thead>
+            <thead><tr><th>Metric</th><th>This Ride</th><th>Prior 5 Avg (${escapeHtml(currentWorkout.intent_type || 'Structured')})</th><th>Delta</th></tr></thead>
             <tbody>
               <tr><td>Distance</td><td>${currentWorkout.distance_km} km</td><td>${avgDistPrior} km</td><td class="${dDist >= 0 ? 'delta-pos' : 'delta-neg'}">${dDist >= 0 ? '+' : ''}${dDist} km</td></tr>
-              <tr><td>Average Speed</td><td>${currentWorkout.avg_speed_kmh} km/h</td><td>${avgSpdPrior} km/h</td><td class="${dSpd >= 0 ? 'delta-pos' : 'delta-neg'}">${dSpd >= 0 ? '+' : ''}${dSpd} km/h</td></tr>
-              <tr><td>Average HR</td><td>${currentWorkout.avg_hr || '--'} bpm</td><td>${avgHRPrior || '--'} bpm</td><td>${dHR !== null ? `<span class="${dHR <= 0 ? 'delta-pos' : 'delta-neg'}">${dHR >= 0 ? '+' : ''}${dHR} bpm</span>` : '--'}</td></tr>
+              <tr><td>Speed (Weighted)</td><td>${currentWorkout.avg_speed_kmh} km/h</td><td>${avgSpdPrior} km/h</td><td class="${dSpd >= 0 ? 'delta-pos' : 'delta-neg'}">${dSpd >= 0 ? '+' : ''}${dSpd} km/h</td></tr>
+              <tr><td>HR (Weighted)</td><td>${currentWorkout.avg_hr || '--'} bpm</td><td>${avgHRPrior || '--'} bpm</td><td>${dHR !== null ? `<span class="${dHR <= 0 ? 'delta-pos' : 'delta-neg'}">${dHR >= 0 ? '+' : ''}${dHR} bpm</span>` : '--'}</td></tr>
               <tr><td>Ascent Climbed</td><td>${currentWorkout.elevation_gain_m} m</td><td>${avgAscPrior} m</td><td class="${dAsc >= 0 ? 'delta-pos' : 'delta-neg'}">${dAsc >= 0 ? '+' : ''}${dAsc} m</td></tr>
             </tbody>
           </table>
         `;
       } else {
-        document.getElementById("det_delta").innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); padding:6px 0;">Baseline ride recorded.</div>`;
+        document.getElementById("det_delta").innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); padding:6px 0;">Baseline ride recorded for intent [${escapeHtml(currentWorkout.intent_type || 'Standard')}].</div>`;
       }
 
       document.getElementById("banner_line1_l").textContent = `⏱ Time: ${currentWorkout.duration_str}`;
@@ -1930,16 +2181,16 @@
       setupMetricPills();
       renderStreamPlotly();
 
-      const existingCoach = await db.threads.where({ ride_number: currentWorkout.ride_number, role: 'coach' }).first();
+      const existingCoach = await db.threads.where("strava_id").equals(Number(currentWorkout.strava_id)).and(t => t.role === 'coach').first();
       const badgeDiv = document.getElementById("det_status_badge");
       const actionBox = document.getElementById("sessionActionBox");
 
       if (!existingCoach) {
         badgeDiv.innerHTML = `<span class="status-badge badge-unreviewed">🟡 Needs Analysis</span>`;
-        actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Analyze Ride ${currentWorkout.ride_number} with AI Coach</button>`;
+        actionBox.innerHTML = `<button class="btn btn-primary" onclick="runSingleRideDebrief(currentWorkout)">⚡ Analyze ${currentWorkout.exercise_code} with AI Coach</button>`;
       } else if (currentWorkout.debrief_stale) {
         badgeDiv.innerHTML = `<span class="status-badge badge-stale">🟠 Context Update Available</span>`;
-        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate Ride ${currentWorkout.ride_number} (Updated Goal)</button>`;
+        actionBox.innerHTML = `<button class="btn btn-secondary" onclick="runSingleRideDebrief(currentWorkout)">🔄 Re-Evaluate ${currentWorkout.exercise_code} (Updated Goal)</button>`;
       } else {
         badgeDiv.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
         actionBox.innerHTML = "";
@@ -2124,13 +2375,13 @@
     }
 
     // --------------------------------------------------------
-    // CHAT ENGINE & RESET FUNCTIONALITY
+    // CHAT ENGINE & RESET FUNCTIONALITY (KEYED BY STRAVA_ID)
     // --------------------------------------------------------
     async function resetActiveRideThread() {
       if (!currentWorkout) return;
-      if (!confirm(`Reset conversation thread for Ride ${currentWorkout.ride_number}? This will delete coach messages for this ride.`)) return;
+      if (!confirm(`Reset conversation thread for ${currentWorkout.exercise_code}? This will delete coach messages for this ride.`)) return;
       
-      await db.threads.where("ride_number").equals(currentWorkout.ride_number).delete();
+      await db.threads.where("strava_id").equals(Number(currentWorkout.strava_id)).delete();
       await db.workouts.update(currentWorkout.id, { debrief_stale: false });
       currentWorkout.debrief_stale = false;
       lastPendingRidePayload = null;
@@ -2138,7 +2389,7 @@
       
       await openSession(currentWorkout.id);
 
-      if (confirm(`Configure Ride ${currentWorkout.ride_number}'s target intent before re-evaluating?`)) {
+      if (confirm(`Configure ${currentWorkout.exercise_code}'s target intent before re-evaluating?`)) {
         editCurrentRideIntent();
       }
     }
@@ -2151,15 +2402,16 @@
         clearHubAttachment();
         renderHubChat();
       } else {
-        const rNum = Number(activeChatStreamKey);
-        if (!confirm(`Reset conversation for Ride ${rNum}?`)) return;
-        await db.threads.where("ride_number").equals(rNum).delete();
+        const sId = Number(activeChatStreamKey);
+        const w = await db.workouts.where("strava_id").equals(sId).first();
+        if (!confirm(`Reset conversation for ${w ? w.exercise_code : 'this ride'}?`)) return;
+        
+        await db.threads.where("strava_id").equals(sId).delete();
         lastPendingHubPayload = null;
         clearHubAttachment();
-        openChatThread(activeChatStreamKey);
+        openChatThread(sId);
 
-        const w = await db.workouts.where("ride_number").equals(rNum).first();
-        if (w && confirm(`Configure Ride ${rNum}'s target intent before re-evaluating?`)) {
+        if (w && confirm(`Configure ${w.exercise_code}'s target intent before re-evaluating?`)) {
           currentWorkout = w;
           editCurrentRideIntent();
         }
@@ -2173,7 +2425,8 @@
         return;
       }
 
-      const messages = await db.threads.where("ride_number").equals(currentWorkout.ride_number).toArray();
+      let messages = await db.threads.where("strava_id").equals(Number(currentWorkout.strava_id)).toArray();
+
       let html = "";
       if (messages.length === 0) {
         html = `
@@ -2192,7 +2445,7 @@
         `).join('');
       }
 
-      if (lastPendingRidePayload && lastPendingRidePayload.ride_number === currentWorkout.ride_number) {
+      if (lastPendingRidePayload && Number(lastPendingRidePayload.strava_id) === Number(currentWorkout.strava_id)) {
         html += `
           <div class="retry-card">
             <span>⚠️ Message failed to send.</span>
@@ -2208,7 +2461,7 @@
     // STREAM TIMELINE & TIMELINE EXTRACTORS
     // --------------------------------------------------------
     async function build1MinuteTelemetryTimeline(stravaId) {
-      const cached = await db.streams.get(stravaId);
+      const cached = await db.streams.get(Number(stravaId));
       if (!cached || !cached.stream_data || !cached.stream_data.time) {
         return "No granular stream recorded for this workout.";
       }
@@ -2219,6 +2472,7 @@
       const speeds = s.velocity_smooth ? s.velocity_smooth.data : [];
       const hrs = s.heartrate ? s.heartrate.data : [];
       const alts = s.altitude ? s.altitude.data : [];
+      const moving = s.moving ? s.moving.data : null;
       const totalSec = times[times.length - 1];
 
       let timeline = [];
@@ -2227,7 +2481,10 @@
       for (let sec = 60; sec <= totalSec; sec += 60) {
         let indices = [];
         for (let i = 0; i < times.length; i++) {
-          if (times[i] >= sec - 60 && times[i] < sec) indices.push(i);
+          if (times[i] >= sec - 60 && times[i] < sec) {
+            if (moving && moving[i] === false) continue;
+            indices.push(i);
+          }
         }
 
         if (indices.length > 0) {
@@ -2248,14 +2505,16 @@
       return timeline.join('\n');
     }
 
-    async function buildCompactPriorContinuum(targetRideNumber) {
+    async function buildCompactPriorContinuum(targetWorkout) {
       const priorRides = await db.workouts
-        .where('ride_number').below(targetRideNumber)
-        .sortBy('ride_number');
+        .where('date').below(targetWorkout.date)
+        .sortBy('date');
 
       let lines = [];
-      for (const p of priorRides) {
+      for (let i = 0; i < priorRides.length; i++) {
+        const p = priorRides[i];
         const rWeight = await getAthleteWeightForDate(p.date);
+        const weightTag = rWeight ? `${rWeight}kg` : "Weight Unspecified";
         
         let intentShort = p.intent_type === 'PLAY' ? '[Play]' : '';
         if (p.intent_type !== 'PLAY' && p.intent_target && p.intent_type !== 'NONE') {
@@ -2265,14 +2524,121 @@
             intentShort = `[${zTag || 'Train'}]`;
           } catch(e) {}
         }
-        let line = `• R${p.ride_number} (${p.date.slice(5,10)} | ${rWeight}kg ${intentShort}): ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.elevation_gain_m}m asc.`;
-        const athleteMsg = await db.threads.where({ ride_number: p.ride_number, role: 'athlete' }).first();
+
+        let gapStr = "";
+        if (i > 0) {
+          const prevDate = parseSafeDate(priorRides[i - 1].date);
+          const curDate = parseSafeDate(p.date);
+          const diffMs = Math.max(0, curDate.getTime() - prevDate.getTime());
+          gapStr = ` (+${formatRecoveryGap(diffMs)})`;
+        }
+
+        const pZones = formatFullZoneSummary(p.zone_seconds);
+        const vamGross = p.moving_sec > 0 ? Math.round(p.elevation_gain_m / (p.moving_sec / 3600)) : 0;
+        const vamStr = p.climbing_vam ? `${p.climbing_vam}m/h VAM(>3%)` : `${vamGross}m/h grossVAM`;
+        const driftStr = p.cardiac_drift_bpm !== null && p.cardiac_drift_bpm !== undefined ? `${p.cardiac_drift_bpm}bpm drift` : 'n/a drift';
+
+        const formattedDate = formatFullDateWithDay(p.date);
+        let line = `• R${p.ride_number} [${formattedDate}${gapStr} | ${weightTag} ${intentShort} | Dur: ${p.duration_str} | ${vamStr} | ${driftStr} | ${pZones}]: ${p.distance_km}km, ${p.avg_speed_kmh}km/h, ${p.avg_hr || '--'}bpm, ${p.elevation_gain_m}m asc.`;
+        
+        const athleteMsg = await db.threads.where("strava_id").equals(Number(p.strava_id)).and(t => t.role === 'athlete').first();
         if (athleteMsg) {
           line += ` Note: "${athleteMsg.message.slice(0, 45)}"`;
         }
         lines.push(line);
       }
-      return lines.join('\n');
+
+      // Explicit recovery gap between immediate prior ride and current analyzed workout
+      let targetRecoveryGapText = "Baseline ride in series (no prior ride recorded).";
+      if (priorRides.length > 0) {
+        const lastPrior = priorRides[priorRides.length - 1];
+        const lastDate = parseSafeDate(lastPrior.date);
+        const curDate = parseSafeDate(targetWorkout.date);
+        const gapMs = Math.max(0, curDate.getTime() - lastDate.getTime());
+        targetRecoveryGapText = `${formatRecoveryGap(gapMs)} since immediate prior session (Ride ${lastPrior.ride_number} on ${formatFullDateWithDay(lastPrior.date)}).`;
+      }
+
+      return {
+        continuumText: lines.join('\n'),
+        targetRecoveryGapText: targetRecoveryGapText
+      };
+    }
+
+    // --------------------------------------------------------
+    // UNIFIED RIDE PROMPT BUILDER
+    // --------------------------------------------------------
+    async function buildRideChatPrompt(targetWorkout, athleteMessage, userW, userH) {
+      const activeGoal = await getActiveTrainingGoalForDate(targetWorkout.date);
+      const cleanIntent = getCleanIntentLabel(targetWorkout);
+      const rideDateStr = formatFullDateWithDay(targetWorkout.date);
+      const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
+      const weightSummary = await getWeightPromptSummary();
+      const athleteMassDesc = userW ? `${userW} kg` : "Not Logged / Unspecified";
+      const athleteHeightDesc = userH ? `${userH} cm` : "Not Logged / Unspecified";
+
+      const minuteTimeline = await build1MinuteTelemetryTimeline(targetWorkout.strava_id);
+      const continuumObj = await buildCompactPriorContinuum(targetWorkout);
+
+      let pastThreads = await db.threads.where("strava_id").equals(Number(targetWorkout.strava_id)).toArray();
+
+      let dialogueTurns = [];
+      if (pastThreads.length > 0) {
+        dialogueTurns.push(`${pastThreads[0].role.toUpperCase()}: ${pastThreads[0].message}`);
+        const recentTurns = pastThreads.slice(1).slice(-7);
+        recentTurns.forEach(t => dialogueTurns.push(`${t.role.toUpperCase()}: ${t.message}`));
+      }
+      const dialogueContext = dialogueTurns.join("\n");
+
+      const zoneSummary = formatFullZoneSummary(targetWorkout.zone_seconds);
+
+      let driftStr = "n/a (Interval/play pacing or <30m moving; do not diagnose aerobic drift from intervals)";
+      if (targetWorkout.cardiac_drift_bpm !== null && targetWorkout.cardiac_drift_bpm !== undefined) {
+        const pctDecoup = targetWorkout.cardiac_decoupling_pct !== null && targetWorkout.cardiac_decoupling_pct !== undefined ? `, Decoupling: ${targetWorkout.cardiac_decoupling_pct > 0 ? '+' : ''}${targetWorkout.cardiac_decoupling_pct}%` : '';
+        driftStr = `${targetWorkout.cardiac_drift_bpm > 0 ? '+' : ''}${targetWorkout.cardiac_drift_bpm} bpm (HR Drift${pctDecoup} on moving time, skipping first 12m moving warmup)`;
+      }
+
+      const grossAscRate = targetWorkout.moving_sec > 0 ? Math.round(targetWorkout.elevation_gain_m / (targetWorkout.moving_sec / 3600)) : 0;
+      const vamStr = targetWorkout.climbing_vam ? `${targetWorkout.climbing_vam} m/h (Sustained Climb >3% grade)` : `${grossAscRate} m/h (Gross Ascent Rate - No qualifying >3% sustained climb)`;
+
+      return `
+CURRENT SYSTEM DATE: ${todayDateStr}
+You are Mustafa's personal cycling sports scientist.
+ATHLETE STATUS: Height: ${athleteHeightDesc}, Mass at this ride: ${athleteMassDesc}. Logged mass trajectory: [${weightSummary}]. Kron XC150 Mountain Bike. Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
+CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
+OVERARCHING TRAINING OBJECTIVE (ACTIVE PHASE): "${activeGoal}"
+
+ESTIMATED SENSORS & DECOUPLING METHODOLOGY:
+- Power and kJ figures are Strava estimates from speed, elevation, and rider mass, NOT crank/pedal strain-gauge data. Do not treat W as absolute strain data.
+- Decoupling is calculated from Speed-to-HR (km/h per bpm) on moving time, NOT power/HR. On technical or undulating XC mountain bike terrain, elevation changes and trail surface friction will introduce noise into aerodynamic efficiency and decoupling ratios. Account for terrain gradients before diagnosing true cardiovascular drift.
+
+SESSION TELEMETRY & RECOVERY STATUS:
+- Ride: ${targetWorkout.exercise_code}
+- Calendar Date & Time: ${rideDateStr}
+- Recovery Status: ${continuumObj.targetRecoveryGapText}
+- Metrics: ${targetWorkout.distance_km} km | Duration: ${targetWorkout.duration_str} | Avg Speed: ${targetWorkout.avg_speed_kmh} km/h | Avg HR: ${targetWorkout.avg_hr} bpm (Max: ${targetWorkout.max_hr} bpm)
+- Ascent: ${targetWorkout.elevation_gain_m} m | Climbing VAM: ${vamStr} | Est Work: ${targetWorkout.kilojoules} kJ
+- Target Session Intent: ${cleanIntent}
+- Precomputed In-Zone Minutes (Moving Time Across All 5 Zones): ${zoneSummary}
+- Halves Profile: ${targetWorkout.halves_profile || 'N/A'}
+- Intraday Decoupling / Drift: ${driftStr}
+
+IN-RIDE 1-MINUTE TELEMETRY TIMELINE:
+${minuteTimeline}
+
+PRIOR RIDES IN BLOCK (CHRONOLOGICAL WITH RECOVERY GAPS):
+${continuumObj.continuumText || "Baseline session."}
+
+CONVERSATION HISTORY:
+${dialogueContext || "None"}
+
+ATHLETE MESSAGE:
+${athleteMessage}
+
+DIRECTIVES:
+- Clean plain English. NO LaTeX formulas, NO dollar signs.
+- Address timeline specifics (minute intervals) and prior ride comparisons if relevant to athlete query.
+- Factor in the exact calendar date, start time, recovery gap (${continuumObj.targetRecoveryGapText}), and logged weight progression.
+`;
     }
 
     // --------------------------------------------------------
@@ -2299,54 +2665,76 @@
       if (hubBanner) hubBanner.style.display = "flex";
 
       const userW = await getAthleteWeightForDate(targetRide.date);
-      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+      const userH = (await getConfig("athlete_height")) || null;
+      const activeGoal = await getActiveTrainingGoalForDate(targetRide.date);
+      const cleanIntent = getCleanIntentLabel(targetRide);
+      const weightSummary = await getWeightPromptSummary();
+      const athleteMassDesc = userW ? `${userW} kg` : "Not Logged / Unspecified";
+      const athleteHeightDesc = userH ? `${userH} cm` : "Not Logged / Unspecified";
 
       const minuteTimeline = await build1MinuteTelemetryTimeline(targetRide.strava_id);
-      const priorContinuum = await buildCompactPriorContinuum(targetRide.ride_number);
+      const continuumObj = await buildCompactPriorContinuum(targetRide);
 
-      const athleteNotes = (await db.threads.where("ride_number").equals(targetRide.ride_number).toArray())
+      const athleteThreads = await db.threads.where("strava_id").equals(Number(targetRide.strava_id)).toArray();
+      const athleteNotes = athleteThreads
         .filter(t => t.role === "athlete")
         .map(t => t.message)
         .join(" | ");
 
-      let intentContext = "INTENDED GOAL: None recorded (Routine log).";
-      if (targetRide.intent_type === 'PLAY') {
-        intentContext = "INTENDED GOAL: Play Ride / Commute (Free-form, non-structured session). Do NOT penalize for zone variability or lack of interval discipline.";
-      } else if (targetRide.intent_type !== 'PLAY' && targetRide.intent_target && targetRide.intent_type !== 'NONE') {
-        try {
-          const it = JSON.parse(targetRide.intent_target);
-          intentContext = `INTENDED GOAL: Structured Training Session.\n- Target Primary Zone: ${it.target_zone}\n- Execution Format: ${it.format}${it.format === 'INTERVAL' ? ` (Switching: ${it.interval_zones}, Pattern: ${it.interval_freq})` : ''}\nEvaluate how well actual telemetry executed this goal.`;
-        } catch(e) {}
+      const formattedRideDate = formatFullDateWithDay(targetRide.date);
+      const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
+
+      const zoneSummary = formatFullZoneSummary(targetRide.zone_seconds);
+
+      let driftStr = "n/a (Interval/play pacing or <30m moving; do not diagnose aerobic drift from intervals)";
+      if (targetRide.cardiac_drift_bpm !== null && targetRide.cardiac_drift_bpm !== undefined) {
+        const pctDecoup = targetRide.cardiac_decoupling_pct !== null && targetRide.cardiac_decoupling_pct !== undefined ? `, Decoupling: ${targetRide.cardiac_decoupling_pct > 0 ? '+' : ''}${targetRide.cardiac_decoupling_pct}%` : '';
+        driftStr = `${targetRide.cardiac_drift_bpm > 0 ? '+' : ''}${targetRide.cardiac_drift_bpm} bpm (HR Drift${pctDecoup} on moving time, skipping first 12m moving warmup)`;
       }
 
+      const grossAscRate = targetRide.moving_sec > 0 ? Math.round(targetRide.elevation_gain_m / (targetRide.moving_sec / 3600)) : 0;
+      const vamStr = targetRide.climbing_vam ? `${targetRide.climbing_vam} m/h (Sustained Climb >3% grade)` : `${grossAscRate} m/h (Gross Ascent Rate - No qualifying >3% sustained climb)`;
+
       const prompt = `
-You are a cycling physiologist coaching Mustafa (${userH} cm, ${userW} kg at time of ride, XC Mountain Bike). Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
+CURRENT SYSTEM DATE: ${todayDateStr}
+You are a cycling physiologist coaching Mustafa (Height: ${athleteHeightDesc}, Mass at this ride: ${athleteMassDesc}, Kron XC150 Mountain Bike). Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
 CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
+OVERARCHING TRAINING OBJECTIVE (ACTIVE PHASE): "${activeGoal}"
+ATHLETE MASS PROGRESSION: Logged mass trajectory: [${weightSummary}]. Speed shifts must be contextualized with body mass changes rather than assuming sudden VO2 gains alone.
 
-CRITICAL SENSOR NOTICE:
-Power figures are algorithmic calculations from GPS speed and elevation, NOT direct crank strain-gauge data. Prioritize heart rate response, cardiac drift, terrain gradient, and sustained speed.
+CRITICAL SENSOR & TERRAIN NOTICE:
+- Power figures are algorithmic calculations from GPS speed and elevation, NOT direct crank strain-gauge data. Prioritize heart rate response, terrain gradient, and sustained speed.
+- Aerobic decoupling uses Speed-to-HR on moving time. Because this is an XC mountain bike on variable terrain, surface friction and undulating gradient shifts introduce noise. Treat decoupling with appropriate nuance.
 
-ATHLETE'S PRE-RIDE OBJECTIVE:
-${intentContext}
+RECOVERY GAP STATUS:
+${continuumObj.targetRecoveryGapText}
+
+ATHLETE'S SESSION OBJECTIVE:
+${cleanIntent}
 
 WORKOUT UNDER EVALUATION:
-- Ride: ${targetRide.exercise_code}
+- Session: ${targetRide.exercise_code}
+- Exact Calendar Date & Time: ${formattedRideDate}
 - Distance: ${targetRide.distance_km} km | Duration: ${targetRide.duration_str} | Speed: Avg ${targetRide.avg_speed_kmh} km/h, Max ${targetRide.max_speed_kmh} km/h
 - Heart Rate: Avg ${targetRide.avg_hr} bpm, Peak ${targetRide.max_hr} bpm
-- Ascent: ${targetRide.elevation_gain_m} m | Mass: ${userW} kg
+- Ascent: ${targetRide.elevation_gain_m} m | Climbing VAM: ${vamStr} | Work: ${targetRide.kilojoules} kJ (Estimated)
+- Precomputed Sensor In-Zone Minutes (Moving Only Across All 5 Zones): ${zoneSummary}
+- Intraday Drift / Decoupling: ${driftStr}
+- Biomechanical Halves Profile: ${targetRide.halves_profile || 'N/A'}
 
 IN-RIDE 1-MINUTE TELEMETRY TIMELINE:
 ${minuteTimeline}
 
-PRIOR RIDES IN THIS SERIES:
-${priorContinuum || "First baseline ride recorded."}
+PRIOR RIDES IN THIS SERIES (CHRONOLOGICAL WITH CALENDAR DATES & RECOVERY GAPS):
+${continuumObj.continuumText || "First baseline ride recorded."}
 
 ATHLETE SENSATIONS/NOTES:
 ${athleteNotes || "None recorded."}
 
 DIRECTIVES:
-- Compare actual heart rate execution against the athlete's intended goal.
-- Analyze intraday cardiac drift (late-ride decoupling on steady efforts).
+- Explicitly factor in the calendar date, start time, and the exact recovery gap (${continuumObj.targetRecoveryGapText}).
+- Evaluate execution strictly against the athlete's intended session objective and overarching goal phase.
+- Use the provided precomputed in-zone minutes and steady drift. If drift is n/a due to interval training, analyze interval recovery repeatability instead of aerobic drift.
 - NO formula derivations. NO ASCII tables or pipe borders. NO LaTeX or dollar signs.
 `;
 
@@ -2356,12 +2744,19 @@ DIRECTIVES:
       if (hubBanner) hubBanner.style.display = "none";
 
       if (reply) {
-        await db.threads.where({ ride_number: targetRide.ride_number, role: 'coach' }).delete();
-        await db.threads.add({ ride_number: targetRide.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
+        await db.threads.where("strava_id").equals(Number(targetRide.strava_id)).and(t => t.role === 'coach').delete();
+
+        await db.threads.add({ 
+          strava_id: Number(targetRide.strava_id), 
+          ride_number: targetRide.ride_number, 
+          role: 'coach', 
+          message: reply, 
+          created_at: new Date().toISOString() 
+        });
         await db.workouts.update(targetRide.id, { debrief_stale: false });
         targetRide.debrief_stale = false;
         
-        if (currentWorkout && currentWorkout.ride_number === targetRide.ride_number) {
+        if (currentWorkout && Number(currentWorkout.strava_id) === Number(targetRide.strava_id)) {
           document.getElementById("sessionActionBox").innerHTML = "";
           const badge = document.getElementById("det_status_badge");
           if (badge) badge.innerHTML = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
@@ -2369,7 +2764,9 @@ DIRECTIVES:
         }
 
         const hubAct = document.getElementById("hubActionBox");
-        if (hubAct && String(activeChatStreamKey) === String(targetRide.ride_number)) hubAct.innerHTML = "";
+        if (hubAct && Number(activeChatStreamKey) === Number(targetRide.strava_id)) {
+          hubAct.innerHTML = "";
+        }
         
         if (document.getElementById("chatsThreadView").style.display === "block") {
           renderHubChat();
@@ -2379,7 +2776,7 @@ DIRECTIVES:
           if (b) {
             b.disabled = false;
             b.style.opacity = "1";
-            b.textContent = `⚡ Analyze Ride ${targetRide.ride_number} with AI Coach`;
+            b.textContent = `⚡ Analyze ${targetRide.exercise_code} with AI Coach`;
           }
         });
       }
@@ -2400,6 +2797,7 @@ DIRECTIVES:
       lastPendingRidePayload = {
         text: text,
         image_b64: imgB64,
+        strava_id: Number(currentWorkout.strava_id),
         ride_number: currentWorkout.ride_number
       };
 
@@ -2418,50 +2816,17 @@ DIRECTIVES:
 
       document.getElementById("sessionLoadingBanner").style.display = "flex";
 
-      const targetWorkout = await db.workouts.where("ride_number").equals(payload.ride_number).first();
+      const targetWorkout = await db.workouts.where("strava_id").equals(Number(payload.strava_id)).first();
       const userW = await getAthleteWeightForDate(targetWorkout ? targetWorkout.date : null);
-      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+      const userH = (await getConfig("athlete_height")) || null;
 
-      let intentStr = "None recorded";
-      if (targetWorkout) {
-        if (targetWorkout.intent_type === 'PLAY') intentStr = "Play Ride / Commute";
-        else if (targetWorkout.intent_target && targetWorkout.intent_type !== 'NONE') {
-          try {
-            const it = JSON.parse(targetWorkout.intent_target);
-            intentStr = `${it.target_zone} (${it.format || 'Steady'})`;
-          } catch(e) {}
-        }
-      }
-
-      const pastThreads = await db.threads.where("ride_number").equals(payload.ride_number).toArray();
-      let dialogueTurns = [];
-      if (pastThreads.length > 0) {
-        dialogueTurns.push(`${pastThreads[0].role.toUpperCase()}: ${pastThreads[0].message}`);
-        const recentTurns = pastThreads.slice(1).slice(-7);
-        recentTurns.forEach(t => dialogueTurns.push(`${t.role.toUpperCase()}: ${t.message}`));
-      }
-      const dialogueContext = dialogueTurns.join("\n");
-
-      const prompt = `
-You are Mustafa's personal cycling coach.
-ATHLETE: ${userH} cm, ${userW} kg at time of this ride, XC Mountain Bike.
-WORKOUT: Ride ${payload.ride_number} (${targetWorkout ? targetWorkout.distance_km + 'km, ' + targetWorkout.avg_speed_kmh + 'km/h, ' + targetWorkout.avg_hr + 'bpm' : ''}).
-INTENDED TARGET: ${intentStr}
-CONVERSATION HISTORY (ANCHORED WITH INITIAL DEBRIEF):
-${dialogueContext}
-
-CURRENT ATHLETE MESSAGE:
-${payload.text}
-${payload.image_b64 ? "(Athlete attached a screenshot. Examine visual curves directly.)" : ""}
-
-DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete directly.
-`;
-
+      const prompt = await buildRideChatPrompt(targetWorkout, payload.text, userW, userH);
       const aiResponse = await callGeminiAPI(key, prompt, payload.image_b64);
       document.getElementById("sessionLoadingBanner").style.display = "none";
 
       if (aiResponse) {
         await db.threads.add({ 
+          strava_id: Number(payload.strava_id),
           ride_number: payload.ride_number, 
           role: 'athlete', 
           message: payload.text, 
@@ -2469,6 +2834,7 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete direc
           created_at: new Date().toISOString() 
         });
         await db.threads.add({ 
+          strava_id: Number(payload.strava_id),
           ride_number: payload.ride_number, 
           role: 'coach', 
           message: aiResponse, 
@@ -2509,7 +2875,7 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete direc
 
     async function renderGlobalGraphs() {
       setupGlobalMetricPills();
-      let workouts = await db.workouts.orderBy('ride_number').toArray();
+      let workouts = await db.workouts.orderBy('date').toArray();
 
       const chartDiv = document.getElementById("plotlyGlobalChart");
       if (workouts.length < 2) {
@@ -2556,7 +2922,7 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete direc
         "Work (kJ)": { 
           y: workouts.map(w => w.kilojoules ? Math.min(100, Math.round((w.kilojoules / peakWork) * 100)) : null), 
           color: "#10b981",
-          text: workouts.map(w => `${w.kilojoules || '--'} kJ`)
+          text: workouts.map(w => `${w.kilojoules || '--'} kJ (Est)`)
         }
       };
 
@@ -2573,9 +2939,6 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete direc
           line: { color: cfg.color, width: 2.5 }
         });
       }
-
-      const totalDist = workouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1);
-      const totalAsc = workouts.reduce((a, b) => a + b.elevation_gain_m, 0);
 
       const dynamicWidth = Math.max(window.innerWidth - 24, workouts.length * 55);
 
@@ -2600,7 +2963,8 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete direc
         const idx = pt.pointIndex;
         const w = workouts[idx];
         if (w) {
-          document.getElementById("global_banner_sub").textContent = `${w.exercise_code}: ${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_hr || '--'} bpm | ${w.elevation_gain_m} m`;
+          const wDate = formatFullDateWithDay(w.date);
+          document.getElementById("global_banner_sub").textContent = `${w.exercise_code} [${wDate}]: ${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_hr || '--'} bpm | ${w.elevation_gain_m} m`;
         }
       });
 
@@ -2633,18 +2997,42 @@ DIRECTIVES: Clean plain English. NO LaTeX or dollar signs. Address athlete direc
       const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Enter Gemini key in Settings."); return; }
 
-      let workouts = await db.workouts.orderBy('ride_number').toArray();
-      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
-      const summaryLogs = workouts.map(w => `${w.exercise_code}: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m`).join('\n');
+      let workouts = await db.workouts.orderBy('date').toArray();
+      const userH = (await getConfig("athlete_height")) || null;
+      const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
+      const activeGoal = await getActiveTrainingGoalForDate(formatLocalDate(new Date()));
+      const weightSummary = await getWeightPromptSummary();
+      const athleteHeightDesc = userH ? `${userH} cm` : "Not Logged / Unspecified";
+
+      let summaryLogs = [];
+      for (const w of workouts) {
+        const wMass = await getAthleteWeightForDate(w.date);
+        const wMassDesc = wMass ? `${wMass}kg` : "Unspecified";
+        const wIntent = getCleanIntentLabel(w);
+        const zMins = formatFullZoneSummary(w.zone_seconds);
+        const drift = w.cardiac_drift_bpm !== null ? `${w.cardiac_drift_bpm}bpm drift` : 'n/a drift';
+        const grossAscRate = w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
+        const vam = w.climbing_vam ? `${w.climbing_vam}m/h VAM(>3%)` : `${grossAscRate}m/h grossVAM`;
+
+        const athleteMsg = await db.threads.where("strava_id").equals(Number(w.strava_id)).and(t => t.role === 'athlete').first();
+        const noteStr = athleteMsg ? ` | Note: "${athleteMsg.message.slice(0,35)}"` : '';
+
+        summaryLogs.push(`${w.exercise_code} [${formatFullDateWithDay(w.date)} | ${wMassDesc} | ${wIntent} | Dur: ${w.duration_str}]: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m, ${vam}, ${drift}, [${zMins}]${noteStr}`);
+      }
 
       const prompt = `
-You are an executive sports scientist reviewing athlete Mustafa (${userH} cm, XC Mountain Bike).
+CURRENT SYSTEM DATE: ${todayDateStr}
+You are an executive sports scientist reviewing athlete Mustafa (Height: ${athleteHeightDesc}, XC Mountain Bike).
+ACTIVE TRAINING GOAL PHASE: "${activeGoal}"
+ATHLETE MASS DYNAMICS: Logged mass trajectory: [${weightSummary}]. Power and work are Strava estimates.
+
+WORKOUT LOG (WITH EXACT DATES, START TIMES, INTENT, ALL 5 ZONE MINS, VAM, AND DRIFT):
+${summaryLogs.join('\n')}
+
+ANALYTICAL DIRECTIVE:
 Analyze macro progression trends across: ${globalSelectedMetrics.join(', ')}.
-
-WORKOUT LOG:
-${summaryLogs}
-
-RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (km/h, bpm). Focus strictly on comparative shift across the season.
+Address whether speed improvements coincide with mass reduction rather than cardiac efficiency alone. Note terrain friction and elevation changes for an XC mountain bike.
+RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (km/h, bpm).
 `;
       document.getElementById("graphLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt, null);
@@ -2672,8 +3060,10 @@ RULES: NO LaTeX. NO math formulas. Use clean conversational English with units (
         if (key) {
           const pastThreads = await db.graph_threads.where("metric_key").equals(metricKey).toArray();
           const dialogueContext = pastThreads.slice(-8).map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
+          const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
 
           const prompt = `
+CURRENT SYSTEM DATE: ${todayDateStr}
 You are Mustafa's sports scientist discussing macro progression (${globalSelectedMetrics.join(', ')}).
 CONVERSATION:
 ${dialogueContext}
@@ -2696,7 +3086,7 @@ RULES: Clean plain English. NO LaTeX formulas.
     // COMPARE LAB
     // --------------------------------------------------------
     async function setupComparison() {
-      const workouts = await db.workouts.orderBy('ride_number').reverse().toArray();
+      const workouts = await db.workouts.orderBy('date').reverse().toArray();
       const s1 = document.getElementById("comp_s1");
       const s2 = document.getElementById("comp_s2");
       const s3 = document.getElementById("comp_s3");
@@ -2708,7 +3098,7 @@ RULES: Clean plain English. NO LaTeX formulas.
         s3.innerHTML = "";
         return;
       }
-      const opts = workouts.map(w => `<option value="${w.id}">${escapeHtml(w.exercise_code.split('-')[0].trim())} (${w.distance_km} km)</option>`).join('');
+      const opts = workouts.map(w => `<option value="${w.id}">${escapeHtml(w.exercise_code.split('-')[0].trim())} (${w.date.slice(5,16)} | ${w.distance_km} km)</option>`).join('');
       s1.innerHTML = opts;
       s2.innerHTML = opts;
       s3.innerHTML = `<option value="">(None - 1 to 1)</option>` + opts;
@@ -2717,9 +3107,9 @@ RULES: Clean plain English. NO LaTeX formulas.
     }
 
     async function renderComparison() {
-      const val1 = document.getElementById("comp_s1").value;
-      const val2 = document.getElementById("comp_s2").value;
-      const val3 = document.getElementById("comp_s3").value;
+      const val1 = document.getElementById("comp_s1")?.value;
+      const val2 = document.getElementById("comp_s2")?.value;
+      const val3 = document.getElementById("comp_s3")?.value;
 
       if (!val1 || !val2) return;
 
@@ -2732,22 +3122,19 @@ RULES: Clean plain English. NO LaTeX formulas.
       const w3 = id3 ? await db.workouts.get(id3) : null;
       if (!w1 || !w2) return;
 
-      const getVAM = w => w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
+      const m1 = await getAthleteWeightForDate(w1.date);
+      const m2 = await getAthleteWeightForDate(w2.date);
+      const m3 = w3 ? await getAthleteWeightForDate(w3.date) : null;
 
-      const getIntentLabel = w => {
-        if (w.intent_type === 'PLAY') return 'Play Ride';
-        if (w.intent_type !== 'PLAY' && w.intent_target && w.intent_type !== 'NONE') {
-          try {
-            const it = JSON.parse(w.intent_target);
-            const zTag = parseZoneTag(it.target_zone);
-            return `${zTag || 'Train'} (${it.format || 'Steady'})`;
-          } catch(e) {}
-        }
-        return 'Routine';
+      const getVAMDisplay = w => {
+        if (!w) return '--';
+        if (w.climbing_vam) return `${w.climbing_vam} m/h (Climb >3%)`;
+        const gross = w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
+        return gross > 0 ? `${gross} m/h (Gross Ascent)` : '--';
       };
 
       const diffStr = (v2, v1, unit = '') => {
-        if (v1 > 0 && v2 > 0) {
+        if (v1 !== null && v2 !== null && !isNaN(v1) && !isNaN(v2)) {
           const diff = +(v2 - v1).toFixed(1);
           return `<span class="${diff >= 0 ? 'delta-pos' : 'delta-neg'}">${diff >= 0 ? '+' : ''}${diff}${unit}</span>`;
         }
@@ -2755,7 +3142,9 @@ RULES: Clean plain English. NO LaTeX formulas.
       };
 
       const metrics = [
-        { name: "Target Intent", v1: getIntentLabel(w1), v2: getIntentLabel(w2), dHtml: '--', v3: w3 ? getIntentLabel(w3) : null },
+        { name: "Date & Start Time", v1: formatFullDateWithDay(w1.date), v2: formatFullDateWithDay(w2.date), dHtml: '--', v3: w3 ? formatFullDateWithDay(w3.date) : null },
+        { name: "Athlete Weight", v1: m1 ? `${m1} kg` : "Not Set", v2: m2 ? `${m2} kg` : "Not Set", dHtml: (m1 && m2) ? diffStr(m2, m1, ' kg') : '--', v3: m3 ? `${m3} kg` : (w3 ? "Not Set" : null) },
+        { name: "Target Intent", v1: getCleanIntentLabel(w1), v2: getCleanIntentLabel(w2), dHtml: '--', v3: w3 ? getCleanIntentLabel(w3) : null },
         { name: "Distance", v1: `${w1.distance_km} km`, v2: `${w2.distance_km} km`, dHtml: diffStr(w2.distance_km, w1.distance_km, ' km'), v3: w3 ? `${w3.distance_km} km` : null },
         { name: "Duration", v1: w1.duration_str, v2: w2.duration_str, dHtml: diffStr(Math.round(w2.moving_sec/60), Math.round(w1.moving_sec/60), ' min'), v3: w3 ? w3.duration_str : null },
         { name: "Average Speed", v1: `${w1.avg_speed_kmh} km/h`, v2: `${w2.avg_speed_kmh} km/h`, dHtml: diffStr(w2.avg_speed_kmh, w1.avg_speed_kmh, ' km/h'), v3: w3 ? `${w3.avg_speed_kmh} km/h` : null },
@@ -2763,8 +3152,8 @@ RULES: Clean plain English. NO LaTeX formulas.
         { name: "Average HR", v1: w1.avg_hr ? `${w1.avg_hr} bpm` : '--', v2: w2.avg_hr ? `${w2.avg_hr} bpm` : '--', dHtml: (w1.avg_hr > 0 && w2.avg_hr > 0) ? `<span class="${(w2.avg_hr - w1.avg_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.avg_hr - w1.avg_hr) >= 0 ? '+' : ''}${w2.avg_hr - w1.avg_hr} bpm</span>` : '--', v3: w3 && w3.avg_hr ? `${w3.avg_hr} bpm` : '--' },
         { name: "Peak HR", v1: w1.max_hr ? `${w1.max_hr} bpm` : '--', v2: w2.max_hr ? `${w2.max_hr} bpm` : '--', dHtml: (w1.max_hr > 0 && w2.max_hr > 0) ? `<span class="${(w2.max_hr - w1.max_hr) <= 0 ? 'delta-pos' : 'delta-neg'}">${(w2.max_hr - w1.max_hr) >= 0 ? '+' : ''}${w2.max_hr - w1.max_hr} bpm</span>` : '--', v3: w3 && w3.max_hr ? `${w3.max_hr} bpm` : '--' },
         { name: "Ascent Climbed", v1: `${w1.elevation_gain_m} m`, v2: `${w2.elevation_gain_m} m`, dHtml: diffStr(w2.elevation_gain_m, w1.elevation_gain_m, ' m'), v3: w3 ? `${w3.elevation_gain_m} m` : null },
-        { name: "Climbing VAM", v1: `${getVAM(w1)} m/h`, v2: `${getVAM(w2)} m/h`, dHtml: diffStr(getVAM(w2), getVAM(w1), ' m/h'), v3: w3 ? `${getVAM(w3)} m/h` : null },
-        { name: "Work Done", v1: `${w1.kilojoules} kJ`, v2: `${w2.kilojoules} kJ`, dHtml: diffStr(w2.kilojoules, w1.kilojoules, ' kJ'), v3: w3 ? `${w3.kilojoules} kJ` : null }
+        { name: "Climbing VAM", v1: getVAMDisplay(w1), v2: getVAMDisplay(w2), dHtml: '--', v3: w3 ? getVAMDisplay(w3) : null },
+        { name: "Est. Work Done", v1: `${w1.kilojoules} kJ`, v2: `${w2.kilojoules} kJ`, dHtml: diffStr(w2.kilojoules, w1.kilojoules, ' kJ'), v3: w3 ? `${w3.kilojoules} kJ` : null }
       ];
 
       let head = `<tr><th>Metric</th><th>${escapeHtml(w1.exercise_code.split('-')[0].trim())}</th><th>${escapeHtml(w2.exercise_code.split('-')[0].trim())}</th><th>Delta (2 vs 1)</th>`;
@@ -2815,14 +3204,33 @@ RULES: Clean plain English. NO LaTeX formulas.
       const sessions = [w1, w2];
       if (w3) sessions.push(w3);
 
-      const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+      const userH = (await getConfig("athlete_height")) || null;
+      const athleteHeightDesc = userH ? `${userH} cm` : "Not Logged / Unspecified";
+      const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
+
+      let sessionLines = [];
+      for (const s of sessions) {
+        const sMass = await getAthleteWeightForDate(s.date);
+        const sMassDesc = sMass ? `${sMass}kg` : "Unspecified";
+        const sIntent = getCleanIntentLabel(s);
+        const zMins = formatFullZoneSummary(s.zone_seconds);
+        const drift = s.cardiac_drift_bpm !== null ? `${s.cardiac_drift_bpm}bpm drift` : 'n/a drift';
+        const grossAscRate = s.moving_sec > 0 ? Math.round(s.elevation_gain_m / (s.moving_sec / 3600)) : 0;
+        const vam = s.climbing_vam ? `${s.climbing_vam}m/h VAM(>3%)` : `${grossAscRate}m/h grossVAM`;
+
+        const athleteMsg = await db.threads.where("strava_id").equals(Number(s.strava_id)).and(t => t.role === 'athlete').first();
+        const note = athleteMsg ? ` | Notes: "${athleteMsg.message}"` : '';
+
+        sessionLines.push(`${s.exercise_code} [Date: ${formatFullDateWithDay(s.date)} | Mass: ${sMassDesc} | Intent: ${sIntent} | Duration: ${s.duration_str}]: ${s.distance_km} km | Speed: ${s.avg_speed_kmh} km/h | HR: ${s.avg_hr} bpm | Ascent: ${s.elevation_gain_m} m | ${vam} | ${drift} | [${zMins}]${note}`);
+      }
 
       const prompt = `
-You are an expert sports physiologist analyzing athlete Mustafa (${userH} cm).
-Compare these rides considering their intended objectives:
-${sessions.map(s => `${s.exercise_code} [Intent: ${s.intent_type === 'PLAY' ? 'Play' : (s.intent_target || 'None')}]: ${s.distance_km} km | Speed: ${s.avg_speed_kmh} km/h | HR: ${s.avg_hr} bpm | Ascent: ${s.elevation_gain_m} m`).join('\n')}
+CURRENT SYSTEM DATE: ${todayDateStr}
+You are an expert sports physiologist analyzing athlete Mustafa (Height: ${athleteHeightDesc}).
+Compare these rides considering their exact calendar dates, start times, duration, mass differences, intended training targets, climbing VAM (>3% grade) vs gross ascent rates, cardiac drift, and moving zone minutes across all 5 zones:
+${sessionLines.join('\n')}
 
-RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiological responses.
+RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiological responses. Specifically analyze if speed gains are influenced by changing body mass and terrain gradients.
 `;
       document.getElementById("compareLoadingBanner").style.display = "flex";
       const reply = await callGeminiAPI(key, prompt, null);
@@ -2843,7 +3251,7 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
       document.getElementById("chatsThreadView").style.display = "none";
 
       const container = document.getElementById("chatsListContainer");
-      const workouts = await db.workouts.orderBy('ride_number').toArray();
+      const workouts = await db.workouts.orderBy('date').reverse().toArray();
       const lastMaster = await db.master_chat.reverse().first();
 
       let html = `
@@ -2852,7 +3260,7 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
           <div class="chat-row-body">
             <div class="chat-row-top">
               <span class="chat-contact-name">Master Season AI Coach</span>
-              <span class="chat-timestamp">${lastMaster ? lastMaster.created_at.slice(5, 10) : 'Active'}</span>
+              <span class="chat-timestamp">${lastMaster ? lastMaster.created_at.slice(5, 16) : 'Active'}</span>
             </div>
             <div class="chat-snippet">${lastMaster ? escapeHtml(lastMaster.message.slice(0, 60)) : 'Full season history & long-term macro analysis...'}</div>
           </div>
@@ -2860,22 +3268,23 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
       `;
 
       for (const w of workouts) {
-        const coachMsg = await db.threads.where({ ride_number: w.ride_number, role: 'coach' }).first();
-        const lastMsg = await db.threads.where("ride_number").equals(w.ride_number).reverse().first();
+        const numericStravaId = Number(w.strava_id);
+        const coachMsg = await db.threads.where("strava_id").equals(numericStravaId).and(t => t.role === 'coach').first();
+        const lastMsg = await db.threads.where("strava_id").equals(numericStravaId).reverse().first();
 
         let badgeHtml = `<span class="status-badge badge-unreviewed">🟡 New</span>`;
         if (coachMsg && w.debrief_stale) badgeHtml = `<span class="status-badge badge-stale">🟠 Update</span>`;
         else if (coachMsg) badgeHtml = `<span class="status-badge badge-ok">🟢 Up to Date</span>`;
 
         html += `
-          <div class="chat-row" onclick="openChatThread(${w.ride_number})">
+          <div class="chat-row" onclick="openChatThread(${numericStravaId})">
             <div class="chat-avatar">🚴</div>
             <div class="chat-row-body">
               <div class="chat-row-top">
                 <span class="chat-contact-name">Ride ${w.ride_number}</span>
                 <div style="display:flex; align-items:center; gap:6px;">
                   ${badgeHtml}
-                  <span class="chat-timestamp">${w.date.slice(5, 10)}</span>
+                  <span class="chat-timestamp">${w.date.slice(5, 16)}</span>
                 </div>
               </div>
               <div class="chat-snippet">${lastMsg ? escapeHtml(lastMsg.message.slice(0, 55)) : `${w.distance_km} km | ${w.avg_speed_kmh} km/h | ${w.avg_hr || '--'} bpm`}</div>
@@ -2888,33 +3297,36 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
     }
 
     async function openChatThread(streamKey) {
-      activeChatStreamKey = streamKey;
+      const sId = (streamKey === 'MASTER') ? 'MASTER' : Number(streamKey);
+      activeChatStreamKey = sId;
       document.getElementById("chatsListView").style.display = "none";
       document.getElementById("chatsThreadView").style.display = "block";
-      document.getElementById("activeChatHeaderTitle").textContent = streamKey === 'MASTER' ? 'Master Season Coach' : `Ride ${streamKey}`;
 
       const hubActionBox = document.getElementById("hubActionBox");
-      if (streamKey !== 'MASTER') {
-        const rNum = Number(streamKey);
-        const w = await db.workouts.where("ride_number").equals(rNum).first();
-        const existingCoach = await db.threads.where({ ride_number: rNum, role: 'coach' }).first();
+      if (sId === 'MASTER') {
+        document.getElementById("activeChatHeaderTitle").textContent = 'Master Season Coach';
+        hubActionBox.innerHTML = "";
+      } else {
+        const w = await db.workouts.where("strava_id").equals(sId).first();
+        document.getElementById("activeChatHeaderTitle").textContent = w ? w.exercise_code : `Ride ${sId}`;
 
-        if (!existingCoach) {
-          hubActionBox.innerHTML = `<button class="btn btn-primary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">⚡ Generate AI Debrief for Ride ${rNum}</button>`;
+        const existingCoach = w ? await db.threads.where("strava_id").equals(sId).and(t => t.role === 'coach').first() : null;
+
+        if (w && !existingCoach) {
+          hubActionBox.innerHTML = `<button class="btn btn-primary btn-small" style="width:100%;" onclick="runSingleRideDebriefByStravaId(${sId})">⚡ Generate AI Debrief for ${w.exercise_code}</button>`;
         } else if (w && w.debrief_stale) {
-          hubActionBox.innerHTML = `<button class="btn btn-secondary btn-small" style="width:100%;" onclick="runSingleRideDebriefByNumber(${rNum})">🔄 Re-Evaluate Ride ${rNum} (Updated Goal)</button>`;
+          hubActionBox.innerHTML = `<button class="btn btn-secondary btn-small" style="width:100%;" onclick="runSingleRideDebriefByStravaId(${sId})">🔄 Re-Evaluate ${w.exercise_code} (Updated Goal)</button>`;
         } else {
           hubActionBox.innerHTML = "";
         }
-      } else {
-        hubActionBox.innerHTML = "";
       }
 
       renderHubChat();
     }
 
-    async function runSingleRideDebriefByNumber(num) {
-      const w = await db.workouts.where("ride_number").equals(num).first();
+    async function runSingleRideDebriefByStravaId(sId) {
+      const numericId = Number(sId);
+      const w = await db.workouts.where("strava_id").equals(numericId).first();
       if (w) await runSingleRideDebrief(w);
     }
 
@@ -2929,12 +3341,17 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
 
       if (activeChatStreamKey === "MASTER") {
         const messages = await db.master_chat.toArray();
+        const athleteW = await getLatestWeight();
+        const weightTag = athleteW ? `${athleteW} kg` : "weight not logged";
+        const athleteH = await getConfig("athlete_height");
+        const heightTag = athleteH ? `${athleteH} cm` : "height not logged";
+
         let html = "";
         if (messages.length === 0) {
           html = `
             <div class="chat-bubble chat-coach">
               <div class="chat-sender">Master AI Coach</div>
-              Hello Mustafa. I retain your full season trajectory (${await getLatestWeight()} kg active weight, ${(await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm} cm, XC MTB). Ask me anything about physiological adaptations, training load accumulation, or attach charts.
+              Hello Mustafa. I retain your full season trajectory (${weightTag}, ${heightTag}, XC MTB). Ask me anything about physiological adaptations, training load accumulation, or attach charts.
             </div>
           `;
         } else {
@@ -2957,11 +3374,14 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
         }
         container.innerHTML = html;
       } else {
-        const rNum = Number(activeChatStreamKey);
-        const messages = await db.threads.where("ride_number").equals(rNum).toArray();
+        const sId = Number(activeChatStreamKey);
+        const w = await db.workouts.where("strava_id").equals(sId).first();
+        
+        let messages = await db.threads.where("strava_id").equals(sId).toArray();
+
         let html = "";
         if (messages.length === 0) {
-          html = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for Ride ${activeChatStreamKey}. Tap the button above to analyze or type below.</div>`;
+          html = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:0.8rem;">No messages for ${w ? w.exercise_code : 'this ride'}. Tap the button above to analyze or type below.</div>`;
         } else {
           html = messages.map(m => `
             <div class="chat-bubble ${m.role === 'coach' ? 'chat-coach' : 'chat-athlete'}">
@@ -2972,7 +3392,7 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
           `).join('');
         }
 
-        if (lastPendingHubPayload && String(lastPendingHubPayload.streamKey) === String(activeChatStreamKey)) {
+        if (lastPendingHubPayload && Number(lastPendingHubPayload.streamKey) === Number(activeChatStreamKey)) {
           html += `
             <div class="retry-card">
               <span>⚠️ Message failed to send.</span>
@@ -2996,7 +3416,7 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
       lastPendingHubPayload = {
         text: text,
         image_b64: imgB64,
-        streamKey: activeChatStreamKey
+        streamKey: activeChatStreamKey === 'MASTER' ? 'MASTER' : Number(activeChatStreamKey)
       };
 
       await executeHubMessageDispatch(lastPendingHubPayload);
@@ -3015,9 +3435,14 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
       document.getElementById("hubLoadingBanner").style.display = "flex";
 
       if (payload.streamKey === "MASTER") {
-        const workouts = await db.workouts.orderBy('ride_number').toArray();
+        const workouts = await db.workouts.orderBy('date').toArray();
         const athleteW = await getLatestWeight();
-        const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+        const userH = (await getConfig("athlete_height")) || null;
+        const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
+        const activeGoal = await getActiveTrainingGoalForDate(formatLocalDate(new Date()));
+        const weightSummary = await getWeightPromptSummary();
+        const athleteMassDesc = athleteW ? `${athleteW} kg` : "Not Logged / Unspecified";
+        const athleteHeightDesc = userH ? `${userH} cm` : "Not Logged / Unspecified";
 
         const pastMessages = await db.master_chat.toArray();
         let timeElapsedContext = "First conversation initiated today.";
@@ -3036,22 +3461,23 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
         let fullSeasonLedgerLines = [];
         let totalZoneSecs = [0, 0, 0, 0, 0];
 
-        for (const w of workouts) {
+        for (let i = 0; i < workouts.length; i++) {
+          const w = workouts[i];
           const rWeight = await getAthleteWeightForDate(w.date);
+          const weightTag = rWeight ? `${rWeight}kg` : "Mass Unspecified";
           const halvesStr = (w.halves_profile) ? `| Halves: ${w.halves_profile}` : '';
-          
-          let intentStr = w.intent_type === 'PLAY' ? '[Play]' : '';
-          if (w.intent_type !== 'PLAY' && w.intent_target && w.intent_type !== 'NONE') {
-            try {
-              const it = JSON.parse(w.intent_target);
-              const zTag = parseZoneTag(it.target_zone);
-              intentStr = `[${zTag || 'Train'}]`;
-            } catch(e) {}
-          }
-          fullSeasonLedgerLines.push(`• R${w.ride_number} (${w.date.slice(5,10)} | ${rWeight}kg ${intentStr}): ${w.distance_km}km | ${w.avg_speed_kmh}km/h | HR: ${w.avg_hr||'--'}bpm | Asc: ${w.elevation_gain_m}m ${halvesStr}`);
+          const intentStr = getCleanIntentLabel(w);
+          const formattedWDate = formatFullDateWithDay(w.date);
+          const zMins = formatFullZoneSummary(w.zone_seconds);
+          const drift = w.cardiac_drift_bpm !== null ? `${w.cardiac_drift_bpm}bpm drift` : 'n/a drift';
+
+          const athleteMsg = await db.threads.where("strava_id").equals(Number(w.strava_id)).and(t => t.role === 'athlete').first();
+          const noteStr = athleteMsg ? ` | Note: "${athleteMsg.message.slice(0,35)}"` : '';
+
+          fullSeasonLedgerLines.push(`• R${w.ride_number} [Date: ${formattedWDate} | ${weightTag} | ${intentStr} | ${drift} | ${zMins}]: ${w.distance_km}km | ${w.avg_speed_kmh}km/h | HR: ${w.avg_hr||'--'}bpm | Asc: ${w.elevation_gain_m}m ${halvesStr}${noteStr}`);
 
           if (w.zone_seconds && Array.isArray(w.zone_seconds)) {
-            for (let i = 0; i < 5; i++) totalZoneSecs[i] += (w.zone_seconds[i] || 0);
+            for (let z = 0; z < 5; z++) totalZoneSecs[z] += (w.zone_seconds[z] || 0);
           }
         }
         const fullSeasonLedger = fullSeasonLedgerLines.join('\n');
@@ -3063,22 +3489,25 @@ RULES: NO LaTeX. NO math formulas. Contrast execution vs intent and physiologica
         const dialogue = pastMessages.slice(-8).map(t => `${t.role.toUpperCase()}: ${t.message}`).join("\n");
 
         const prompt = `
+CURRENT SYSTEM DATE: ${todayDateStr}
 You are Mustafa's head cycling sports director and exercise physiologist.
-ATHLETE BIO: ${userH} cm, ${athleteW} kg active mass, XC Mountain Biking. Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
+ATHLETE BIO: Height: ${athleteHeightDesc}, Active Mass: ${athleteMassDesc}, Kron XC150 Mountain Bike. Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
 CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
+OVERARCHING TRAINING OBJECTIVE (ACTIVE PHASE): "${activeGoal}"
+ATHLETE MASS DYNAMICS: Logged mass trajectory: [${weightSummary}]. All power and work values are Strava algorithmic estimates.
 
 CHRONOLOGICAL CONTEXT & TIME ELAPSED:
 ${timeElapsedContext}
-Rides completed since last conversation: ${ridesSinceLastChat.length ? ridesSinceLastChat.map(r => `Ride ${r.ride_number} (${r.distance_km}km on ${r.date.slice(5,10)})`).join(', ') : 'None.'}
+Rides completed since last conversation: ${ridesSinceLastChat.length ? ridesSinceLastChat.map(r => `Ride ${r.ride_number} (${r.distance_km}km on ${formatFullDateWithDay(r.date)})`).join(', ') : 'None.'}
 
 SEASON ACCUMULATION (${workouts.length} TOTAL RIDES RETAINED):
 - Total Distance: ${totalDist} km
 - Total Vertical Ascent: ${totalAsc} m
-- Total Mechanical Work: ${totalWork} kJ
-- True Time-In-Zone Accumulation (Sensor Time Deltas):
+- Total Estimated Work: ${totalWork} kJ
+- True Moving Time-In-Zone Accumulation (Sensor Time Deltas Across All 5 Zones):
   Z1: ${Math.round(totalZoneSecs[0]/60)}m | Z2: ${Math.round(totalZoneSecs[1]/60)}m | Z3: ${Math.round(totalZoneSecs[2]/60)}m | Z4: ${Math.round(totalZoneSecs[3]/60)}m | Z5: ${Math.round(totalZoneSecs[4]/60)}m
 
-SEASON WORKOUT LEDGER:
+SEASON WORKOUT LEDGER (WITH EXACT DATES, START TIMES, MASS, 5-ZONE BREAKDOWNS, DRIFT, AND ATHLETE NOTES):
 ${fullSeasonLedger}
 
 CONVERSATION HISTORY:
@@ -3090,7 +3519,8 @@ ${payload.image_b64 ? "(Athlete attached a screenshot. Examine visual data direc
 
 DIRECTIVES:
 - Maintain full longitudinal memory of all recorded rides.
-- Factor in whether sessions were 'Play' vs 'Structured Training'.
+- Note the calendar dates, start times, and recovery gaps across sessions.
+- Factor in changing body mass when assessing sustained speed and power.
 - NO formula derivations. NO ASCII tables. NO LaTeX or dollar signs.
 `;
 
@@ -3115,57 +3545,27 @@ DIRECTIVES:
           renderHubChat();
         }
       } else {
-        const rNum = Number(payload.streamKey);
-        const w = await db.workouts.where("ride_number").equals(rNum).first();
-        const userW = await getAthleteWeightForDate(w ? w.date : null);
-        const userH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+        const sId = Number(payload.streamKey);
+        const targetWorkout = await db.workouts.where("strava_id").equals(sId).first();
+        const userW = await getAthleteWeightForDate(targetWorkout ? targetWorkout.date : null);
+        const userH = (await getConfig("athlete_height")) || null;
 
-        let intentStr = "None recorded";
-        if (w) {
-          if (w.intent_type === 'PLAY') intentStr = "Play Ride / Commute";
-          else if (w.intent_target && w.intent_type !== 'NONE') {
-            try {
-              const it = JSON.parse(w.intent_target);
-              intentStr = `${it.target_zone} (${it.format || 'Steady'})`;
-            } catch(e) {}
-          }
-        }
-
-        const pastThreads = await db.threads.where("ride_number").equals(rNum).toArray();
-        let dialogueTurns = [];
-        if (pastThreads.length > 0) {
-          dialogueTurns.push(`${pastThreads[0].role.toUpperCase()}: ${pastThreads[0].message}`);
-          const recentTurns = pastThreads.slice(1).slice(-7);
-          recentTurns.forEach(t => dialogueTurns.push(`${t.role.toUpperCase()}: ${t.message}`));
-        }
-        const dialogue = dialogueTurns.join("\n");
-
-        const prompt = `
-You are Mustafa's personal cycling coach.
-WORKOUT: Ride ${rNum} (${w ? w.distance_km + 'km, ' + w.avg_speed_kmh + 'km/h, ' + userW + 'kg, ' + userH + 'cm' : ''})
-INTENDED TARGET: ${intentStr}
-CONVERSATION HISTORY (ANCHORED WITH INITIAL DEBRIEF):
-${dialogue}
-
-ATHLETE MESSAGE:
-${payload.text}
-${payload.image_b64 ? "(Athlete attached a screenshot. Analyze it directly.)" : ""}
-
-RULES: NO LaTeX. Plain English only.
-`;
+        const prompt = await buildRideChatPrompt(targetWorkout, payload.text, userW, userH);
         const reply = await callGeminiAPI(key, prompt, payload.image_b64);
         document.getElementById("hubLoadingBanner").style.display = "none";
 
         if (reply) {
           await db.threads.add({ 
-            ride_number: rNum, 
+            strava_id: Number(targetWorkout.strava_id),
+            ride_number: targetWorkout.ride_number, 
             role: 'athlete', 
             message: payload.text, 
             image_b64: payload.image_b64, 
             created_at: new Date().toISOString() 
           });
           await db.threads.add({ 
-            ride_number: rNum, 
+            strava_id: Number(targetWorkout.strava_id),
+            ride_number: targetWorkout.ride_number, 
             role: 'coach', 
             message: reply, 
             created_at: new Date().toISOString() 
@@ -3180,7 +3580,7 @@ RULES: NO LaTeX. Plain English only.
     }
 
     // --------------------------------------------------------
-    // REPORTS & PDF ENGINE
+    // REPORTS & PDF ENGINE (PERIOD-OVER-PERIOD COMPARISON)
     // --------------------------------------------------------
     function setReportTimeframe(tf, el) {
       reportTimeframe = tf;
@@ -3189,38 +3589,46 @@ RULES: NO LaTeX. Plain English only.
       renderReports();
     }
 
-    async function getScopedWorkouts() {
+    async function getScopedWorkouts(daysOffset = 0) {
       let workouts = await db.workouts.orderBy('date').toArray();
       if (!workouts.length) return [];
 
-      if (reportTimeframe === 'all') return workouts;
+      if (reportTimeframe === 'all' && daysOffset === 0) return workouts;
+      if (reportTimeframe === 'all' && daysOffset > 0) return [];
 
       const now = new Date();
       let days = 7;
       if (reportTimeframe === '30d') days = 30;
       if (reportTimeframe === '365d') days = 365;
 
-      const cutoff = new Date(now.getTime() - (days * 86400000));
-      return workouts.filter(w => parseSafeDate(w.date).getTime() >= cutoff.getTime());
+      const endCutoff = new Date(now.getTime() - (daysOffset * days * 86400000));
+      const startCutoff = new Date(now.getTime() - ((daysOffset + 1) * days * 86400000));
+
+      return workouts.filter(w => {
+        const t = parseSafeDate(w.date).getTime();
+        return t >= startCutoff.getTime() && t <= endCutoff.getTime();
+      });
     }
 
     async function renderReports() {
       const allWorkouts = await db.workouts.orderBy('date').toArray();
-      const scopedWorkouts = await getScopedWorkouts();
+      const scopedWorkouts = await getScopedWorkouts(0);
       const scopeHeader = document.getElementById("reportScopeDateHeader");
 
       if (allWorkouts.length > 0) {
         const prDist = allWorkouts.reduce((p, c) => (c.distance_km > p.distance_km) ? c : p, allWorkouts[0]);
         const prSpd = allWorkouts.reduce((p, c) => (c.max_speed_kmh > p.max_speed_kmh) ? c : p, allWorkouts[0]);
         const prAsc = allWorkouts.reduce((p, c) => (c.elevation_gain_m > p.elevation_gain_m) ? c : p, allWorkouts[0]);
-        const calcVAM = w => w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
-        const prVAM = allWorkouts.reduce((p, c) => (calcVAM(c) > calcVAM(p)) ? c : p, allWorkouts[0]);
+        
+        const validVamRides = allWorkouts.filter(w => w.climbing_vam && w.climbing_vam > 0);
+        const prVAM = validVamRides.length ? validVamRides.reduce((p, c) => (c.climbing_vam > p.climbing_vam) ? c : p, validVamRides[0]) : null;
+        const vamPrDisplay = prVAM ? `${prVAM.climbing_vam} m/h (>3% grade)` : '--';
 
         document.getElementById("pr_grid").innerHTML = `
           <div class="telemetry-row"><span class="telemetry-name">All-Time Longest</span><span class="telemetry-val">${prDist.distance_km} km</span></div>
           <div class="telemetry-row"><span class="telemetry-name">All-Time Peak Speed</span><span class="telemetry-val">${prSpd.max_speed_kmh} km/h</span></div>
           <div class="telemetry-row"><span class="telemetry-name">All-Time Max Ascent</span><span class="telemetry-val">${prAsc.elevation_gain_m} m</span></div>
-          <div class="telemetry-row"><span class="telemetry-name">All-Time Best VAM</span><span class="telemetry-val">${calcVAM(prVAM)} m/h</span></div>
+          <div class="telemetry-row"><span class="telemetry-name">All-Time Best Climbing VAM</span><span class="telemetry-val">${vamPrDisplay}</span></div>
         `;
       }
 
@@ -3235,7 +3643,8 @@ RULES: NO LaTeX. Plain English only.
 
       const startDate = scopedWorkouts[0].date.split(' ')[0];
       const endDate = scopedWorkouts[scopedWorkouts.length - 1].date.split(' ')[0];
-      scopeHeader.textContent = `Period Range: ${startDate} to ${endDate} (${scopedWorkouts.length} Sessions Analyzed)`;
+      const dateRangeKey = `${startDate}_to_${endDate}`;
+      scopeHeader.textContent = `Period Range: ${formatFullDateWithDay(startDate)} to ${formatFullDateWithDay(endDate)} (${scopedWorkouts.length} Sessions Analyzed)`;
 
       let scopedZoneSecs = [0, 0, 0, 0, 0];
       let validDrifts = [];
@@ -3287,7 +3696,7 @@ RULES: NO LaTeX. Plain English only.
         </div>
         <div class="lab-item">
           <div style="color:#94a3b8; font-size:0.65rem; text-transform:uppercase;">Period Volume / Work</div>
-          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${scopedWorkouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1)} km | ${totWork} kJ</div>
+          <div style="font-size:1.05rem; font-weight:800; color:#38bdf8;">${scopedWorkouts.reduce((a, b) => a + b.distance_km, 0).toFixed(1)} km | ${totWork} kJ (Est)</div>
         </div>
       `;
 
@@ -3305,9 +3714,14 @@ RULES: NO LaTeX. Plain English only.
         `;
       }).join('');
 
+      // Invalidate cache if ride count or date range changed
       const cachedReport = await db.reports.get(1);
       const box = document.getElementById("reportSummaryBox");
-      if (cachedReport && cachedReport.timeframe === reportTimeframe && cachedReport.analysis_text) {
+      if (cachedReport && 
+          cachedReport.timeframe === reportTimeframe && 
+          cachedReport.ride_count === scopedWorkouts.length && 
+          cachedReport.date_range === dateRangeKey &&
+          cachedReport.analysis_text) {
         box.style.display = "block";
         box.innerHTML = `<b>Longitudinal Review (${cachedReport.timeframe.toUpperCase()})</b><br/><br/>` + cleanAiText(cachedReport.analysis_text);
       } else {
@@ -3321,61 +3735,119 @@ RULES: NO LaTeX. Plain English only.
       const key = (await getConfig("gemini_api_key")).trim();
       if (!key) { alert("Enter Gemini key in Profile."); return; }
 
-      const workouts = await getScopedWorkouts();
-      if (!workouts.length) { alert("No workouts in selected timeframe."); return; }
+      const currentWorkouts = await getScopedWorkouts(0);
+      if (!currentWorkouts.length) { alert("No workouts in selected timeframe."); return; }
 
-      const startDate = workouts[0].date.split(' ')[0];
-      const endDate = workouts[workouts.length - 1].date.split(' ')[0];
+      const priorWorkouts = await getScopedWorkouts(1);
+      const todayDateStr = formatFullDateWithDay(formatLocalDate(new Date()));
+      const activeGoal = await getActiveTrainingGoalForDate(formatLocalDate(new Date()));
+      const weightSummary = await getWeightPromptSummary();
+
+      const startDate = currentWorkouts[0].date.split(' ')[0];
+      const endDate = currentWorkouts[currentWorkouts.length - 1].date.split(' ')[0];
+      const dateRangeKey = `${startDate}_to_${endDate}`;
       const athleteW = await getLatestWeight();
-      const athleteH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+      const athleteH = (await getConfig("athlete_height")) || null;
+      const athleteMassDesc = athleteW ? `${athleteW} kg` : "Not Logged / Unspecified";
+      const athleteHeightDesc = athleteH ? `${athleteH} cm` : "Not Logged / Unspecified";
+
+      // Duration-weighted Period-Over-Period Statistics
+      const curDist = currentWorkouts.reduce((a, b) => a + b.distance_km, 0);
+      const curMovingSec = currentWorkouts.reduce((a, b) => a + (b.moving_sec || 0), 0);
+      const curWork = Math.round(currentWorkouts.reduce((a, b) => a + b.kilojoules, 0));
+      const curSpeed = curMovingSec > 0 ? +((curDist / (curMovingSec / 3600))).toFixed(1) : +(currentWorkouts.reduce((a,b)=>a+b.avg_speed_kmh,0)/currentWorkouts.length).toFixed(1);
+
+      let curDurHR = 0, curDurSecHR = 0;
+      currentWorkouts.forEach(w => {
+        if (w.avg_hr > 0 && w.moving_sec > 0) {
+          curDurHR += (w.avg_hr * w.moving_sec);
+          curDurSecHR += w.moving_sec;
+        }
+      });
+      const curMeanHR = curDurSecHR > 0 ? Math.round(curDurHR / curDurSecHR) : '--';
+
+      let popComparisonText = "PRIOR PERIOD COMPARISON: No prior baseline period of equal length recorded.";
+      if (priorWorkouts.length > 0) {
+        const priDist = priorWorkouts.reduce((a, b) => a + b.distance_km, 0);
+        const priMovingSec = priorWorkouts.reduce((a, b) => a + (b.moving_sec || 0), 0);
+        const priWork = Math.round(priorWorkouts.reduce((a, b) => a + b.kilojoules, 0));
+        const priSpeed = priMovingSec > 0 ? +((priDist / (priMovingSec / 3600))).toFixed(1) : +(priorWorkouts.reduce((a,b)=>a+b.avg_speed_kmh,0)/priorWorkouts.length).toFixed(1);
+
+        let priDurHR = 0, priDurSecHR = 0;
+        priorWorkouts.forEach(w => {
+          if (w.avg_hr > 0 && w.moving_sec > 0) {
+            priDurHR += (w.avg_hr * w.moving_sec);
+            priDurSecHR += w.moving_sec;
+          }
+        });
+        const priMeanHR = priDurSecHR > 0 ? Math.round(priDurHR / priDurSecHR) : '--';
+
+        popComparisonText = `
+PERIOD-OVER-PERIOD EMPIRICAL PROGRESSION (Duration-Weighted, Current vs Immediately Preceding Matching Window):
+- Distance Volume: ${curDist.toFixed(1)} km (vs Prior ${priDist.toFixed(1)} km | Delta: ${(curDist - priDist).toFixed(1)} km)
+- Estimated Mechanical Work: ${curWork} kJ (vs Prior ${priWork} kJ | Delta: ${curWork - priWork} kJ)
+- Weighted Average Speed: ${curSpeed} km/h (vs Prior ${priSpeed} km/h | Delta: ${(curSpeed - priSpeed).toFixed(1)} km/h)
+- Weighted Mean Heart Rate: ${curMeanHR} bpm (vs Prior ${priMeanHR} bpm)
+`;
+      }
 
       let scopedZoneSecs = [0, 0, 0, 0, 0];
       let validDrifts = [];
-      workouts.forEach(w => {
+      currentWorkouts.forEach(w => {
         if (w.zone_seconds) {
           for (let i = 0; i < 5; i++) scopedZoneSecs[i] += (w.zone_seconds[i] || 0);
         }
         if (w.cardiac_drift_bpm !== undefined && w.cardiac_drift_bpm !== null) validDrifts.push(w.cardiac_drift_bpm);
       });
       const meanDrift = validDrifts.length ? +(validDrifts.reduce((a,b)=>a+b,0)/validDrifts.length).toFixed(1) : null;
-      const driftText = meanDrift !== null ? `${meanDrift} bpm` : "n/a (no steady rides over 35 min with valid continuous HR)";
+      const driftText = meanDrift !== null ? `${meanDrift} bpm (Steady State decoupling on moving time)` : "n/a (no steady efforts >= 30min moving with valid HR; interval decoupling not diagnosed)";
 
-      const athleteReplies = await db.threads.where("role").equals("athlete").toArray();
-      const qualitativeNotes = athleteReplies.map(r => `- Ride ${r.ride_number}: "${r.message}"`).join("\n");
-      const telemetryTable = workouts.map(w => {
-        let it = w.intent_type === 'PLAY' ? '[Play]' : '';
-        if (w.intent_type !== 'PLAY' && w.intent_target && w.intent_type !== 'NONE') {
-          try {
-            const zTag = parseZoneTag(JSON.parse(w.intent_target).target_zone);
-            it = `[${zTag || 'Train'}]`;
-          } catch(e) {}
-        }
-        return `Ride ${w.ride_number} (${w.date.slice(5,10)} ${it}): ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m`;
-      }).join("\n");
+      const currentStravaIds = currentWorkouts.map(w => Number(w.strava_id));
+      const athleteReplies = (await db.threads.where("role").equals("athlete").toArray())
+        .filter(t => currentStravaIds.includes(Number(t.strava_id)));
+      const qualitativeNotes = athleteReplies.map(r => `- Session: "${r.message}"`).join("\n");
+
+      let telemetryTable = [];
+      for (const w of currentWorkouts) {
+        const wMass = await getAthleteWeightForDate(w.date);
+        const wMassDesc = wMass ? `${wMass}kg` : "Unspecified";
+        const wIntent = getCleanIntentLabel(w);
+        const zMins = formatFullZoneSummary(w.zone_seconds);
+        const drift = w.cardiac_drift_bpm !== null ? `${w.cardiac_drift_bpm}bpm drift` : 'n/a drift';
+        const grossAscRate = w.moving_sec > 0 ? Math.round(w.elevation_gain_m / (w.moving_sec / 3600)) : 0;
+        const vam = w.climbing_vam ? `${w.climbing_vam}m/h VAM(>3%)` : `${grossAscRate}m/h grossVAM`;
+
+        telemetryTable.push(`Ride ${w.ride_number} [${formatFullDateWithDay(w.date)} | ${wMassDesc} | ${wIntent} | Moving: ${w.duration_str}]: ${w.distance_km} km, ${w.avg_speed_kmh} km/h, ${w.avg_hr || '--'} bpm, ${w.elevation_gain_m} m, ${vam}, ${drift}, [${zMins}]`);
+      }
 
       const prompt = `
-You are an executive head sports scientist reviewing athlete Mustafa (${athleteH} cm, ${athleteW} kg active mass, XC Mountain Bike). Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
+CURRENT SYSTEM DATE: ${todayDateStr}
+You are an executive sports scientist reviewing athlete Mustafa (Height: ${athleteHeightDesc}, Mass: ${athleteMassDesc}, Kron XC150 Mountain Bike). Max HR: ${PHYSIO_CONFIG.max_hr} bpm.
 CARDIAC FRAMEWORK: Z1 (<135 bpm), Z2 (135-154 bpm), Z3 (155-170 bpm), Z4 (171-188 bpm), Z5 (189-207 bpm).
-EVALUATION TIMEFRAME SCOPE: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()}).
+EVALUATION TIMEFRAME SCOPE: ${formatFullDateWithDay(startDate)} to ${formatFullDateWithDay(endDate)} (${reportTimeframe.toUpperCase()}).
+ACTIVE TRAINING GOAL PHASE: "${activeGoal}"
+LOGGED MASS PROGRESSION: [${weightSummary}]. All power and kJ figures are Strava estimates.
 
-EMPIRICAL COMPUTED TIME-IN-ZONE ACCUMULATION FOR THIS PERIOD:
+EMPIRICAL COMPUTED MOVING TIME-IN-ZONE ACCUMULATION FOR THIS PERIOD ACROSS ALL 5 ZONES:
 Z1: ${Math.round(scopedZoneSecs[0]/60)}m | Z2: ${Math.round(scopedZoneSecs[1]/60)}m | Z3: ${Math.round(scopedZoneSecs[2]/60)}m | Z4: ${Math.round(scopedZoneSecs[3]/60)}m | Z5: ${Math.round(scopedZoneSecs[4]/60)}m
-Mean Intraday Cardiac Drift (H2 - H1 decoupling on steady rides >= 35min): ${driftText}
+Mean Intraday Cardiac Drift: ${driftText}
 
-TELEMETRY LEDGER:
-${telemetryTable}
+${popComparisonText}
 
-ATHLETE QUALITATIVE IN-RIDE SENSATIONS:
+CURRENT PERIOD SESSION LEDGER (WITH EXACT DATES, START TIMES, MASS, MOVING TIME, VAM, AND DRIFT):
+${telemetryTable.join('\n')}
+
+ATHLETE QUALITATIVE IN-RIDE SENSATIONS (BOUNDED TO THIS TIMEFRAME):
 ${qualitativeNotes || "No specific discomfort notes recorded."}
 
 CLINICAL REPORT REQUIREMENTS:
 - Structure into four clear, analytical sections:
   1. Aerobic Base & Sub-Threshold Dynamics
-  2. Intraday Cardiac Drift & Decoupling Under Current Body Mass
+  2. Intraday Cardiac Drift & Decoupling Under Current Body Mass & Terrain Friction
   3. Climbing VAM (m/h) & Terrain Ascent Adaptation
-  4. Athlete Subjective Feedback & Recovery Synthesis
-- You MUST evaluate the empirical time-in-zone numbers and mean drift values provided above.
-- If drift is marked 'n/a', explain that insufficient long steady rides occurred rather than hallucinating zero drift.
+  4. Period-Over-Period Progress & Recovery Synthesis
+- You MUST evaluate the empirical period-over-period delta numbers, the active goal phase, and the mass progression [${weightSummary}].
+- Note that decoupling is based on Speed-to-HR on moving time and that trail topography creates noise.
 - STRICT FORMATTING RULES:
   - NO formula derivations.
   - NO ASCII tables, pipes (|), or repeated % symbols.
@@ -3389,19 +3861,41 @@ CLINICAL REPORT REQUIREMENTS:
       banner.style.display = "none";
 
       if (report) {
-        await db.reports.put({ id: 1, ref_code: `REPORT_${reportTimeframe}`, created_at: new Date().toISOString(), timeframe: reportTimeframe, analysis_text: report });
+        await db.reports.put({ 
+          id: 1, 
+          ref_code: `REPORT_${reportTimeframe}`, 
+          created_at: new Date().toISOString(), 
+          timeframe: reportTimeframe, 
+          analysis_text: report,
+          ride_count: currentWorkouts.length,
+          date_range: dateRangeKey
+        });
         const box = document.getElementById("reportSummaryBox");
         box.style.display = "block";
-        box.innerHTML = `<b>Longitudinal Review (${startDate} to ${endDate})</b><br/><br/>` + cleanAiText(report);
+        box.innerHTML = `<b>Longitudinal Review (${formatFullDateWithDay(startDate)} to ${formatFullDateWithDay(endDate)})</b><br/><br/>` + cleanAiText(report);
       }
     }
 
     async function triggerOfficialPdfDownload() {
       const statusDiv = document.getElementById("pdfDownloadStatus");
       const latestReport = await db.reports.get(1);
+      const workouts = await getScopedWorkouts(0);
 
-      if (!latestReport || latestReport.timeframe !== reportTimeframe || !latestReport.analysis_text) {
-        alert(`Please tap 'Synthesize Review' for ${reportTimeframe.toUpperCase()} first to compile the report.`);
+      if (!workouts.length) {
+        alert("No workouts recorded in this timeframe.");
+        return;
+      }
+
+      const startDate = workouts[0].date.split(' ')[0];
+      const endDate = workouts[workouts.length - 1].date.split(' ')[0];
+      const dateRangeKey = `${startDate}_to_${endDate}`;
+
+      if (!latestReport || 
+          latestReport.timeframe !== reportTimeframe || 
+          latestReport.ride_count !== workouts.length ||
+          latestReport.date_range !== dateRangeKey ||
+          !latestReport.analysis_text) {
+        alert(`Cached report is outdated or missing. Please tap 'Synthesize Review' for ${reportTimeframe.toUpperCase()} first to compile fresh report text.`);
         return;
       }
 
@@ -3415,11 +3909,10 @@ CLINICAL REPORT REQUIREMENTS:
         const margin = 14;
         const contentWidth = pageWidth - (margin * 2);
 
-        const workouts = await getScopedWorkouts();
-        const startDate = workouts[0].date.split(' ')[0];
-        const endDate = workouts[workouts.length - 1].date.split(' ')[0];
         const athleteW = await getLatestWeight();
-        const athleteH = (await getConfig("athlete_height")) || PHYSIO_CONFIG.default_height_cm;
+        const athleteH = (await getConfig("athlete_height")) || null;
+        const massStr = athleteW ? `${athleteW} kg` : "Not Set";
+        const heightStr = athleteH ? `${athleteH} cm` : "Not Set";
 
         doc.setFillColor(15, 23, 42);
         doc.rect(0, 0, pageWidth, 28, 'F');
@@ -3434,11 +3927,19 @@ CLINICAL REPORT REQUIREMENTS:
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text(`ATHLETE: Mustafa (${athleteH} cm | ${athleteW} kg | XC MTB)  *  PERIOD: ${startDate} to ${endDate} (${reportTimeframe.toUpperCase()})  *  ISSUED: ${new Date().toLocaleDateString()}`, margin, 21);
+        doc.text(`ATHLETE: Mustafa (${heightStr} | ${massStr} | XC MTB)  *  PERIOD: ${formatFullDateWithDay(startDate)} to ${formatFullDateWithDay(endDate)} (${reportTimeframe.toUpperCase()})  *  ISSUED: ${new Date().toLocaleDateString()}`, margin, 21);
 
         let y = 35;
 
-        const avgHR = Math.round(workouts.filter(w => w.avg_hr > 0).reduce((a, b) => a + b.avg_hr, 0) / (workouts.filter(w => w.avg_hr > 0).length || 1));
+        let totalDurHR = 0, totalDurSecHR = 0;
+        workouts.forEach(w => {
+          if (w.avg_hr > 0 && w.moving_sec > 0) {
+            totalDurHR += (w.avg_hr * w.moving_sec);
+            totalDurSecHR += w.moving_sec;
+          }
+        });
+        const avgHR = totalDurSecHR > 0 ? Math.round(totalDurHR / totalDurSecHR) : '--';
+
         const validRidesWithBoth = workouts.filter(w => w.avg_power_w > 0 && w.avg_hr > 0);
         const efVal = validRidesWithBoth.length
           ? (validRidesWithBoth.reduce((acc, w) => acc + (w.avg_power_w / w.avg_hr), 0) / validRidesWithBoth.length).toFixed(2)
@@ -3450,9 +3951,9 @@ CLINICAL REPORT REQUIREMENTS:
         const cardHeight = 16;
         const cards = [
           { label: "EST. AEROBIC EFFICIENCY", val: `${efVal !== '--' ? efVal + ' W/bpm' : '--'}`, color: [37, 99, 235] },
-          { label: "MEAN HEART RATE", val: `${avgHR} bpm`, color: [22, 163, 74] },
-          { label: "TOTAL WORK DONE", val: `${totWork} kJ`, color: [252, 82, 0] },
-          { label: "PERIOD ACCUMULATION", val: `${totDist} km`, color: [15, 23, 42] }
+          { label: "WEIGHTED MEAN HR", val: `${avgHR} bpm`, color: [22, 163, 74] },
+          { label: "EST. WORK DONE", val: `${totWork} kJ`, color: [252, 82, 0] },
+          { label: "PERIOD VOLUME", val: `${totDist} km`, color: [15, 23, 42] }
         ];
 
         cards.forEach((c, idx) => {
@@ -3479,7 +3980,7 @@ CLINICAL REPORT REQUIREMENTS:
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
-        doc.text("CARDIOVASCULAR TIME-IN-ZONE ACCUMULATION (MAX 207 BPM)", margin, y);
+        doc.text("CARDIOVASCULAR MOVING TIME-IN-ZONE ACCUMULATION (MAX 207 BPM)", margin, y);
         y += 4;
 
         let scopedSecs = [0, 0, 0, 0, 0];
@@ -3604,17 +4105,17 @@ CLINICAL REPORT REQUIREMENTS:
 
         const tableData = workouts.map(w => [
           `Ride ${w.ride_number}`,
-          w.date.split(' ')[0],
+          w.date.slice(0, 16),
           w.distance_km + ' km',
           w.duration_str || '--',
           w.avg_speed_kmh + ' km/h',
           w.avg_hr > 0 ? w.avg_hr + ' bpm' : '--',
           w.elevation_gain_m + ' m',
-          w.kilojoules > 0 ? w.kilojoules + ' kJ' : '--'
+          w.kilojoules > 0 ? w.kilojoules + ' kJ (Est)' : '--'
         ]);
 
         doc.autoTable({
-          head: [['Session', 'Date', 'Distance', 'Duration', 'Avg Speed', 'Avg HR', 'Ascent', 'Work']],
+          head: [['Session', 'Date & Start Time', 'Distance', 'Duration', 'Avg Speed', 'Avg HR', 'Ascent', 'Est Work']],
           body: tableData,
           startY: y,
           theme: 'grid',
@@ -3654,7 +4155,7 @@ CLINICAL REPORT REQUIREMENTS:
 
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
           const base64Data = doc.output('datauristring').split(',')[1];
-          let savedToDownloads = false;
+          let savedPath = null;
 
           try {
             await window.Capacitor.Plugins.Filesystem.writeFile({
@@ -3662,7 +4163,7 @@ CLINICAL REPORT REQUIREMENTS:
               data: base64Data,
               directory: 'EXTERNAL_STORAGE'
             });
-            savedToDownloads = true;
+            savedPath = "Downloads";
           } catch(e) {
             try {
               await window.Capacitor.Plugins.Filesystem.writeFile({
@@ -3670,15 +4171,17 @@ CLINICAL REPORT REQUIREMENTS:
                 data: base64Data,
                 directory: 'DOCUMENTS'
               });
+              savedPath = "Documents";
             } catch(err2) {
               console.warn("Filesystem PDF save error:", err2);
             }
           }
 
-          const targetFolder = savedToDownloads ? "Downloads" : "Documents";
-          statusDiv.innerHTML = `✓ Saved to ${targetFolder}: <b>${escapeHtml(fileName)}</b>`;
-          alert(`PDF Report downloaded successfully to ${targetFolder} folder:\n${fileName}`);
-          return;
+          if (savedPath) {
+            statusDiv.innerHTML = `✓ Saved to ${savedPath}: <b>${escapeHtml(fileName)}</b>`;
+            alert(`PDF Report downloaded successfully to ${savedPath} folder:\n${fileName}`);
+            return;
+          }
         }
 
         const pdfDataUri = doc.output('datauristring');
@@ -3816,12 +4319,13 @@ CLINICAL REPORT REQUIREMENTS:
     }
 
     async function loadSettings() {
-      document.getElementById("cfg_height").value = await getConfig("athlete_height") || PHYSIO_CONFIG.default_height_cm;
+      document.getElementById("cfg_height").value = await getConfig("athlete_height") || "";
       document.getElementById("cfg_model").value = await getActiveModel();
       document.getElementById("cfg_client_id").value = await getConfig("strava_client_id") || "277202";
       document.getElementById("cfg_client_secret").value = await getConfig("strava_client_secret");
       document.getElementById("cfg_gemini_key").value = await getConfig("gemini_api_key");
       renderWeightHistoryUI();
+      renderGoalHistoryUI();
     }
 
     async function testStravaConnection() {
@@ -3866,7 +4370,7 @@ CLINICAL REPORT REQUIREMENTS:
     }
 
     // --------------------------------------------------------
-    // ROBUST STRAVA SYNC
+    // ROBUST STRAVA SYNC (PAGINATED, ALL RIDES, CHRONO NUMBERING)
     // --------------------------------------------------------
     async function syncStrava() {
       if (isSyncInProgress) return;
@@ -3903,44 +4407,45 @@ CLINICAL REPORT REQUIREMENTS:
         }
         await setConfig("strava_refresh_token", tokenData.refresh_token);
 
+        // Fetch paginated activities without an 'after' cutoff so back-dated rides are always found
         let acts = [];
-        for (let page = 1; page <= 2; page++) {
-          const actRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=30`, {
+        let page = 1;
+        while (true) {
+          let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=50`;
+
+          const actRes = await fetch(url, {
             headers: { Authorization: `Bearer ${tokenData.access_token}` }
           });
           const pageActs = await actRes.json();
-          if (Array.isArray(pageActs)) {
+          if (Array.isArray(pageActs) && pageActs.length > 0) {
             acts = acts.concat(pageActs);
-            if (pageActs.length < 30) break;
-          } else break;
+            if (pageActs.length < 50) break;
+            page++;
+            if (page > 10) break; // safety guardrail
+          } else {
+            break;
+          }
         }
 
         const rideActs = acts.filter(a => ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide'].includes(a.type || 'Ride'));
-        rideActs.sort((a, b) => parseSafeDate(a.start_date_local) - parseSafeDate(b.start_date_local));
-
-        const lastWorkout = await db.workouts.orderBy('ride_number').last();
-        let maxRideNum = lastWorkout ? lastWorkout.ride_number : 0;
+        
+        // Deduplicate vs stored database
         let newlyAddedWorkouts = [];
-
         for (const a of rideActs) {
-          const exists = await db.workouts.where("strava_id").equals(a.id).first();
+          const numericId = Number(a.id);
+          const exists = await db.workouts.where("strava_id").equals(numericId).first();
           if (!exists) {
-            maxRideNum++;
-            const currentRideNum = maxRideNum;
-            const seqStr = String(currentRideNum).padStart(3, '0');
-            
-            const localDateStr = a.start_date_local ? a.start_date_local.slice(0, 10) : new Date().toISOString().slice(0, 10);
+            const localDateStr = a.start_date_local ? a.start_date_local.slice(0, 10) : formatLocalDate(new Date());
             const localDateTime = a.start_date_local ? a.start_date_local.replace('T', ' ').slice(0, 16) : localDateStr;
-            const code = `Ride ${seqStr} - ${localDateStr}`;
 
             const m = Math.floor(a.moving_time / 60);
             const s = a.moving_time % 60;
             const durStr = m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}:${s < 10 ? '0' : ''}${s}`;
 
             const newWorkoutObj = {
-              strava_id: a.id,
-              ride_number: currentRideNum,
-              exercise_code: code,
+              strava_id: numericId,
+              ride_number: 0,
+              exercise_code: "",
               date: localDateTime,
               distance_km: +(a.distance / 1000).toFixed(2),
               duration_str: durStr,
@@ -3959,6 +4464,8 @@ CLINICAL REPORT REQUIREMENTS:
               intent_type: null,
               zone_seconds: [0, 0, 0, 0, 0],
               cardiac_drift_bpm: null,
+              cardiac_decoupling_pct: null,
+              climbing_vam: null,
               halves_profile: ""
             };
 
@@ -3968,28 +4475,46 @@ CLINICAL REPORT REQUIREMENTS:
           }
         }
 
+        // Chronological Re-numbering & Code Assignment
         const allSavedWorkouts = await db.workouts.toArray();
+        allSavedWorkouts.sort((a, b) => parseSafeDate(a.date) - parseSafeDate(b.date));
+
+        for (let i = 0; i < allSavedWorkouts.length; i++) {
+          const w = allSavedWorkouts[i];
+          const seq = i + 1;
+          const seqStr = String(seq).padStart(3, '0');
+          const datePart = w.date.split(' ')[0];
+          const newCode = `Ride ${seqStr} - ${datePart}`;
+
+          if (w.ride_number !== seq || w.exercise_code !== newCode) {
+            w.ride_number = seq;
+            w.exercise_code = newCode;
+            await db.workouts.update(w.id, { ride_number: seq, exercise_code: newCode });
+          }
+        }
+
+        // Backfill streams including grade_smooth, moving, cadence
         for (const w of allSavedWorkouts) {
-          const streamCount = await db.streams.where('strava_id').equals(w.strava_id).count();
+          const streamCount = await db.streams.where('strava_id').equals(Number(w.strava_id)).count();
           let streamData = null;
 
           if (streamCount === 0) {
             try {
-              const strRes = await fetch(`https://www.strava.com/api/v3/activities/${w.strava_id}/streams?keys=time,distance,altitude,heartrate,velocity_smooth,watts,cadence&key_by_type=true`, {
+              const strRes = await fetch(`https://www.strava.com/api/v3/activities/${w.strava_id}/streams?keys=time,distance,altitude,heartrate,velocity_smooth,watts,cadence,grade_smooth,moving&key_by_type=true`, {
                 headers: { Authorization: `Bearer ${tokenData.access_token}` }
               });
 
               if (strRes.status === 429) {
-                console.warn("Strava rate limit reached. Halting backfill loop.");
+                console.warn("Strava rate limit reached. Halting stream fetch loop.");
                 break;
               }
 
               if (strRes.ok) {
                 const sData = await strRes.json();
-                await db.streams.put({ strava_id: w.strava_id, stream_data: sData });
+                await db.streams.put({ strava_id: Number(w.strava_id), stream_data: sData });
                 streamData = sData;
               } else if (strRes.status === 404) {
-                await db.streams.put({ strava_id: w.strava_id, stream_data: null });
+                await db.streams.put({ strava_id: Number(w.strava_id), stream_data: null });
               }
               await new Promise(r => setTimeout(r, 250));
             } catch(e) {
@@ -3997,9 +4522,9 @@ CLINICAL REPORT REQUIREMENTS:
             }
           }
 
-          if (!w.zone_seconds || w.zone_seconds.every(v => v === 0)) {
+          if (!w.zone_seconds || w.zone_seconds.every(v => v === 0) || w.climbing_vam === undefined) {
             if (!streamData) {
-              const strRow = await db.streams.get(w.strava_id);
+              const strRow = await db.streams.get(Number(w.strava_id));
               if (strRow) streamData = strRow.stream_data;
             }
             if (streamData) {
@@ -4011,7 +4536,7 @@ CLINICAL REPORT REQUIREMENTS:
         renderFeed();
 
         if (newlyAddedWorkouts.length > 0) {
-          intentModalQueue = newlyAddedWorkouts;
+          intentModalQueue = await Promise.all(newlyAddedWorkouts.map(w => db.workouts.get(w.id)));
           openNextIntentModal();
         } else {
           alert("All rides and telemetry streams up to date.");
