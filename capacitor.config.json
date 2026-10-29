@@ -1,6 +1,8 @@
 {
   "appId": "com.ridepartner.v2",
-  "appName": "Ride Partner V2",
+  "appName": "Ride Partner",
   "webDir": "www",
-  "bundledWebRuntime": false
+  "android": {
+    "backgroundColor": "#f3f5fa"
+  }
 }

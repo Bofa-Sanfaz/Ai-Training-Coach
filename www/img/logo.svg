@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Ride Partner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2a48"/>
+      <stop offset="1" stop-color="#0a101d"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff9f5a"/>
+      <stop offset="0.5" stop-color="#fc5200"/>
+      <stop offset="1" stop-color="#ff9f5a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <g id="mark">
+    <!-- wheels -->
+    <circle cx="142" cy="316" r="74" fill="none" stroke="#ffffff" stroke-width="22"/>
+    <circle cx="370" cy="316" r="74" fill="none" stroke="#ffffff" stroke-width="22"/>
+    <!-- heartbeat frame: the ride and the heart in one line -->
+    <path d="M142 316 H196 L224 254 L260 392 L298 168 L328 316 H370" fill="none" stroke="url(#pulse)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="142" cy="316" r="16" fill="#fc5200"/>
+    <circle cx="370" cy="316" r="16" fill="#fc5200"/>
+    <!-- coach spark -->
+    <path d="M388 92 L401 130 L439 143 L401 156 L388 194 L375 156 L337 143 L375 130 Z" fill="#ffffff"/>
+  </g>
+</svg>
