@@ -73,7 +73,7 @@ android-res/          launcher icons, adaptive icon, splash (generated from asse
 - "Add skills, fetch from GitHub" → `www/skills/*.md` (SKILL.md format) + `skills.js` (per-agent assignment, import from GitHub URL).
 - Samsung Health (Galaxy Watch 8 Classic) → Health Connect via `@capgo/capacitor-health` 8.x → required **Capacitor 8** upgrade (Node 22, JDK 21, SDK 36).
 - Found & fixed: `Capacitor.Plugins.X` never existed without a bundler (affected v2 too) → `capPlugin()` now calls the native bridge directly.
-- Privacy: user asked not to leak anything on public GitHub → commit author switched to the GitHub no-reply address; history rewrite prepared locally (force-push needs the user's OK); keystore/password were already public from the original CI (flagged to the user).
+- Privacy: user asked not to leak anything on public GitHub → commit author switched to the GitHub no-reply address; branch history rewritten and force-pushed with the user's OK (2026-10-29); keystore/password were already public from the original CI (flagged to the user).
 
 ## Not verified yet
 - Real Strava sync and Gemini calls (no credentials here) — logic reviewed, demo data used for everything else.
