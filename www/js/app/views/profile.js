@@ -6,7 +6,7 @@
 async function renderProfile() {
   $('#cfg_name').value = ATHLETE.name || '';
   $('#cfg_height').value = (await getConfig('athlete_height')) || '';
-  $('#cfg_bike').value = ATHLETE.bike || '';
+  $('#cfg_bike').value = (await getConfig('bike_name')) || (isNative() ? ATHLETE.bike || '' : '');
   $('#cfg_max_hr').value = PHYSIO.max_hr;
   $('#cfg_rest_hr').value = PHYSIO.resting_hr;
   $('#cfg_trimp_sex').value = PHYSIO.trimp_sex;

@@ -264,7 +264,9 @@ async function syncStrava(opts = {}) {
     // 2) Insert new rides, runs, swims and gym sessions (2026 onwards; deleted workouts are never re-imported).
     //    Other types (walks, hikes, yoga…) go to the inbox unless the athlete set a rule for that type.
     const recent = acts.filter(a => String(a.start_date_local || '') >= MIN_WORKOUT_DATE);
-    const isSyncType = a => SYNC_TYPES.includes(a.sport_type) || SYNC_TYPES.includes(a.type || 'Ride');
+    // Web app (a friend's iPhone): walks are a main sport there, so they import directly
+    const isSyncType = a => SYNC_TYPES.includes(a.sport_type) || SYNC_TYPES.includes(a.type || 'Ride') ||
+      (!isNative() && WALK_TYPES.includes(a.sport_type || a.type));
     const alwaysInclude = await routeToInbox(recent.filter(a => !isSyncType(a)).map(a => ({
       key: `strava:${a.id}`, src: 'strava', type: a.sport_type || a.type, name: a.name || '', date: String(a.start_date_local || '').replace('T', ' ').slice(0, 16),
       distance_km: round(num(a.distance) / 1000, 2), moving_sec: num(a.moving_time), raw: a

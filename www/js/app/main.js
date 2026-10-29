@@ -168,6 +168,12 @@ async function boot() {
   try { if ((await dedupeWorkouts()) + (await migrateWalks())) await renderRides(); } catch (e) { console.warn('dedupe/walks', e); }
   maybeAutoSync();
   setTimeout(resumePendingChats, 2000);
+  // Web app: Strava needs the person's own (free) Strava API app — show how, with this site's address
+  if (!isNative()) {
+    $('#stravaWebSteps').classList.remove('hidden');
+    $('#stravaHost').textContent = location.host;
+    $('#stravaSite').textContent = location.origin;
+  }
   // First run (fresh install / friend's web app): the introduction, which also handles an invite link
   let intro = false;
   try { intro = await introNeeded(); } catch (e) { console.warn('intro', e); }

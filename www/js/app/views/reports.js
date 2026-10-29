@@ -145,8 +145,13 @@ async function renderPeriodStory(rides, prior, startDate, endDate) {
   $('#repHighlights').innerHTML = st.highlights.map(h => `<div class="hl-card" ${h.w ? `onclick="openRide(${h.w.id})"` : ''}><span class="hl-l">${escapeHtml(h.label)}</span><b>${escapeHtml(h.value)}</b>${h.w ? `<span class="hl-s">${escapeHtml(rideCode(h.w))} · ${escapeHtml(formatNiceDate(h.w.date, false))}</span>` : ''}</div>`).join('');
   if (!plotReady()) return;
   const sports = Object.keys(SPORTS).filter(s => st.daily.some(d => d.bySport[s]));
-  drawChart($('#repDailyChart'), sports.map(s => ({ x: st.days, y: st.daily.map(d => round(d.bySport[s] || 0, 0)), type: 'bar', name: SPORTS[s].plural, marker: { color: SPORTS[s].color }, hovertemplate: `${SPORTS[s].plural} %{x|%d %b}: %{y}<extra></extra>` })),
-    plotLayout({ barmode: 'stack', bargap: 0.2, hovermode: 'closest', showlegend: sports.length > 1, legend: { orientation: 'h', y: -0.25, font: { size: 10 } }, margin: { l: 30, r: 8, t: 6, b: sports.length > 1 ? 46 : 26 }, xaxis: { type: 'date', tickformat: '%d %b' }, yaxis: { title: { text: 'load', font: { size: 10 } } } }));
+  // At least a week on the axis, so one or two sessions draw as normal bars, not a wall
+  const DAY = 86400000;
+  const lastT = Date.parse(`${st.days[st.days.length - 1]}T12:00:00Z`);
+  const firstT = Math.min(Date.parse(`${st.days[0]}T12:00:00Z`), lastT - 6 * DAY);
+  const xRange = [new Date(firstT - DAY / 2).toISOString(), new Date(lastT + DAY / 2).toISOString()];
+  drawChart($('#repDailyChart'), sports.map(s => ({ x: st.days, y: st.daily.map(d => round(d.bySport[s] || 0, 0)), type: 'bar', width: 0.72 * DAY, name: SPORTS[s].plural, marker: { color: SPORTS[s].color }, hovertemplate: `${SPORTS[s].plural} %{x|%d %b}: %{y}<extra></extra>` })),
+    plotLayout({ barmode: 'stack', bargap: 0.2, hovermode: 'closest', showlegend: sports.length > 1, legend: { orientation: 'h', y: -0.25, font: { size: 10 } }, margin: { l: 30, r: 8, t: 6, b: sports.length > 1 ? 46 : 26 }, xaxis: { type: 'date', tickformat: '%d %b', range: xRange }, yaxis: { title: { text: 'load', font: { size: 10 } } } }));
   drawChart($('#repRhythmChart'), [
     { x: WEEKDAYS, y: st.weekday.map(v => round(v, 1)), type: 'bar', name: 'hours', marker: { color: st.weekday.map(v => (v === Math.max(...st.weekday) ? '#fc5200' : 'rgba(252,82,0,0.4)')) }, hovertemplate: '%{x}: %{y} h<extra></extra>' }
   ], plotLayout({ hovermode: 'closest', bargap: 0.35, margin: { l: 28, r: 8, t: 6, b: 26 }, yaxis: { title: { text: 'hours', font: { size: 10 } } } }));

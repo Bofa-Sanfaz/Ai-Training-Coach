@@ -182,7 +182,13 @@ Sources: CTHRU/Hitrava (format, sport codes), Huawei developer pages (Health Kit
 - ✅ Introduction; ✅ Gemini-only personal AI on the web app (user decision); ✅ Samsung card explains itself on iPhone.
 - ✅ Free-plan check: requests, D1 reads/writes, storage, cron and wall time far inside the free limits; CPU per request measured live: polls 1–8 ms, AI runs 9–12 ms on 6 months of heavy history after moving the AI context to a phone-built digest (Cloudflare tolerates occasional overruns; consistent ones are cut off).
 - ❌ Apple Health route: not easier or better (Huawei → Apple Health is unreliable for workouts and has no swim lengths).
-- ⏳ Health Kit automatic link: starts when the owner registers a Huawei developer account (then the docs are readable and every field can be verified).
+- ⏳ Health Kit automatic link: starts when the owner registers a Huawei developer account.
+
+## 6.5 Health Kit — verified in Huawei's docs (2026-10-30, read in a real browser)
+- **iPhone users are supported**: the user links once in the Huawei Health app (Me → Third party services → HUAWEI Health Kit → LINK) or via Huawei's linking page; data reaches the cloud when Huawei Health syncs ("in minutes").
+- **Open to individual developers ("basic" level)**: exercise record summary (100+ workout types incl. swimming), exercise detail samples (workout heart rate, speed, cadence, altitude, swim stroke rate), GPS location, daily steps/calories/distance, and historical data (week/month/year). **Not open to individuals ("advanced")**: resting HR, HRV, sleep, weight, SpO2, stress etc. (enterprise only).
+- **Conditions for an individual developer**: the app must be a **mobile app released on AppGallery** (web apps by individuals are rejected). Then: apply for Health Service Kit with the application material (xlsx) → manual review ≈ 10 working days → **test scopes for up to 100 users** (enough for the squad; the ≈ 15-day verification is only needed beyond 100 users, recommended within a year).
+- Plan: (1) owner registers + identity-verifies a Huawei developer account; (2) publish the Android app on AppGallery (listing, privacy policy, screenshots prepared by Claude); (3) apply for Health Service Kit test scopes (exercise records + details + location + history) with prepared material; (4) build HUAWEI ID OAuth on the web app + Worker token storage + REST sync (`health-api.cloud.huawei.com/healthkit/v2/…`) + cron; (5) Assad links once and taps Connect — then automatic. Until then: the export importer.
 
 ## Not verified yet
 - Real Strava sync and Gemini calls (no credentials here) — logic reviewed, demo data used for everything else.

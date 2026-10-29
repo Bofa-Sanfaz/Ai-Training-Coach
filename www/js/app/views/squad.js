@@ -257,6 +257,14 @@ async function squadSummary(w, history, c) {
       s.laps_line = `${sw.pool_m} m pool: ${sw.laps.map(l => `${fmtPace(l.sec)}${l.strokes ? `/${l.strokes}` : ''}${l.style !== 'FREESTYLE' ? ` ${String(l.style).slice(0, 2).toLowerCase()}` : ''}`).join(' ')}`.slice(0, 2500);
     }
   }
+  if (sp === 'swim' && !sw) {
+    // Logged by hand: what was entered (no per-length detail)
+    if (w.swolf_manual) s.swolf = w.swolf_manual;
+    if (w.pool_m) s.pool_m = w.pool_m;
+    if (w.strokes_total) s.strokes = w.strokes_total;
+  }
+  if (w.main_stroke && w.main_stroke !== 'FREESTYLE') s.stroke = w.main_stroke.toLowerCase();
+  if (w.reps) s.reps = w.reps;
   if (num(mv(w, 'avg_hr')) > 0) s.avg_hr = w.avg_hr;
   if (num(mv(w, 'max_hr')) > 0) s.max_hr = w.max_hr;
   if (hasVal(mv(w, 'trimp'))) s.load = Math.round(w.trimp);
@@ -422,57 +430,189 @@ async function squadImportPicked(ev) {
   }
 }
 
+// Log a workout by hand (pool swims, gym…) — or check what the AI read from a screenshot.
+// The fields follow the sport: swims by pool length × lengths (distance and pace follow),
+// stroke, SWOLF and strokes; walks/runs with steps, cadence, climbing, treadmill; rides with
+// climbing, power, cadence, indoor; gym by activity type with reps. All: HR, calories, RPE, note.
+const MANUAL_FIELD_DEFS = {
+  pool: { label: 'Pool', type: 'select', options: [['25', '25 m'], ['50', '50 m'], ['33', '33 m'], ['20', '20 m']] },
+  lengths: { label: 'Lengths', type: 'int', ph: 'e.g. 40' },
+  dist_m: { label: 'Distance (m)', type: 'int', ph: 'auto' },
+  stroke: { label: 'Main stroke', type: 'select', options: [['FREESTYLE', 'Freestyle'], ['BREASTSTROKE', 'Breaststroke'], ['BACKSTROKE', 'Backstroke'], ['BUTTERFLY', 'Butterfly'], ['MIXED', 'Mixed']] },
+  swolf: { label: 'Avg SWOLF', type: 'int', ph: 'optional' },
+  strokes: { label: 'Total strokes', type: 'int', ph: 'optional' },
+  dist: { label: 'Distance (km)', type: 'dec' },
+  dist_opt: { label: 'Distance (km)', type: 'dec', ph: 'optional' },
+  avg_hr: { label: 'Avg heart rate', type: 'int', ph: 'bpm' },
+  max_hr: { label: 'Max heart rate', type: 'int', ph: 'bpm' },
+  kcal: { label: 'Calories', type: 'int', ph: 'kcal' },
+  steps: { label: 'Steps', type: 'int' },
+  cadence_spm: { label: 'Cadence', type: 'int', ph: 'steps/min' },
+  cadence_rpm: { label: 'Cadence', type: 'int', ph: 'rpm' },
+  elev: { label: 'Climbing (m)', type: 'int' },
+  power: { label: 'Avg power (W)', type: 'int', ph: 'optional' },
+  reps: { label: 'Reps / sets', type: 'int', ph: 'optional' },
+  gym: { label: 'Activity', type: 'select', options: [['WeightTraining', 'Strength'], ['Elliptical', 'Elliptical'], ['Rowing', 'Rowing'], ['StairStepper', 'Stair stepper'], ['HighIntensityIntervalTraining', 'HIIT'], ['Yoga', 'Yoga / Pilates'], ['Workout', 'Other']] },
+  indoor: { label: 'Treadmill', type: 'check' },
+  indoor_ride: { label: 'Indoor / trainer', type: 'check' }
+};
+const MANUAL_FIELDS = {
+  swim: ['pool', 'lengths', 'dist_m', 'stroke', 'avg_hr', 'max_hr', 'kcal', 'swolf', 'strokes'],
+  walk: ['dist', 'steps', 'avg_hr', 'max_hr', 'kcal', 'cadence_spm', 'elev', 'indoor'],
+  run: ['dist', 'avg_hr', 'max_hr', 'kcal', 'cadence_spm', 'steps', 'elev', 'indoor'],
+  ride: ['dist', 'avg_hr', 'max_hr', 'kcal', 'elev', 'power', 'cadence_rpm', 'indoor_ride'],
+  other: ['gym', 'avg_hr', 'max_hr', 'kcal', 'reps', 'dist_opt']
+};
+
+function openManualWorkout(sport = 'swim') {
+  Squad.importDraft = { manual: true, sport, date: formatLocalDate(new Date()), start_time: new Date().toTimeString().slice(0, 5) };
+  squadFillImport();
+  openSheet('squadImportSheet');
+}
+
+function squadPickSport(sport) {
+  squadReadManualFields();
+  $('#sqi_sport').value = sport;
+  $$('#sqi_sportSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === sport));
+  const title = $('#sqi_title');
+  if (!title.value || title.dataset.auto === '1') { title.value = SPORTS[sport].label; title.dataset.auto = '1'; }
+  squadRenderManualFields();
+}
+
+// Values survive switching the sport back and forth
+function squadReadManualFields() {
+  const vals = Squad.manualVals || (Squad.manualVals = {});
+  $$('#sqi_fields [data-k]').forEach(el => { vals[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; });
+}
+
+function squadRenderManualFields() {
+  const sport = $('#sqi_sport').value;
+  const vals = Squad.manualVals || {};
+  $('#sqi_fields').innerHTML = MANUAL_FIELDS[sport].map(k => {
+    const d = MANUAL_FIELD_DEFS[k];
+    const v = vals[k] === undefined || vals[k] === null ? '' : vals[k];
+    if (d.type === 'select') return `<div class="field"><label>${d.label}</label><select class="input" data-k="${k}" onchange="squadManualChanged()">${d.options.map(([o, l]) => `<option value="${o}" ${String(v) === o ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`;
+    if (d.type === 'check') return `<label class="sq-check"><input type="checkbox" data-k="${k}" ${v ? 'checked' : ''} /><span>${d.label}</span></label>`;
+    return `<div class="field"><label>${d.label}</label><input class="input" data-k="${k}" inputmode="${d.type === 'dec' ? 'decimal' : 'numeric'}" placeholder="${d.ph || ''}" value="${escapeHtml(String(v))}" oninput="squadManualChanged(this)" /></div>`;
+  }).join('');
+  squadManualChanged();
+}
+
+// Swim: pool × lengths → distance; pace preview for every sport
+function squadManualChanged(src) {
+  const f = k => $(`#sqi_fields [data-k="${k}"]`);
+  const sport = $('#sqi_sport').value;
+  const dur = squadParseDuration($('#sqi_dur').value);
+  let hint = '';
+  if (sport === 'swim') {
+    const n = parseInt(f('lengths').value, 10), pool = Number(f('pool').value);
+    if (n > 0 && pool > 0 && (!src || src.dataset.k !== 'dist_m')) f('dist_m').value = String(n * pool);
+    const m = parseInt(f('dist_m').value, 10);
+    if (m > 0 && dur > 0) hint = `Pace ${fmtPace(dur / m * 100)} /100 m`;
+  } else {
+    const km = parseFloat(String((f('dist') || f('dist_opt') || {}).value || '').replace(',', '.'));
+    if (km > 0 && dur > 0) hint = sport === 'ride' ? `Avg speed ${fmtNum(km / (dur / 3600), 1)} km/h` : sport === 'other' ? '' : `Pace ${fmtPace(dur / km)} /km`;
+  }
+  $('#sqi_extra').textContent = [hint, Squad.importDraft && Squad.importDraft.notes ? Squad.importDraft.notes : ''].filter(Boolean).join(' · ');
+}
+
+function squadRenderRpe(v) {
+  $('#sqi_rpe').innerHTML = Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button type="button" class="rpe-btn ${v === n ? 'selected' : ''}" style="${v === n ? `background:${rpeColor(n)}` : ''}" onclick="Squad.manualRpe = Squad.manualRpe === ${n} ? null : ${n}; squadRenderRpe(Squad.manualRpe)">${n}</button>`).join('');
+}
+
 function squadFillImport() {
   const w = Squad.importDraft || {};
   const v = (id, x) => { $(id).value = x === null || x === undefined ? '' : String(x); };
+  const manual = !!w.manual;
+  $('#sqi_head').textContent = manual ? 'Log a workout' : 'Workout from screenshot';
+  $('#sqi_sub').textContent = manual ? 'For sessions that don\'t sync (e.g. pool swims, gym). It\'s added to your own workouts and shared with the squad.'
+    : 'Aether read these numbers — check them, fix anything wrong, then save. It\'s added to your own workouts and shared with the squad.';
+  $('#sqi_thumb').classList.toggle('hidden', !w.image);
   $('#sqi_thumb').src = w.image || '';
-  v('#sqi_sport', SPORTS[w.sport] ? w.sport : 'other');
-  v('#sqi_title', w.type || '');
+  const sport = SPORTS[w.sport] ? w.sport : 'other';
+  const stroke = { free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY', mixed: 'MIXED' }[String(w.main_stroke || '').toLowerCase()];
+  const pool = w.pool_m > 0 ? Math.round(w.pool_m) : 25;
+  // Everything the AI read (or nothing, for a manual log) → the form's values
+  Squad.manualVals = {
+    pool: String([25, 50, 33, 20].includes(pool) ? pool : 25), lengths: w.pool_m && w.dist_m ? Math.round(w.dist_m / w.pool_m) : '',
+    dist_m: sport === 'swim' && w.dist_m ? Math.round(w.dist_m) : '', stroke: stroke || 'FREESTYLE', swolf: w.swolf || '', strokes: w.strokes || '',
+    dist: sport !== 'swim' && w.dist_m ? round(w.dist_m / 1000, 2) : '', dist_opt: '', avg_hr: w.avg_hr || '', max_hr: w.max_hr || '', kcal: w.calories || '',
+    steps: w.steps || '', cadence_spm: w.cadence || '', cadence_rpm: w.cadence || '', elev: w.elev_m || '', power: '', reps: '', gym: 'WeightTraining',
+    indoor: /treadmill|indoor/i.test(w.type || ''), indoor_ride: /indoor|trainer/i.test(w.type || '')
+  };
+  Squad.manualRpe = null;
+  v('#sqi_title', w.type || SPORTS[sport].label);
+  $('#sqi_title').dataset.auto = w.type ? '0' : '1';
   v('#sqi_date', w.date || formatLocalDate(new Date()));
   v('#sqi_time', w.start_time || '');
   v('#sqi_dur', w.dur_s ? formatDuration(w.dur_s) : '');
-  v('#sqi_dist', w.dist_m ? round(w.dist_m / 1000, 2) : '');
-  v('#sqi_hr', w.avg_hr);
-  v('#sqi_steps', w.steps);
-  v('#sqi_kcal', w.calories);
-  $('#sqi_extra').textContent = [w.swolf ? `SWOLF ${w.swolf}` : '', w.pool_m ? `${w.pool_m} m pool` : '', Array.isArray(w.laps) && w.laps.length ? `${w.laps.length} lengths read` : '', w.notes || ''].filter(Boolean).join(' · ');
+  v('#sqi_note', '');
+  $('#sqi_dur').oninput = () => squadManualChanged();
+  $('#sqi_sport').value = sport;
+  $$('#sqi_sportSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === sport));
+  squadRenderManualFields();
+  squadRenderRpe(null);
 }
 
 function squadParseDuration(s) {
   const p = String(s || '').trim().split(':').map(Number);
-  if (p.some(x => !Number.isFinite(x))) return 0;
+  if (!p.length || p.some(x => !Number.isFinite(x))) return 0;
   return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0] * 60;
 }
 
 async function saveSquadImport() {
   const d = Squad.importDraft || {};
+  squadReadManualFields();
+  const x = Squad.manualVals || {};
+  const int = k => parseInt(x[k], 10) || 0;
+  const dec = k => parseFloat(String(x[k] || '').replace(',', '.')) || 0;
   const sport = $('#sqi_sport').value;
   const date = $('#sqi_date').value;
   const time = $('#sqi_time').value || '12:00';
   const dur = squadParseDuration($('#sqi_dur').value);
-  const km = parseFloat(String($('#sqi_dist').value).replace(',', '.')) || 0;
   if (!date || !(dur > 0)) { toast('Date and duration are needed', 'warn'); return; }
+  const km = sport === 'swim' ? int('dist_m') / 1000 : sport === 'other' ? dec('dist_opt') : dec('dist');
+  if (sport !== 'other' && !(km > 0)) { toast(sport === 'swim' ? 'Enter the lengths (or the distance)' : 'Enter the distance', 'warn'); return; }
+  const avgHr = int('avg_hr'), maxHr = int('max_hr');
+  if ((avgHr && (avgHr < 30 || avgHr > 230)) || (maxHr && (maxHr < 40 || maxHr > 240))) { toast('Heart rate looks wrong (30–240 bpm)', 'warn'); return; }
   const start = new Date(`${date}T${time}:00`);
   const sid = -Math.round(start.getTime() / 1000) - 7; // own id range, never collides with the watch import
   const all = await db.workouts.toArray();
   const same = findSameWorkout(all, +start, dur, () => true);
   if (same) { toast(`Already in your workouts: ${rideTitle(same)}`, 'warn', 4500); closeSheet('squadImportSheet'); return; }
-  const hr = parseInt($('#sqi_hr').value, 10) || 0;
+  const indoor = sport === 'swim' ? true : sport === 'ride' ? !!x.indoor_ride : sport === 'other' ? true : !!x.indoor;
+  const sportType = sport === 'other' ? (x.gym || 'Workout') : sport === 'ride' && indoor ? 'VirtualRide' : SPORTS[sport].code;
+  // A gym session without its own name is called after its activity ("Strength", "Rowing"…)
+  const gymLabel = sport === 'other' ? (MANUAL_FIELD_DEFS.gym.options.find(o => o[0] === x.gym) || [])[1] : null;
+  if (gymLabel && $('#sqi_title').dataset.auto === '1') $('#sqi_title').value = gymLabel;
   const w = {
-    strava_id: sid, ride_number: 0, exercise_code: '', source: 'screenshot', name: $('#sqi_title').value.trim() || SPORTS[sport].label,
-    sport, sport_type: SPORTS[sport].code, indoor: sport === 'swim' ? true : undefined,
+    strava_id: sid, ride_number: 0, exercise_code: '', source: d.manual ? 'manual' : 'screenshot', name: $('#sqi_title').value.trim() || SPORTS[sport].label,
+    sport, sport_type: sportType, indoor,
     date: `${date} ${time}`, distance_km: round(km, 3), moving_sec: dur, elapsed_sec: dur, duration_str: formatDuration(dur),
-    avg_speed_kmh: km > 0 ? round(km / (dur / 3600), 2) : 0, max_speed_kmh: 0, avg_hr: hr, max_hr: parseInt(d.max_hr, 10) || 0,
-    elevation_gain_m: num(d.elev_m), kilojoules: 0, calories: parseInt($('#sqi_kcal').value, 10) || 0,
-    steps: parseInt($('#sqi_steps').value, 10) || undefined, avg_cadence: d.cadence ? Math.round(d.cadence) : undefined,
-    avg_power_w: 0, max_power_w: 0, norm_power_w: 0, device_watts: false, map_polyline: '',
-    source_name: 'Screenshot (read by AI)', debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
+    avg_speed_kmh: km > 0 ? round(km / (dur / 3600), 2) : 0, max_speed_kmh: 0, avg_hr: avgHr, max_hr: maxHr,
+    elevation_gain_m: indoor ? 0 : int('elev'), kilojoules: 0, calories: int('kcal'),
+    avg_power_w: sport === 'ride' ? int('power') : 0, max_power_w: 0, norm_power_w: 0, device_watts: sport === 'ride' && int('power') > 0, map_polyline: '',
+    source_name: d.manual ? 'Logged by hand' : 'Screenshot (read by AI)', debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
   };
-  if (sport === 'swim' && Array.isArray(d.laps) && d.laps.length && d.pool_m > 0) {
-    const style = s => ({ free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY' })[String(s || '').toLowerCase()] || 'FREESTYLE';
-    const sw = buildSwimDetail({ poolLength: d.pool_m, laps: d.laps.map(l => ({ sec: num(l.sec), strokes: num(l.strokes), style: style(l.stroke) })) }, dur);
-    if (sw) w.swim = sw;
+  if (onFoot(sport) && int('steps')) w.steps = int('steps');
+  if (onFoot(sport) && int('cadence_spm')) w.avg_cadence = int('cadence_spm');
+  if (sport === 'ride' && int('cadence_rpm')) w.avg_cadence = int('cadence_rpm');
+  if (sport === 'other' && int('reps')) w.reps = int('reps');
+  if (sport === 'swim') {
+    w.pool_m = Number(x.pool) || 25;
+    w.main_stroke = x.stroke || 'FREESTYLE';
+    if (int('swolf')) w.swolf_manual = int('swolf');
+    if (int('strokes')) w.strokes_total = int('strokes');
+    // Per-length detail only when the AI actually read every length off the screen
+    if (Array.isArray(d.laps) && d.laps.length && d.pool_m > 0) {
+      const style = s => ({ free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY' })[String(s || '').toLowerCase()] || w.main_stroke;
+      const sw = buildSwimDetail({ poolLength: d.pool_m, laps: d.laps.map(l => ({ sec: num(l.sec), strokes: num(l.strokes), style: style(l.stroke) })) }, dur);
+      if (sw) w.swim = sw;
+    }
   }
+  if (Squad.manualRpe) w.rpe = Squad.manualRpe;
+  const note = $('#sqi_note').value.trim();
+  if (note) w.note = note;
   w.id = await db.workouts.add(w);
   await ensureRideMetrics(w, null, true);
   await renumberRides();
@@ -652,7 +792,8 @@ function squadHomeHtml(S) {
     ${squadTodayHtml(S)}
     ${squadChatRowHtml(S)}
     <div class="sq-quick">
-      <button onclick="openSquadImport()">${icon('camera')}<span>Add from screenshot</span></button>
+      <button onclick="openManualWorkout()">${icon('plus')}<span>Log workout</span></button>
+      <button onclick="openSquadImport()">${icon('camera')}<span>Screenshot</span></button>
       <button onclick="openSquadWeight()">${icon('scale')}<span>Log weight</span></button>
       <button onclick="squadAskQuick()">${icon('sparkle')}<span>Ask ${SQUAD_AI}</span></button>
     </div>
@@ -702,7 +843,7 @@ function squadChatRowHtml(S) {
   const snippet = typing ? `${SQUAD_AI} is typing…` : last ? `${squadName(S, last.author)}: ${String(last.body.text || '').slice(0, 80)}` : `Say hi — mention @${SQUAD_AI} to bring the AI in`;
   return `<div class="thread-row sq-chat-row" onclick="openSquadChat()">
     <div class="avatar master">${icon('chat')}</div>
-    <div class="thread-body"><div class="thread-top"><span class="thread-name">Squad chat <span class="tiny muted">· you, ${escapeHtml(S.members.filter(m => m.active && m.id !== S.me).map(m => m.name).join(', ') || 'nobody yet')} &amp; ${SQUAD_AI}</span></span>
+    <div class="thread-body"><div class="thread-top"><span class="thread-name">Squad chat <span class="tiny muted">· ${(() => { const o = S.members.filter(m => m.active && m.id !== S.me).map(m => m.name); return o.length ? `you, ${escapeHtml(o.join(', '))} &amp; ${SQUAD_AI}` : 'invite a friend (Crew → Invite)'; })()}</span></span>
     <span class="row" style="gap:6px">${unread ? `<span class="badge badge-new">${unread} new</span>` : ''}<span class="thread-time">${last ? escapeHtml(relativeTime(last.created_at)) : ''}</span></span></div>
     <div class="thread-snippet ${typing ? 'sq-typing' : ''}">${escapeHtml(snippet)}</div></div>
   </div>`;

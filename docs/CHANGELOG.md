@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.6.2 — 2026-10-30 · sport-specific manual log, polish
+- **Log a workout** has fields per sport: swim (pool × lengths → distance, main stroke, avg/max HR, calories, SWOLF, total strokes), walk/run (distance, steps, cadence, climbing, HR, calories, treadmill), ride (distance, climbing, power, cadence, HR, calories, indoor), gym (activity: strength/elliptical/rowing/stairs/HIIT/yoga/other, HR, calories, reps, optional distance); all with effort (RPE) and a note; live pace/speed preview; values kept when switching sport; an unnamed gym session is named after its activity. The same form checks screenshot imports. Manual SWOLF/stroke/calories reach the squad summary and the coaches.
+- Polish: Reports daily-load chart always shows at least a week (no full-width wall for one session); week card keeps "N-week streak" together; web app Profile no longer shows a placeholder bike name; Squad quick actions (Log workout · Screenshot · Log weight · Ask Aether); chat row says "invite a friend" until someone joins.
+
+## 3.6.1 — 2026-10-30 · automatic for Assad tonight (free)
+- **Huawei Health → Strava → app**: on the web app Strava walks import directly (no inbox); Profile → Connections shows the one-time steps (Huawei Health → Strava link, his own free Strava API app with this site as callback domain). Strava API calls verified to work from the browser (CORS).
+- **Log a workout by hand** (Training → Log, Squad → Log workout): sport, date/time, duration, distance, HR, steps, kcal; swims with pool length × lengths → distance and pace /100 m. Saved as "Logged by hand".
+- Introduction: Strava (automatic) first on the web app, then Log by hand, Huawei history export, screenshot.
+- Everything stays free: Strava account and API app, Huawei's Strava link, Cloudflare free plan, Gemini free key.
+
 ## 3.6.0 — 2026-10-30 · Huawei, introduction, free-plan proof squad
 - **Huawei Health import** (`huawei.js`, vendored zip.js 2.24.0 BSD-3 for AES ZIPs): reads Huawei's data export (2025 multi-file and legacy layouts, `partTimeMap` quirk), maps sport codes, local time from `timeZone`, HR/GPS/speed/altitude/step-rate samples → one 5-s stream (zones, TRIMP, route, charts), steps/cadence, calories, climbing (1 m hysteresis), pool swims → per-length swim model (segments longer than the pool split evenly). Own id range (−start−3), duplicates and deleted sessions skipped, pre-2026 ignored, password remembered locally (kept out of exported backups). Tested with generated AES-encrypted exports.
 - **First-run introduction** (`views/intro.js`): fresh installs / web app only; name, sex, age → max HR (208 − 0.7 × age), resting HR, weight; zones rebuilt from the person's max HR (not the owner's defaults); workout sources (Huawei first on the web), free Gemini key, squad join (invite link handled inside), done. Profile → Introduction reopens it. No "What's new" for brand-new users.

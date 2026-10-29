@@ -67,10 +67,11 @@ async function renderIntro() {
     html = `<h2 class="intro-title">Where do your workouts come from?</h2>
       <p class="intro-lead">Pick what you use — you can add more later in Profile.</p>
       <div class="intro-cards">
-        <button class="intro-card ${native ? '' : 'primary'}" onclick="openHuaweiImport()">${icon('download')}<span><b>Huawei Health</b> (Huawei watch / band)<small>Imports your whole history: heart rate, routes, steps and every pool length.</small></span></button>
-        <button class="intro-card" onclick="closePanel('introPanel'); switchTab('profile'); setTimeout(() => $('#cfg_client_id') && $('#cfg_client_id').scrollIntoView({ block: 'center' }), 600)">${icon('link')}<span><b>Strava</b><small>Automatic sync of everything you record on Strava.</small></span></button>
+        <button class="intro-card ${native ? '' : 'primary'}" onclick="closePanel('introPanel'); switchTab('profile'); setTimeout(() => $('#stravaWebSteps') && $('#stravaWebSteps').closest('.card').scrollIntoView({ block: 'start' }), 700)">${icon('link')}<span><b>Automatic: Huawei Health → Strava</b><small>Free. Walks, runs and rides arrive by themselves after every workout. 5-minute setup (steps shown).</small></span></button>
+        <button class="intro-card" onclick="openManualWorkout()">${icon('plus')}<span><b>Log by hand</b><small>Pool swims and gym in a few taps — Training → Log.</small></span></button>
+        <button class="intro-card" onclick="openHuaweiImport()">${icon('download')}<span><b>Huawei history (optional)</b><small>Import past sessions from Huawei's data export, incl. every pool length.</small></span></button>
         ${native ? `<button class="intro-card" onclick="closePanel('introPanel'); switchTab('profile')">${icon('heart')}<span><b>Samsung Health / Galaxy Watch</b><small>Swims, treadmill, gym, sleep and heart rate, automatic.</small></span></button>` : ''}
-        <div class="intro-card static">${icon('camera')}<span><b>Anything else</b><small>Squad → Add from screenshot: the AI reads the numbers off any app's screen.</small></span></div>
+        <div class="intro-card static">${icon('camera')}<span><b>Anything else</b><small>Squad → From screenshot: the AI reads the numbers off any app's screen.</small></span></div>
       </div>
       <div class="small mt-8" id="introWorkoutCount"></div>`;
   } else if (step === 'coach') {

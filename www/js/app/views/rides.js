@@ -73,7 +73,7 @@ async function renderWeekCard(all) {
       <div class="row between" style="position:relative; z-index:1">
         <div>
           <div class="card-title">This week</div>
-          <div class="card-sub">${formatNiceDate(formatLocalDate(ws), false)} – ${formatNiceDate(formatLocalDate(addDays(ws, 6)), false)}${streak > 1 ? ` · 🔥 ${streak}-week streak` : ''}</div>
+          <div class="card-sub">${formatNiceDate(formatLocalDate(ws), false)} – ${formatNiceDate(formatLocalDate(addDays(ws, 6)), false)}${streak > 1 ? ` · <span class="nowrap">🔥 ${streak}-week streak</span>` : ''}</div>
         </div>
         ${fs ? `<span class="form-chip" title="${escapeHtml(fs.label)}">${icon('activity', 'ic-sm')}Form ${signed(snap.tsb, 0)}</span>` : ''}
       </div>

@@ -101,7 +101,10 @@
         <div class="screen-title">Training</div>
         <div class="screen-sub" id="ridesSub">Loading…</div>
       </div>
-      <button id="btnSync" class="btn btn-primary btn-sm" onclick="syncAll()"><svg class="ic"><use href="#i-refresh"/></svg><span>Sync</span></button>
+      <div class="row" style="gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="openManualWorkout()" aria-label="Log a workout by hand"><svg class="ic"><use href="#i-plus"/></svg><span>Log</span></button>
+        <button id="btnSync" class="btn btn-primary btn-sm" onclick="syncAll()"><svg class="ic"><use href="#i-refresh"/></svg><span>Sync</span></button>
+      </div>
     </div>
     <div id="syncStatus" class="sync-status hidden">
       <span id="syncStatusText"></span>
@@ -389,6 +392,14 @@
 
     <div class="card">
       <div class="card-title"><svg class="ic"><use href="#i-link"/></svg>Connections</div>
+      <div id="stravaWebSteps" class="hidden">
+        <div class="card-sub mt-4">Huawei Health → Strava → this app, automatically. One-time setup (5 minutes):</div>
+        <ol class="hw-steps mt-8">
+          <li><b>Huawei Health</b> app → <b>Me</b> → <b>Data sharing and authorization</b> (or Third-party services) → <b>Strava</b> → sign in / create a free Strava account → allow.</li>
+          <li>Open <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> (signed in to that Strava account) and create an app: name <b>Training Partner</b>, category <b>Training</b>, website <b id="stravaSite"></b>, <b>Authorization Callback Domain</b>: <b id="stravaHost"></b>. Upload any picture as icon if asked.</li>
+          <li>Copy its <b>Client ID</b> and <b>Client Secret</b> below and tap <b>Sign in with Strava</b> → Authorize.</li>
+        </ol>
+      </div>
       <div class="field mt-12"><label>Strava Client ID</label><input type="text" id="cfg_client_id" class="input" /></div>
       <div class="field"><label>Strava Client Secret</label><input type="password" id="cfg_client_secret" class="input" autocomplete="off" /></div>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()">
@@ -768,28 +779,26 @@
 
 <div class="sheet" id="squadImportSheet" role="dialog" aria-modal="true">
   <div class="sheet-grip"></div>
-  <div class="sheet-title">Workout from screenshot</div>
-  <div class="sheet-sub mb-12">Aether read these numbers — check them, fix anything wrong, then save. It's added to your own workouts and shared with the squad.</div>
-  <div class="row" style="gap:10px; align-items:flex-start">
-    <img id="sqi_thumb" class="sq-import-thumb" alt="" />
-    <div class="grow">
-      <div class="field"><label for="sqi_sport">Sport</label><select id="sqi_sport" class="input"><option value="walk">Walk</option><option value="swim">Swim</option><option value="run">Run</option><option value="ride">Ride</option><option value="other">Gym &amp; other</option></select></div>
-      <div class="field mt-8"><label for="sqi_title">Name</label><input id="sqi_title" class="input" maxlength="60" /></div>
-    </div>
+  <div class="sheet-title" id="sqi_head">Workout from screenshot</div>
+  <div class="sheet-sub mb-12" id="sqi_sub">Aether read these numbers — check them, fix anything wrong, then save. It's added to your own workouts and shared with the squad.</div>
+  <img id="sqi_thumb" class="sq-import-thumb hidden" alt="" />
+  <div class="segmented sq-sport-pick" id="sqi_sportSeg">
+    <button data-v="walk" onclick="squadPickSport('walk')"><svg class="ic ic-sm"><use href="#i-walk"/></svg>Walk</button>
+    <button data-v="run" onclick="squadPickSport('run')"><svg class="ic ic-sm"><use href="#i-run"/></svg>Run</button>
+    <button data-v="swim" onclick="squadPickSport('swim')"><svg class="ic ic-sm"><use href="#i-swim"/></svg>Swim</button>
+    <button data-v="ride" onclick="squadPickSport('ride')"><svg class="ic ic-sm"><use href="#i-bike"/></svg>Ride</button>
+    <button data-v="other" onclick="squadPickSport('other')"><svg class="ic ic-sm"><use href="#i-dumbbell"/></svg>Gym</button>
   </div>
-  <div class="row mt-8" style="gap:8px">
-    <div class="field grow"><label for="sqi_date">Date</label><input id="sqi_date" type="date" class="input" /></div>
-    <div class="field grow"><label for="sqi_time">Start</label><input id="sqi_time" type="time" class="input" /></div>
+  <input type="hidden" id="sqi_sport" value="walk" />
+  <div class="field mt-12"><label for="sqi_title">Name</label><input id="sqi_title" class="input" maxlength="60" /></div>
+  <div class="sq-form-grid three mt-8">
+    <div class="field"><label for="sqi_date">Date</label><input id="sqi_date" type="date" class="input" /></div>
+    <div class="field"><label for="sqi_time">Start</label><input id="sqi_time" type="time" class="input" /></div>
+    <div class="field"><label for="sqi_dur">Duration</label><input id="sqi_dur" class="input" placeholder="h:mm:ss or mm:ss" /></div>
   </div>
-  <div class="row mt-8" style="gap:8px">
-    <div class="field grow"><label for="sqi_dur">Duration (h:mm:ss)</label><input id="sqi_dur" class="input" placeholder="0:45:00" /></div>
-    <div class="field grow"><label for="sqi_dist">Distance (km)</label><input id="sqi_dist" class="input" inputmode="decimal" /></div>
-  </div>
-  <div class="row mt-8" style="gap:8px">
-    <div class="field grow"><label for="sqi_hr">Avg HR</label><input id="sqi_hr" class="input" inputmode="numeric" /></div>
-    <div class="field grow"><label for="sqi_steps">Steps</label><input id="sqi_steps" class="input" inputmode="numeric" /></div>
-    <div class="field grow"><label for="sqi_kcal">kcal</label><input id="sqi_kcal" class="input" inputmode="numeric" /></div>
-  </div>
+  <div class="sq-form-grid mt-8" id="sqi_fields"></div>
+  <div class="field mt-8"><label>Effort (RPE 1–10)</label><div class="rpe-row" id="sqi_rpe"></div></div>
+  <div class="field mt-8"><label for="sqi_note">Note</label><input id="sqi_note" class="input" maxlength="240" placeholder="How it felt, what you did…" /></div>
   <div class="hint mt-8" id="sqi_extra"></div>
   <button class="btn btn-primary mt-12" onclick="saveSquadImport()"><svg class="ic"><use href="#i-check-circle"/></svg>Save workout</button>
 </div>

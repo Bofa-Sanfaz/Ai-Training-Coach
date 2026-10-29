@@ -222,7 +222,7 @@ function rideLedgerLine(w, mass, note, verdict) {
   const pmTxt = w.power_source === 'meter' && w.np_w && !isFlagged(w, 'power') ? ` | NP ${w.np_w}W` : '';
   const flags = flagNotes(w);
   const sw = swimOf(w);
-  const dist = hasVal(mv(w, 'distance_km')) ? `${distText(w)}, ${sp === 'swim' && swimPace100(w) ? `${fmtPace(swimPace100(w))}/100m` : speedText(w)}${sw && sw.swolf ? `, SWOLF ${sw.swolf}` : ''}${w.avg_cadence ? `, ${w.avg_cadence} spm` : ''}` : sp === 'other' ? `${w.name || 'gym'}${w.reps ? `, ${w.reps} reps` : ''}` : `distance/speed ${FLAGGED}`;
+  const dist = hasVal(mv(w, 'distance_km')) ? `${distText(w)}, ${sp === 'swim' && swimPace100(w) ? `${fmtPace(swimPace100(w))}/100m` : speedText(w)}${sw && sw.swolf ? `, SWOLF ${sw.swolf}` : w.swolf_manual ? `, SWOLF ${w.swolf_manual}` : ''}${w.main_stroke && w.main_stroke !== 'FREESTYLE' ? `, mostly ${w.main_stroke.toLowerCase()}` : ''}${w.calories ? `, ${w.calories} kcal` : ''}${w.avg_cadence ? `, ${w.avg_cadence} spm` : ''}` : sp === 'other' ? `${w.name || 'gym'}${w.reps ? `, ${w.reps} reps` : ''}` : `distance/speed ${FLAGGED}`;
   const asc = sp === 'swim' ? '' : hasVal(mv(w, 'elevation_gain_m')) ? `, ${Math.round(num(w.elevation_gain_m))}m` : `, climbing ${FLAGGED}`;
   const hr = hasVal(mv(w, 'avg_hr')) ? `${w.avg_hr || '--'}bpm` : `HR ${FLAGGED}`;
   const extra = sp === 'ride' ? ` | ${isFlagged(w, 'elevation') ? 'VAM n/a' : vamText(w)} | ${driftText(w)}` : '';

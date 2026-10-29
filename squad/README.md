@@ -94,12 +94,16 @@ node test/api-test.mjs
 1. Open the invite link (`https://…workers.dev/#join=ABCD-EFGH`) in **Safari** → Share → **Add to Home Screen**.
 2. Join with the code and his name.
 3. The **introduction** opens by itself: name, age/heart rate, weight, free Gemini key, join.
-4. Workouts from **Huawei Health** (no Strava needed): Huawei Health app → Me → his name → Privacy Center →
+4. **Automatic (free)**: Huawei Health app → Me → Data sharing → **Strava** (free account), then his own free
+   Strava API app at strava.com/settings/api (callback domain = this site's host) → Client ID/Secret in Profile →
+   Connections → Sign in with Strava. Walks, runs and rides then arrive by themselves; pool swims and gym
+   can be logged by hand (Training → Log).
+5. History / pool lengths (optional) from **Huawei Health's export**: Huawei Health app → Me → his name → Privacy Center →
    Request your data → Health → set a password → open the e-mailed link and download the ZIP → in the web
    app Profile → **Huawei Health → Import** (pick the ZIP, enter the password; remembered next time). His
    whole history comes in with heart rate, routes, steps and every pool length; later imports add only new
    sessions. Single sessions can also be added with Squad → **Add from screenshot**.
-5. Weight: Squad → **Log weight** (opt-in sharing).
+6. Weight: Squad → **Log weight** (opt-in sharing).
 
 ## Free-plan limits, measured (2026-10-30, `wrangler tail`, 6 months of heavy history)
 | | Free limit | Squad |

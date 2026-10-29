@@ -1211,3 +1211,17 @@ span.agent-chip { cursor: default; }
 .intro-ok { display: flex; gap: 8px; align-items: center; background: var(--good-soft); color: var(--good); border-radius: 12px; padding: 10px 12px; font-size: 0.86rem; margin-bottom: 12px; }
 .intro-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid var(--border); background: var(--surface); }
 .intro-foot .btn { width: auto; }
+.sq-quick { grid-template-columns: repeat(4, 1fr); }
+.sq-quick button { font-size: 0.66rem; padding: 10px 2px; }
+
+/* Manual log form */
+.sq-sport-pick button { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 2px; font-size: 0.72rem; }
+.sq-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sq-form-grid .field { margin: 0; }
+.sq-form-grid.three { grid-template-columns: 1fr 1fr; }
+.sq-form-grid.three .field:last-child { grid-column: 1 / -1; }
+.sq-form-grid > .field > label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.sq-check { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 650; padding: 10px 2px 0; grid-column: 1 / -1; }
+.sq-check input { width: 20px; height: 20px; accent-color: var(--brand); }
+#sqi_rpe { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.nowrap { white-space: nowrap; }
