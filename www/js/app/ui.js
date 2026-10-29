@@ -12,8 +12,33 @@ function icon(name, cls = '') {
   return `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 }
 
+// Native plugin access without a bundler.
+// Plugin JS packages normally call registerPlugin(); this app ships no bundle, so
+// Capacitor.Plugins.X would be undefined. Instead we call the native bridge directly:
+// method calls → Capacitor.nativePromise(plugin, method, options),
+// addListener → Capacitor.addListener(plugin, event, callback).
+const _pluginProxies = {};
 function capPlugin(name) {
-  return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
+  const C = window.Capacitor;
+  if (!C) return null;
+  if (C.Plugins && C.Plugins[name]) return C.Plugins[name];
+  if (typeof C.isNativePlatform !== 'function' || !C.isNativePlatform() || typeof C.nativePromise !== 'function') return null;
+  if (Array.isArray(C.PluginHeaders) && C.PluginHeaders.length && !C.PluginHeaders.some(h => h.name === name)) return null;
+  if (_pluginProxies[name]) return _pluginProxies[name];
+  _pluginProxies[name] = new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'then' || typeof prop === 'symbol') return undefined;
+      if (prop === 'addListener') {
+        return (event, cb) => {
+          const id = C.addListener(name, event, cb);
+          const handle = { remove: async () => C.removeListener(name, id, event, cb) };
+          return Object.assign(Promise.resolve(handle), handle);
+        };
+      }
+      return (opts = {}) => C.nativePromise(name, String(prop), opts);
+    }
+  });
+  return _pluginProxies[name];
 }
 
 function isNative() {
@@ -207,6 +232,9 @@ function applyTheme(theme) {
   if (meta) meta.setAttribute('content', dark ? '#0a101d' : '#f3f5fa');
   const btn = $('#themeBtn');
   if (btn) btn.innerHTML = icon(dark ? 'sun' : 'moon');
+  // Status/navigation bar icons: light icons on dark theme, dark icons on light theme
+  const bars = capPlugin('SystemBars');
+  if (bars) bars.setStyle({ style: dark ? 'DARK' : 'LIGHT' }).catch(() => {});
   $$('[data-theme-choice]').forEach(b => b.classList.toggle('active', b.dataset.themeChoice === (theme || 'system')));
 }
 

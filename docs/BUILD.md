@@ -14,9 +14,11 @@ powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1 -VersionCode 3000
 The script uses the portable toolchain in `C:\dev\tools` (no system install):
 | Tool | Path |
 |------|------|
-| Node.js 20 | `C:\dev\tools\node\node-v20.18.0-win-x64` |
-| JDK 17 (Temurin) | `C:\dev\tools\jdk\jdk-17.*` |
-| Android SDK (platform 34, build-tools 34) | `C:\dev\tools\android-sdk` |
+| Node.js 22 | `C:\dev\tools\node22\node-v22.*` |
+| JDK 21 (Temurin) | `C:\dev\tools\jdk21\jdk-21.*` |
+| Android SDK (platform 36, build-tools 36) | `C:\dev\tools\android-sdk` |
+
+(Capacitor 8 requires Node 22+, JDK 21 and compileSdk 36. The older Node 20 / JDK 17 folders are no longer used.)
 
 Steps it runs: `npm install` → `npx cap add/sync android` → `node scripts/patch-android.js` → `gradlew assembleRelease` signed with `persistent-keystore.jks`.
 

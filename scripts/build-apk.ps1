@@ -16,8 +16,9 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$node = Get-ChildItem "$Tools\node" -Directory | Select-Object -First 1
-$jdk = Get-ChildItem "$Tools\jdk" -Directory | Select-Object -First 1
+# Capacitor 8 needs Node 22+ and JDK 21
+$node = Get-ChildItem "$Tools\node22" -Directory | Select-Object -First 1
+$jdk = Get-ChildItem "$Tools\jdk21" -Directory | Select-Object -First 1
 if (-not $node -or -not $jdk) { throw "Toolchain missing in $Tools (node / jdk)." }
 $env:JAVA_HOME = $jdk.FullName
 $env:ANDROID_HOME = "$Tools\android-sdk"
@@ -28,11 +29,11 @@ $sdkmanager = "$env:ANDROID_HOME\cmdline-tools\latest\bin\sdkmanager.bat"
 function Step($m) { Write-Host "`n== $m" -ForegroundColor Cyan }
 
 Step 'Android SDK packages'
-if (-not (Test-Path "$env:ANDROID_HOME\platforms\android-34") -or -not (Test-Path "$env:ANDROID_HOME\build-tools\34.0.0")) {
+if (-not (Test-Path "$env:ANDROID_HOME\platforms\android-36") -or -not (Test-Path "$env:ANDROID_HOME\build-tools\36.0.0")) {
   if (-not (Test-Path "$env:ANDROID_HOME\licenses\android-sdk-license")) {
     throw "Android SDK licenses not accepted yet. Run:  & '$sdkmanager' --licenses"
   }
-  & $sdkmanager --install 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0'
+  & $sdkmanager --install 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
 }
 
 Step 'npm dependencies'

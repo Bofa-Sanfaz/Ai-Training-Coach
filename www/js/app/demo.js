@@ -49,7 +49,7 @@ function makeDemoRide(i, date, kind, rnd) {
     alt.push(round(a, 1));
     vel.push(round(v, 2));
     grade.push(round(Math.max(-15, Math.min(15, g)), 1));
-    hr.push(Math.round(h + (rnd() - 0.5) * 2));
+    hr.push(Math.min(max - 2, Math.round(h + (rnd() - 0.5) * 2)));
     moving.push(!stopped);
     cad.push(stopped ? 0 : Math.round(78 + intensity * 15 + (rnd() - 0.5) * 6));
   }

@@ -29,7 +29,14 @@ const WHATS_NEW = `
 - Ride detail opens as a full screen with a chat composer that stays at the bottom
 - Toasts and in-app dialogs instead of pop-up alerts; Android **Back** button now works everywhere
 
-### New features
+### New in 3.2
+- **Aether**, your season coach, knows everything and can change your plan and weekly targets when you ask — you approve each change
+- **Your own plan**: a repeating weekly template, one-off day changes and weekly targets; done/missed tracking
+- **Samsung Health** (Galaxy Watch) via Health Connect: sleep, resting HR, HRV, weight, steps — a readiness strip on Rides and better coaching
+- **Coach skills**: each AI follows proven coaching methods; import more from GitHub
+- Fixed: Android Back button, Strava sign-in link and file sharing now work natively
+
+### Also new in v3
 - **AI providers**: Gemini, Groq, OpenRouter, Mistral (free tiers) or Claude, OpenAI, DeepSeek (paid) — with a monthly spend cap, automatic fallback and replies that stream in as they're written
 - **AI week plan**: a 7-day plan from your form, phase and goals, with a checklist and today's session on the Rides tab
 - **Route map** coloured by heart-rate zone, and a **shareable ride card** image
@@ -73,6 +80,8 @@ async function boot() {
 
   await loadPhysioConfig();
   await loadAiSettings();
+  await migrateWeekPlan();
+  await loadSkills();
   applyTheme(currentThemeChoice());
   checkNetwork();
   window.addEventListener('online', checkNetwork);
@@ -112,6 +121,10 @@ async function boot() {
 // Auto-sync on open: Strava connected, online, enabled, last sync > 3 h ago
 async function maybeAutoSync() {
   try {
+    const w = await getWellness();
+    if ((await getConfig('health_enabled')) === '1' && (!w.updated_at || Date.now() - parseSafeDate(w.updated_at).getTime() > 3 * 3600000)) {
+      setTimeout(() => syncWellness(false), 2500);
+    }
     if ((await getConfig('auto_sync')) === '0' || !navigator.onLine) return;
     if (!(await getConfig('strava_refresh_token'))) return;
     const last = await getConfig('last_sync_at');

@@ -280,8 +280,8 @@
     </div>
 
     <div class="card">
-      <div class="card-title"><svg class="ic"><use href="#i-flame"/></svg>Weekly goals</div>
-      <div class="card-sub">Shown as progress bars on the Rides tab and used by the AI week planner. Leave blank for no goal.</div>
+      <div class="card-title"><svg class="ic"><use href="#i-flame"/></svg>Default weekly targets</div>
+      <div class="card-sub">Your standing targets. Change a single week (or let Aether do it) from the training plan in Coach. Leave blank for none.</div>
       <div class="input-row mt-12">
         <div class="field"><label>Distance (km)</label><input id="goal_km" class="input" type="number" min="0" inputmode="numeric" /></div>
         <div class="field"><label>Time (h)</label><input id="goal_hours" class="input" type="number" min="0" step="0.5" inputmode="decimal" /></div>
@@ -353,6 +353,30 @@
       <div class="card-sub">The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.</div>
       <div id="providerList" class="list mt-8"></div>
       <label class="switch-row mt-8"><span><b>Automatic fallback</b><br><span class="hint">If the active provider fails or hits a limit, try the others (free ones first).</span></span><input type="checkbox" id="cfg_ai_fallback" onchange="setAiFallback(this.checked)" /></label>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><svg class="ic"><use href="#i-star"/></svg>Coach skills</div>
+      <div class="card-sub">Coaching methods each AI follows (SKILL.md format). Built-in skills are written from open coaching protocols on GitHub. Import more from any GitHub link — only import skills you trust.</div>
+      <div id="skillList" class="mt-8"></div>
+      <div class="row mt-12">
+        <input id="skill_url" class="input grow" placeholder="https://github.com/…/SKILL.md" autocomplete="off" />
+        <button id="btnImportSkill" class="btn btn-secondary btn-sm" style="flex:0 0 auto" onclick="importSkillFromUrl()">Import</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><svg class="ic"><use href="#i-heart"/></svg>Samsung Health</div>
+      <div class="card-sub">Sleep, resting HR, HRV, weight, steps and VO2max from your Galaxy Watch, read through Android Health Connect (rides still come from Strava). In Samsung Health: Settings → Health Connect → allow sharing.</div>
+      <div id="healthState" class="small mt-8"></div>
+      <button id="btnHealthConnect" class="btn btn-primary mt-12" onclick="connectHealth()"><svg class="ic"><use href="#i-link"/></svg>Link Health Connect</button>
+      <div id="healthOnRow" class="hidden">
+        <label class="switch-row mt-8"><span><b>Copy weight to my weight log</b><br><span class="hint">New scale weights from Samsung Health are added automatically.</span></span><input type="checkbox" id="cfg_health_weight" onchange="setPref('health_weight_to_log', this.checked)" /></label>
+        <div class="btn-row mt-8">
+          <button id="btnHealthSync" class="btn btn-secondary btn-sm" onclick="syncWellness(true)">Import now</button>
+          <button class="btn btn-ghost btn-sm" onclick="disconnectHealth()">Pause import</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -482,7 +506,7 @@
 <div class="panel" id="threadPanel">
   <div class="panel-head">
     <button class="icon-btn" onclick="closePanel('threadPanel')" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button>
-    <div class="panel-title"><div class="t">Master Season Coach</div><div class="s" id="masterSub">Full season memory</div></div>
+    <div class="panel-title"><div class="t">Aether</div><div class="s" id="masterSub">Season coach</div></div>
     <button class="icon-btn" onclick="resetMasterThread()" aria-label="Reset conversation"><svg class="ic"><use href="#i-trash"/></svg></button>
   </div>
   <div class="panel-body" id="masterBody">
@@ -490,6 +514,12 @@
       <div class="model-bar"><span class="label tiny"><svg class="ic ic-sm"><use href="#i-sparkle"/></svg>Coach model</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
       <div class="chat" id="hubChatContainer"></div>
     </div>
+  </div>
+  <div class="quick-row">
+    <button class="chip" onclick="aetherQuick('How ready am I to train today, and what should I ride?')">Ready today?</button>
+    <button class="chip" onclick="aetherQuick('Review my week so far against the plan and targets.')">Review my week</button>
+    <button class="chip" onclick="aetherQuick('I can only ride fewer days this week — please adjust my plan and targets.')">Adjust my week</button>
+    <button class="chip" onclick="aetherQuick('Here is my training plan, please set it up as my weekly template: ')">Set up my plan</button>
   </div>
   <div id="hubAttachPreview" class="attach-preview hidden">
     <img id="hubPreviewThumb" alt="" /><span class="grow">Screenshot attached</span>
@@ -534,6 +564,54 @@
     <button class="btn btn-primary" onclick="saveActiveIntentAndNext()">Confirm</button>
   </div>
   <button class="btn btn-ghost btn-sm mt-8" style="width:100%" onclick="closeIntentModalQueue()">Decide later</button>
+</div>
+
+<!-- PLAN DAY EDITOR -->
+<div class="sheet" id="planDaySheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title" id="pdTitle">Session</div>
+  <div class="sheet-sub" id="pdSub"></div>
+  <div class="input-row mt-16">
+    <div class="field"><label>Type</label><select id="pd_type" class="input"></select></div>
+    <div class="field"><label>Minutes</label><input id="pd_dur" class="input" type="number" min="0" inputmode="numeric" /></div>
+    <div class="field"><label>Zone</label><input id="pd_zone" class="input" placeholder="Z2" /></div>
+  </div>
+  <div class="field"><label>Title</label><input id="pd_title" class="input" placeholder="e.g. Z2 endurance" /></div>
+  <div class="field"><label>Details</label><textarea id="pd_details" class="input" rows="2" placeholder="e.g. 3×10 min Z4 with 5 min easy between"></textarea></div>
+  <div id="pdDateActions" class="btn-row">
+    <button class="btn btn-primary" onclick="savePlanDay(false)">Save for this day</button>
+    <button class="btn btn-secondary" onclick="savePlanDay(true)">Save to template</button>
+  </div>
+  <button class="btn btn-primary mt-8 template-only" onclick="savePlanDay(false)">Save</button>
+  <div class="btn-row mt-8">
+    <button class="btn btn-ghost btn-sm" onclick="clearPlanDay()">Make it a rest day</button>
+    <button class="btn btn-ghost btn-sm" id="pdResetBtn" onclick="resetPlanDay()">Back to template</button>
+  </div>
+</div>
+
+<!-- WEEKLY TEMPLATE -->
+<div class="sheet" id="templateSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">My weekly template</div>
+  <div class="sheet-sub mb-12">Your own plan, repeated every week. Changes for single days don't touch it. Tip: paste your plan to Aether and it fills this in.</div>
+  <div id="templateRows" class="list"></div>
+</div>
+
+<!-- WEEKLY TARGETS -->
+<div class="sheet" id="targetsSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Weekly targets</div>
+  <div class="sheet-sub">Set a one-off target for a busy or recovery week, or change your standing default.</div>
+  <div class="field mt-16"><label>Applies to</label>
+    <select id="tg_scope" class="input"><option value="this_week">This week only</option><option value="next_week">Next week only</option><option value="default">Every week (default)</option></select>
+  </div>
+  <div class="input-row">
+    <div class="field"><label>Distance (km)</label><input id="tg_km" class="input" type="number" min="0" inputmode="numeric" /></div>
+    <div class="field"><label>Time (h)</label><input id="tg_hours" class="input" type="number" min="0" step="0.5" inputmode="decimal" /></div>
+    <div class="field"><label>Rides</label><input id="tg_rides" class="input" type="number" min="0" inputmode="numeric" /></div>
+  </div>
+  <div class="field"><label>Note</label><input id="tg_note" class="input" placeholder="e.g. recovery week, travelling" /></div>
+  <button class="btn btn-primary" onclick="saveTargetsSheet()">Save targets</button>
 </div>
 
 <!-- AI PROVIDER EDITOR -->
@@ -610,6 +688,8 @@
 <script src="js/app/athlete.js"></script>
 <script src="js/app/strava.js"></script>
 <script src="js/app/providers.js"></script>
+<script src="js/app/skills.js"></script>
+<script src="js/app/health.js"></script>
 <script src="js/app/ai.js"></script>
 <script src="js/app/charts.js"></script>
 <script src="js/app/route.js"></script>

@@ -23,6 +23,8 @@ async function renderProfile() {
   $('#cfg_client_secret').value = await getConfig('strava_client_secret');
   await renderProviders();
   await renderSpend();
+  renderSkills();
+  await renderHealthCard();
 
   const connected = !!(await getConfig('strava_refresh_token'));
   $('#stravaState').innerHTML = connected

@@ -405,7 +405,7 @@ async function recomputeAllMetrics(onProgress) {
 // --------------------------------------------------------
 // 1-MINUTE TELEMETRY TIMELINE (single pass)
 // --------------------------------------------------------
-async function build1MinuteTelemetryTimeline(stravaId) {
+async function build1MinuteTelemetryTimeline(stravaId, stepMin = 1) {
   const cached = await db.streams.get(Number(stravaId));
   const s = cached && cached.stream_data;
   if (!s || !s.time || !Array.isArray(s.time.data)) return 'No granular stream recorded for this workout.';
@@ -421,7 +421,7 @@ async function build1MinuteTelemetryTimeline(stravaId) {
   const buckets = new Map();
   for (let i = 0; i < times.length; i++) {
     if (moving && moving[i] === false) continue;
-    const minute = Math.floor(times[i] / 60) + 1;
+    const minute = Math.floor(times[i] / (60 * stepMin)) * stepMin + 1;
     let bk = buckets.get(minute);
     if (!bk) { bk = { spd: 0, n: 0, hr: 0, hrN: 0, pw: 0, pwN: 0, first: i, last: i }; buckets.set(minute, bk); }
     bk.spd += num(speeds[i]); bk.n++;

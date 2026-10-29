@@ -1,0 +1,4 @@
+{
+  "credits": "Written for Ride Partner. Methodology informed by open-source coaching skills on GitHub: estruyf/skill-cycling-plan-coach (MIT), CrankAddict Section 11 via satoshistackalotto/skills (MIT), disco-trooper/skills cycling-training; and by Seiler (2010) intensity distribution, Banister impulse-response (TRIMP/CTL/ATL), Friel aerobic decoupling.",
+  "skills": ["coach-voice", "intensity-zones", "load-and-readiness", "ride-analysis", "plan-design", "fuel-and-recovery", "mtb-terrain", "plan-actions"]
+}

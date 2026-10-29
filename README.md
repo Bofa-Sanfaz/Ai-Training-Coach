@@ -12,9 +12,9 @@ aerobic decoupling and training load, and uses Google Gemini as a personal coach
 | **Ride detail** | Route map coloured by HR zone, key stats, feel + RPE + private note, zone time, VAM, decoupling, load, best efforts (NP/IF/TSS with a power meter), comparison with prior rides of the same intent, stream chart, AI debrief and chat (streaming, screenshots), shareable ride card |
 | **Trends** | Fitness / Fatigue / Form (CTL / ATL / TSB from TRIMP), training calendar, weekly volume, best efforts (all time vs 6 weeks), ride-by-ride progression, AI season audit |
 | **Compare** | Two or three rides side by side + AI comparison |
-| **Coach** | AI 7-day plan with checklist, master season coach with full memory, every ride thread |
+| **Coach** | **Aether** (season coach — full context, can change your plan and targets after you approve), your training plan (weekly template + day changes + weekly targets, done/missed tracking, AI adapt), every ride thread |
 | **Reports** | 7d / 30d / 1y / all-time KPIs vs previous period, zone strain, all-time records, AI review, A4 PDF export |
-| **Profile** | Athlete, weekly goals, weight log, training phases, HR zones + FTP, Strava, **AI providers** (free + paid, fallback) and **monthly spend cap**, theme, auto-sync, haptics, backups, restore points, Classic (v2) rollback, diagnostics, demo rides |
+| **Profile** | Athlete, **Samsung Health via Health Connect** (sleep, resting HR, HRV, weight, steps, VO2max), **coach skills** (built-in + import from GitHub), default weekly targets, weight log, training phases, HR zones + FTP, Strava, **AI providers** (free + paid, fallback) and **monthly spend cap**, theme, auto-sync, haptics, backups, restore points, Classic (v2) rollback, diagnostics, demo rides |
 
 ## AI providers
 | Provider | Cost | Notes |

@@ -48,6 +48,19 @@ $2`
 if (!manifest.includes('windowSoftInputMode')) {
   manifest = manifest.replace('android:name=".MainActivity"', 'android:name=".MainActivity"\n            android:windowSoftInputMode="adjustResize"');
 }
+// Health Connect: least privilege. The plugin declares read+write for ~24 data types;
+// keep only the reads Ride Partner uses, remove every write and unused read.
+const HEALTH_KEEP = ['STEPS', 'HEART_RATE', 'WEIGHT', 'SLEEP', 'RESPIRATORY_RATE', 'OXYGEN_SATURATION', 'RESTING_HEART_RATE', 'HEART_RATE_VARIABILITY', 'VO2_MAX'];
+const pluginManifest = path.join(root, 'node_modules', '@capgo', 'capacitor-health', 'android', 'src', 'main', 'AndroidManifest.xml');
+if (fs.existsSync(pluginManifest)) {
+  const perms = [...read(pluginManifest).matchAll(/android\.permission\.health\.([A-Z0-9_]+)/g)].map(m => m[1]);
+  const remove = [...new Set(perms)].filter(p => p.startsWith('WRITE_') || !HEALTH_KEEP.includes(p.replace(/^READ_/, '')));
+  if (!manifest.includes('xmlns:tools=')) manifest = manifest.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android"', '<manifest xmlns:android="http://schemas.android.com/apk/res/android"\n    xmlns:tools="http://schemas.android.com/tools"');
+  manifest = manifest.replace(/\s*<!-- RP-HEALTH -->[\s\S]*?<!-- \/RP-HEALTH -->/, '');
+  const block = `\n    <!-- RP-HEALTH -->\n    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />\n${remove.map(p => `    <uses-permission android:name="android.permission.health.${p}" tools:node="remove" />`).join('\n')}\n    <!-- /RP-HEALTH -->`;
+  manifest = manifest.replace('<!-- Permissions -->', `<!-- Permissions -->${block}`);
+  log(`Health Connect: ${HEALTH_KEEP.length} read permissions kept, ${remove.length} removed`);
+}
 write(manifestPath, manifest);
 log('AndroidManifest: Strava deep link + adjustResize');
 
@@ -59,7 +72,14 @@ let strings = read(stringsPath)
 write(stringsPath, strings);
 log(`App name: ${APP_NAME}`);
 
-// 3) Version
+// 3) Min SDK 26 (Android 8.0) — required by the Health Connect plugin
+const varsPath = path.join(root, 'android', 'variables.gradle');
+if (fs.existsSync(varsPath)) {
+  write(varsPath, read(varsPath).replace(/minSdkVersion\s*=\s*\d+/, 'minSdkVersion = 26'));
+  log('minSdkVersion 26');
+}
+
+// Version
 const gradlePath = path.join(app, 'build.gradle');
 let gradle = read(gradlePath)
   .replace(/versionCode\s+\d+/, `versionCode ${versionCode}`)

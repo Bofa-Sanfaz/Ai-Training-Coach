@@ -60,8 +60,9 @@ async function renderWeekCard(all) {
   const host = $('#weekCard');
   if (!all.length) { host.innerHTML = ''; return; }
   const { cur, prev, streak } = weekSummary(all);
-  const goals = await getWeeklyGoals();
-  const todayItem = todayPlanItem(await getWeekPlan());
+  const goals = await getWeeklyGoals(formatLocalDate(startOfWeek(new Date())));
+  const todayItem = await todayPlanItem();
+  const readiness = await readinessChipHtml();
   const snap = currentLoadSnapshot(computeLoadSeries(all));
   const fs = snap ? formStatus(snap.tsb) : null;
   const ws = startOfWeek(new Date());
@@ -82,6 +83,7 @@ async function renderWeekCard(all) {
       </div>
       ${fs ? `<div class="week-foot">${escapeHtml(fs.label)} · fitness ${Math.round(snap.ctl)} · fatigue ${Math.round(snap.atl)}</div>` : ''}
     </div>
+    ${readiness}
     ${todayItem ? `<div class="today-plan ${todayItem.done ? 'done' : ''}" onclick="switchTab('coach')">
       <span class="plan-dot" style="background:${(PLAN_TYPES[todayItem.type] || PLAN_TYPES.other).color}"></span>
       <span class="grow"><b>Today: ${escapeHtml(todayItem.title)}</b><br><span class="tiny muted">${todayItem.type === 'rest' ? 'Rest day' : `${todayItem.duration_min} min${todayItem.zone ? ` · ${escapeHtml(todayItem.zone)}` : ''}`}${todayItem.done ? ' · done ✓' : ''}</span></span>

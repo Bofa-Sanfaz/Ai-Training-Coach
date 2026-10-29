@@ -66,6 +66,15 @@ android-res/          launcher icons, adaptive icon, splash (generated from asse
 - Verified: Gemini model list (ai.google.dev, Oct 2026), Gemini REST streaming + models list, Anthropic Messages API headers/streaming (claude-api skill), free-tier providers (OpenRouter blog et al.).
 - Tested in browser: fallback (Gemini 429 → Groq streamed), Claude request shape + cost math, spend cap blocking, back button, exports without keys, all tabs error-free.
 
+## v3.2 (user requests 2026-10-29)
+- Preset plan that fluctuates → weekly template + date overrides + weekly targets (default / this week / next week) in `plan.js`.
+- Master coach named **Aether**; can change plan/targets via `<plan-update>` proposals the user approves (`coach.js`, `ai.js`, skill `plan-actions`).
+- Per-agent context review → `ai.js` rewritten as a context library; `contextBudget()` trims for small models.
+- "Add skills, fetch from GitHub" → `www/skills/*.md` (SKILL.md format) + `skills.js` (per-agent assignment, import from GitHub URL).
+- Samsung Health (Galaxy Watch 8 Classic) → Health Connect via `@capgo/capacitor-health` 8.x → required **Capacitor 8** upgrade (Node 22, JDK 21, SDK 36).
+- Found & fixed: `Capacitor.Plugins.X` never existed without a bundler (affected v2 too) → `capPlugin()` now calls the native bridge directly.
+- Privacy: user asked not to leak anything on public GitHub → commit author switched to the GitHub no-reply address; history rewrite prepared locally (force-push needs the user's OK); keystore/password were already public from the original CI (flagged to the user).
+
 ## Not verified yet
 - Real Strava sync and Gemini calls (no credentials here) — logic reviewed, demo data used for everything else.
 - On-device behaviour (back button, share sheet, deep link) — needs a phone test.

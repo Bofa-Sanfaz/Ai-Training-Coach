@@ -1,5 +1,34 @@
 # Changelog
 
+## 3.2.0 — 2026-10-29
+### Your plan, made dynamic
+- **Weekly template**: enter your own preset plan once (Mon–Sun); it repeats every week.
+- **Day changes** for weeks that fluctuate (by you, Aether or the AI planner) without touching the template; "Back to template" resets a day.
+- **Weekly targets**: a default plus one-off overrides for this or next week.
+- Planned sessions are marked done automatically when a ride exists that day (or tick them), missed ones show a red ✕; 14-day adherence feeds the coaches.
+- "Adapt with AI" re-plans only the next 7 days, keeping your template wherever it still fits.
+
+### Aether — the season coach
+- The master coach is now **Aether**: fullest context of all AIs and the only one that can change your plan and targets.
+- When you ask ("I can only ride twice this week", or paste your plan) Aether proposes a change; it appears as a card with **Apply / Dismiss** — nothing changes without your tap (a restore point is created first).
+- Quick prompts: Ready today? · Review my week · Adjust my week · Set up my plan.
+
+### AI context, per role
+- Each AI role now gets its own context (see `www/js/app/ai.js`): Aether everything; ride coach the ride + planned session + load and wellness *on that date*; compare, reports, trends and planner each what they need. Long sections are trimmed automatically for small free models.
+- **Coach skills** (SKILL.md format, `www/skills/`): coach voice, intensity & zones, load & readiness, ride analysis, plan design, fuel & recovery, MTB terrain, plan actions — each assigned to the roles that need it. Written from open coaching protocols on GitHub (estruyf/skill-cycling-plan-coach, CrankAddict Section 11, disco-trooper cycling-training) and the underlying science (Seiler, Banister, Friel). Import more skills from any GitHub link in Profile.
+
+### Samsung Health (Galaxy Watch) via Health Connect
+- Read-only import of sleep (with stages), resting HR, HRV, weight, steps and VO2max. Rides still come from Strava.
+- Readiness strip on Rides (sleep, resting HR vs baseline, HRV vs baseline); wellness feeds Aether, the ride coach, planner and reports.
+- New scale weights can be copied into the weight log automatically.
+- Least privilege: only 9 read permissions are requested; every write permission is stripped at build time. Privacy policy screen included.
+
+### Platform & fixes
+- **Capacitor 8** (Android 16 target, Node 22, JDK 21).
+- **Fixed (also affected v2):** native plugins were never registered because the app has no JS bundler, so the Android Back button handler, the Strava sign-in deep link and file saving silently fell back. The app now talks to the native bridge directly.
+- Status-bar icon colour follows the light/dark theme.
+- Removed a stray empty `www/js/package.json`; demo heart rates capped below max HR.
+
 ## 3.1.0 — 2026-10-29
 ### AI providers (fixes + new)
 - **Fixed:** v2 offered `gemini-3.7-flash` and `gemini-3.5-flash`, which are not on Google's current model list → requests could fail. Retired IDs now switch to `gemini-3.8-flash` automatically.
