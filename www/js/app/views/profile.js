@@ -65,7 +65,14 @@ let editingProviderId = null;
 async function renderProviders() {
   if (!AI) await loadAiSettings();
   $('#cfg_ai_fallback').checked = !!AI.fallback;
-  $('#providerList').innerHTML = AI.providers.map(p => {
+  // Web app: Gemini only (see geminiOnly in providers.js)
+  const gem = geminiOnly();
+  $('#btnAddProvider').classList.toggle('hidden', gem);
+  $('#aiProvSub').textContent = gem
+    ? 'Your coaches run on Google Gemini — free. Tap Google Gemini to paste your key (aistudio.google.com/apikey) and choose the model.'
+    : 'The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.';
+  $('#aiFallbackHint').textContent = gem ? 'If the Gemini model is busy or out of free quota, another Gemini model answers.' : 'If the active provider fails or hits a limit, try the others (free ones first).';
+  $('#providerList').innerHTML = AI.providers.filter(p => !gem || p.type === 'gemini').map(p => {
     const ready = providerReady(p);
     const active = p.id === AI.active;
     return `<div class="list-item prov-row" onclick="openProviderSheet('${escapeHtml(p.id)}')">

@@ -59,7 +59,7 @@ Updating later: `npx wrangler deploy` again (also re-publishes the web app from 
 | 100 000 requests/day | ~4 s polling only while a chat is open, 15–60 s otherwise |
 | D1: 5 M rows read, 100 k written per day | a few thousand per day |
 | Cron: every 15 min | AI recaps and check-ins when nobody has the app open |
-| CPU 10 ms per request | waiting for the AI does not count as CPU |
+| CPU 10 ms per request | waiting for the AI does not count as CPU; measured numbers below |
 
 ## Security & privacy
 
@@ -93,10 +93,18 @@ node test/api-test.mjs
 
 1. Open the invite link (`https://…workers.dev/#join=ABCD-EFGH`) in **Safari** → Share → **Add to Home Screen**.
 2. Join with the code and his name.
-3. Workouts: link **Huawei Health → Strava** (Huawei Health app → Me → Data sharing → Strava), then in
-   the web app: Profile → Strava → his **own** free Strava API app (strava.com/settings/api, callback
-   domain = the workers.dev host) → Connect. New Strava API apps only work for their owner, so
-   everyone needs his own.
-4. Anything that doesn't reach Strava (e.g. pool swims with lengths): Squad → **Add from screenshot** —
-   Aether reads the Huawei screen, he checks the numbers and saves.
+3. The **introduction** opens by itself: name, age/heart rate, weight, free Gemini key, join.
+4. Workouts from **Huawei Health** (no Strava needed): Huawei Health app → Me → his name → Privacy Center →
+   Request your data → Health → set a password → open the e-mailed link and download the ZIP → in the web
+   app Profile → **Huawei Health → Import** (pick the ZIP, enter the password; remembered next time). His
+   whole history comes in with heart rate, routes, steps and every pool length; later imports add only new
+   sessions. Single sessions can also be added with Squad → **Add from screenshot**.
 5. Weight: Squad → **Log weight** (opt-in sharing).
+
+## Free-plan limits, measured (2026-10-30, `wrangler tail`, 6 months of heavy history)
+| | Free limit | Squad |
+|---|---|---|
+| CPU per request | 10 ms (occasional overruns tolerated) | polls 1–8 ms, posts 2–5 ms, AI runs 9–12 ms (context digest built on the phones) |
+| Requests | 100 000/day | a few thousand/day |
+| D1 reads / writes | 5 M / 100 k per day | tens of thousands / hundreds |
+| Wall time | none for HTTP; cron 15 min | AI waits are fine |

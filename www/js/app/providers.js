@@ -50,6 +50,11 @@ const PROVIDER_PRESETS = {
 };
 
 let AI = null; // { active, fallback, capUsd, providers: [...], agentModels: { agent: { pid, model } } }
+
+// A friend's web app (iPhone) uses Google Gemini only: one free key, no provider choices.
+// "Use another provider" then means another Gemini model; "Keep retrying" is unchanged.
+const geminiOnly = () => !isNative();
+const geminiProvider = () => AI && AI.providers.find(p => p.type === 'gemini');
 const aiRunning = new Set(); // agents with a request in flight (one per agent; different agents may run together)
 
 // --------------------------------------------------------
@@ -78,6 +83,11 @@ async function loadAiSettings() {
     await setJsonConfig('ai_providers', s);
   }
   for (const p of s.providers) if (p.type === 'gemini' && RETIRED_MODELS.includes(p.model)) p.model = PROVIDER_PRESETS.gemini.model;
+  if (geminiOnly()) {
+    let g = s.providers.find(p => p.type === 'gemini');
+    if (!g) { g = newProvider('gemini', { id: 'gemini' }); s.providers.unshift(g); }
+    s.active = g.id;
+  }
   if (!s.providers.some(p => p.id === s.active)) s.active = s.providers[0] ? s.providers[0].id : '';
   if (!(s.capUsd >= 0)) s.capUsd = 5;
   if (!s.agentModels || typeof s.agentModels !== 'object') s.agentModels = {};
@@ -168,7 +178,11 @@ function openModelPicker(agent) {
   const cur = AI.agentModels[agent] || null;
   pick = { agent, pid: cur ? cur.pid : null, model: cur ? cur.model : null, strict: !!(cur && cur.strict), all: false, q: '' };
   $('#modelPickTitle').textContent = `Model · ${AI_AGENTS[agent] || agent}`;
-  renderPickProviders();
+  const g = geminiProvider();
+  if (geminiOnly() && g) {
+    if (!pick.pid || pick.pid !== g.id) { pick.pid = g.id; pick.model = g.model; }
+    renderPickModels();
+  } else renderPickProviders();
   openSheet('modelPickSheet', () => { pick = null; });
 }
 
@@ -207,12 +221,15 @@ function pickProvider(pid) {
 
 function renderPickModels() {
   const p = providerById(pick.pid);
-  const list = [{ id: p.model, label: 'Provider default' }].concat((p.models || []).filter(m => m.id !== p.model));
+  const gem = geminiOnly();
+  // Web app: the known Gemini chat models, plus any loaded from Google
+  const base = gem ? GEMINI_MODELS.map(([id, label]) => ({ id, label })) : [];
+  const list = (gem ? base : [{ id: p.model, label: 'Provider default' }]).concat((p.models || []).filter(m => m.id !== p.model && !base.some(b => b.id === m.id) && (!gem || /^gemini/.test(m.id))));
   const q = pick.q.toLowerCase();
   const shown = list.filter(m => !q || `${m.id} ${m.label || ''}`.toLowerCase().includes(q)).slice(0, 60);
   const priceTag = m => m.free ? '<span class="tag free">free</span>' : m.price ? `<span class="tag">$${fmtNum(m.price[0], 2)}/$${fmtNum(m.price[1], 2)}</span>` : (p.type === 'anthropic' && CLAUDE_PRICES[m.id] ? `<span class="tag">$${CLAUDE_PRICES[m.id][0]}/$${CLAUDE_PRICES[m.id][1]}</span>` : '');
   $('#modelPickList').innerHTML = `
-    <button class="pick-back" onclick="renderPickProviders()">${icon('back', 'ic-sm')}All providers</button>
+    ${gem ? '' : `<button class="pick-back" onclick="renderPickProviders()">${icon('back', 'ic-sm')}All providers</button>`}
     <div class="prov-head">${providerBadge(p)}<div class="grow"><b>${escapeHtml(p.name)}</b><div class="tiny muted">${p.paid ? 'Paid — counts toward your spend cap' : 'Free tier'}</div></div>
       <button class="btn btn-secondary btn-xs" onclick="refreshPickModels()">${icon('refresh', 'ic-sm')}Refresh</button></div>
     ${list.length > 8 ? `<input class="input pick-search" placeholder="Search ${list.length} models…" value="${escapeHtml(pick.q)}" oninput="pick.q=this.value; renderPickModelsKeepFocus()" />` : ''}
@@ -221,9 +238,11 @@ function renderPickModels() {
         <span class="grow"><b>${escapeHtml(shortModelName(m.id))}</b><span class="tiny muted">${escapeHtml(m.label && m.label !== m.id ? m.label : m.id)}</span></span>${priceTag(m)}${pick.model === m.id ? icon('check-circle', 'ic-sm') : ''}</button>`).join('') || '<div class="small muted">No models match.</div>'}</div>`;
   $('#modelPickFoot').classList.remove('hidden');
   $$('#pickMode button').forEach(b => b.classList.toggle('active', (b.dataset.v === 'strict') === pick.strict));
+  $('#pickMode button[data-v="fallback"]').textContent = gem ? 'Use another Gemini model' : 'Use another provider';
   $('#pickModeHint').textContent = pick.strict
     ? `Only ${shortModelName(pick.model)} answers. If it is busy or rate-limited, Training Partner waits and retries (10 s, 20 s, 40 s… up to 5 min apart) until it replies — your message is kept even if you leave the app.`
-    : `${shortModelName(pick.model)} answers first; if it fails, your other providers answer instead (free first).`;
+    : gem ? `${shortModelName(pick.model)} answers first; if it is busy or out of free quota, another Gemini model answers instead.`
+      : `${shortModelName(pick.model)} answers first; if it fails, your other providers answer instead (free first).`;
 }
 
 function renderPickModelsKeepFocus() {
@@ -511,10 +530,18 @@ async function callAI(prompt, imageB64 = null, opts = {}) {
   const lane = opts.agent || 'default';
   if (aiRunning.has(lane)) { toast('This coach is still answering — please wait.', 'warn'); return null; }
 
-  const pinned = agentChoice(opts.agent);
-  const primary = pinned ? withModel(pinned.p, pinned.model) : activeProvider();
-  const others = AI.fallback ? AI.providers.filter(p => p.id !== (primary && primary.id) && providerReady(p)).sort((a, b) => Number(a.paid) - Number(b.paid)) : [];
-  if (pinned && AI.fallback && providerReady(activeProvider()) && activeProvider().id !== pinned.p.id) others.unshift(...others.splice(others.indexOf(activeProvider()), 1));
+  const pinnedRaw = agentChoice(opts.agent);
+  const pinned = pinnedRaw && geminiOnly() && pinnedRaw.p.type !== 'gemini' ? null : pinnedRaw;
+  const primary = pinned ? withModel(pinned.p, pinned.model) : geminiOnly() ? geminiProvider() : activeProvider();
+  let others;
+  if (geminiOnly()) {
+    // Fallback = the other Gemini models (lighter ones have more free quota)
+    const g = geminiProvider();
+    others = AI.fallback && g ? GEMINI_MODELS.map(m => m[0]).filter(id => id !== (primary && primary.model)).map(id => withModel(g, id)) : [];
+  } else {
+    others = AI.fallback ? AI.providers.filter(p => p.id !== (primary && primary.id) && providerReady(p)).sort((a, b) => Number(a.paid) - Number(b.paid)) : [];
+    if (pinned && AI.fallback && providerReady(activeProvider()) && activeProvider().id !== pinned.p.id) others.unshift(...others.splice(others.indexOf(activeProvider()), 1));
+  }
   const chain = (providerReady(primary) ? [primary] : []).concat(others);
   if (!chain.length) {
     toast('Set up an AI provider first: Profile → AI providers (Gemini, Groq and OpenRouter have free tiers).', 'warn', 6000);
@@ -536,7 +563,7 @@ async function callAI(prompt, imageB64 = null, opts = {}) {
       try {
         const text = await requestProvider(p, prompt, imageB64, opts);
         if (opts.meta) Object.assign(opts.meta, { provider: shortProviderName(p), model: p.model, secs: Math.round((Date.now() - t0) / 1000) });
-        if (p !== primary) toast(`${primary ? primary.name : 'Primary provider'} unavailable — answered by ${p.name} (${shortModelName(p.model)}).`, 'info', 3500);
+        if (p !== primary) toast(geminiOnly() ? `${shortModelName(primary.model)} busy — answered by ${shortModelName(p.model)}.` : `${primary ? primary.name : 'Primary provider'} unavailable — answered by ${p.name} (${shortModelName(p.model)}).`, 'info', 3500);
         return text;
       } catch (err) {
         failures.push(`${p.name}: ${describeAiError(err)}`);

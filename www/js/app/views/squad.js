@@ -20,7 +20,7 @@ const Squad = {
   cur: null,       // current challenge id
   data: {},        // id → { seq, events, members, challenge, me, today, read_seq }
   outbox: [],      // [{ cid, ev }]
-  timer: null, busy: {}, aiBusy: {}, lastShare: 0, lastAll: 0, offline: false,
+  timer: null, busy: {}, aiBusy: {}, lastShare: 0, lastAll: 0, offline: false, digestHash: {}, digestSeq: {},
   replyTo: null, actRef: null, msgId: null,
   view: 'home', feedFilter: 'all', month: null, statsRange: 'challenge', importDraft: null
 };
@@ -37,7 +37,7 @@ async function squadInit() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) squadTick(true); });
   window.addEventListener('online', () => squadTick(true));
   const hash = location.hash.match(/join=([A-Za-z0-9-]{8,9})/);
-  if (hash) setTimeout(() => openSquadJoin(hash[1]), 900);
+  if (hash && !window.__introPending) setTimeout(() => openSquadJoin(hash[1]), 900); // with the intro, its squad step offers the join
   squadSchedule(1500);
 }
 
@@ -62,7 +62,7 @@ function squadId(prefix = 'e') {
 }
 
 // ---------- API ----------
-async function squadApi(server, method, path, body, token, timeoutMs = 20000) {
+async function squadApi(server, method, path, body, token, timeoutMs = 20000, rawBody) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   let res, d;
@@ -70,7 +70,7 @@ async function squadApi(server, method, path, body, token, timeoutMs = 20000) {
     res = await fetch(String(server).replace(/\/$/, '') + path, {
       method, signal: ctl.signal,
       headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
-      body: body ? JSON.stringify(body) : undefined
+      body: rawBody !== undefined ? rawBody : body ? JSON.stringify(body) : undefined
     });
     d = await res.json().catch(() => ({}));
   } catch (e) {
@@ -127,6 +127,8 @@ async function squadSync(cid) {
     if (c.name !== st.challenge.name) { c.name = st.challenge.name; await squadSaveList(); }
     await squadPersist(cid);
     Squad.offline = false;
+    // 3. The AI's context, built here (the server stays within its free CPU budget)
+    if (st.challenge.ai && st.challenge.ai.enabled && (changed || Squad.digestSeq[cid] !== st.seq)) await squadSendDigest(c, st);
   } catch (e) {
     if (e.status === 403 || e.status === 404) {
       c.revoked = true;
@@ -143,6 +145,23 @@ async function squadSync(cid) {
     if (aiDue) squadRunAi(cid);
     if (again) setTimeout(() => squadSync(cid), 50);
   }
+}
+
+async function squadSendDigest(c, st) {
+  try {
+    const events = st.events;
+    const folded = SquadCore.fold(events);
+    const ch = st.challenge;
+    const acts = Array.from(folded.activities.values());
+    const score = SquadCore.compute({ starts: ch.starts, ends: ch.ends, rules: ch.rules }, (st.members || []).filter(m => m.active || acts.some(a => a.author === m.id)), acts, st.today);
+    const body = JSON.stringify(SquadCore.digest(st.seq, st.today, folded, score));
+    const h = squadHash(body);
+    if (Squad.digestHash[c.id] !== h) {
+      await squadApi(c.server, 'PUT', `/api/c/${c.id}/digest`, null, c.token, 20000, body);
+      Squad.digestHash[c.id] = h;
+    }
+    Squad.digestSeq[c.id] = st.seq;
+  } catch (e) { console.warn('squad digest', e.message); }
 }
 
 // Ask the server to let the AI work (answers, interruptions, recap). One at a time.
@@ -1143,7 +1162,8 @@ async function joinSquadChallenge() {
     toast(`You're in “${r.challenge.name}”`, 'success');
     Squad.lastShare = 0;
     await squadTick(true);
-    if (Router.current !== 'squad') switchTab('squad'); else renderSquad();
+    if ($('#introPanel') && $('#introPanel').classList.contains('open')) renderIntro();
+    else if (Router.current !== 'squad') switchTab('squad'); else renderSquad();
   } catch (e) {
     toast(`Could not join: ${e.message}`, 'error', 5000);
   } finally { setBusy(btn, false); }

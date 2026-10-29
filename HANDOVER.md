@@ -45,6 +45,8 @@ www/js/app/squad-core.js  SHARED with the squad server: event folding, relative 
 www/js/app/views/squad.js       Squad: storage, outbox + polling sync, sharing summaries/wellness, Home/Feed/Crew, chat, sheets, screenshot import
 www/js/app/views/squad-stats.js Squad Stats + monthly Report (Plotly) + Report PDF
 www/manifest.webmanifest  web app (friends on iPhone add it to the home screen)
+www/js/app/huawei.js      Huawei Health data-export importer (zip.js for AES ZIPs)
+www/js/app/views/intro.js first-run introduction (fresh installs / web app)
 squad/                    Squad server: Cloudflare Worker + D1 (see squad/README.md — deploy, limits, tests)
 scripts/                  build-apk.ps1, patch-android.js, phone-update.ps1, phone-rescue.js, phone-eval.js
 ```
@@ -55,6 +57,8 @@ scripts/                  build-apk.ps1, patch-android.js, phone-update.ps1, pho
 - Local config keys: `squad_challenges` (entries incl. member token, `shared`, `daily_shared`, sharing toggles), `squad_outbox`, `squad_data_<id>` (events, members, challenge), `squad_current`, `squad_server`, `squad_name`.
 - AI: owner's provider config + key stored only on the server; client calls `POST /ai/run` when a response says `ai_due`; lease on `challenges.ai_lock`; etiquette (90 s quiet, 1 per 2 h, 4/day), recaps, monthly report, screenshot → workout (`/ai/extract`).
 - Fairness: scores only against own baseline; weight only as a change (UI, PDF, AI).
+- AI context digest: phones upload `SquadCore.digest` after each sync (`PUT /api/c/:id/digest`); AI runs use it when it covers the newest activity/wellness seq, else read history (keeps AI runs ≈10 ms CPU on the free plan).
+- Web app (friend's iPhone): Gemini-only personal AI (`geminiOnly()`), Huawei import, introduction; Samsung card explains it is Android-only. Config keys: `intro_done`, `athlete_age`, `huawei_zip_pw` (sensitive), `huawei_last_import`.
 - **Live** since 2026-10-29: https://training-partner-squad.training-partner-squad.workers.dev (owner's Cloudflare account; wrangler is logged in on this PC). Redeploy with `cd squad; npx wrangler deploy` (also republishes the web app from `www/`). Tests: `squad/test/api-test.mjs` (68 local checks), live smoke test 15/15 (test data removed).
 
 ## 4. Data (IndexedDB "RidePartnerDB", phone only)

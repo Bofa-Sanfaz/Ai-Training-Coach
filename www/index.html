@@ -316,6 +316,7 @@
         <div class="screen-title">Profile</div>
         <div class="screen-sub">Athlete, zones, connections and safety</div>
       </div>
+      <button class="btn btn-secondary btn-sm" onclick="openIntro()"><svg class="ic"><use href="#i-play"/></svg><span>Introduction</span></button>
     </div>
 
     <div class="card">
@@ -408,11 +409,11 @@
     <div class="card">
       <div class="row between">
         <div class="card-title"><svg class="ic"><use href="#i-sparkle"/></svg>AI providers</div>
-        <button class="btn btn-secondary btn-xs" onclick="openAddProvider()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Add</button>
+        <button class="btn btn-secondary btn-xs" id="btnAddProvider" onclick="openAddProvider()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Add</button>
       </div>
-      <div class="card-sub">The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.</div>
+      <div class="card-sub" id="aiProvSub">The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.</div>
       <div id="providerList" class="list mt-8"></div>
-      <label class="switch-row mt-8"><span><b>Automatic fallback</b><br><span class="hint">If the active provider fails or hits a limit, try the others (free ones first).</span></span><input type="checkbox" id="cfg_ai_fallback" onchange="setAiFallback(this.checked)" /></label>
+      <label class="switch-row mt-8"><span><b>Automatic fallback</b><br><span class="hint" id="aiFallbackHint">If the active provider fails or hits a limit, try the others (free ones first).</span></span><input type="checkbox" id="cfg_ai_fallback" onchange="setAiFallback(this.checked)" /></label>
       <div class="field-label mt-12">Model per coach</div>
       <div id="agentModelList" class="list"></div>
     </div>
@@ -466,6 +467,12 @@
         <input type="file" id="shExportInput" multiple class="hidden" onchange="importSamsungExport(event)" />
         <button class="btn btn-secondary btn-sm mt-8" onclick="$('#shExportInput').click()"><svg class="ic"><use href="#i-swim"/></svg>Import Samsung Health export</button>
       </div>
+    </div>
+
+    <div class="card" id="huaweiCard">
+      <div class="card-title"><svg class="ic"><use href="#i-activity"/></svg>Huawei Health</div>
+      <div class="card-sub">For Huawei watches and bands (e.g. Watch Fit): imports every session from Huawei's own data export — heart rate, GPS route, steps, calories and every pool length with strokes and SWOLF. Your whole history at once; later imports only add what's new.</div>
+      <button class="btn btn-primary btn-sm mt-12" onclick="openHuaweiImport()"><svg class="ic"><use href="#i-download"/></svg>Import Huawei Health export</button>
     </div>
 
     <div class="card">
@@ -629,6 +636,17 @@
   </div>
 </div>
 
+<!-- FIRST-RUN INTRODUCTION -->
+<div class="panel intro-panel" id="introPanel">
+  <div class="panel-body" id="introBody"></div>
+  <div class="intro-foot">
+    <button class="btn btn-ghost btn-sm" id="introSkip" onclick="closePanel('introPanel')">Skip</button>
+    <span class="grow"></span>
+    <button class="btn btn-secondary btn-sm hidden" id="introBack" onclick="introBack()">Back</button>
+    <button class="btn btn-primary btn-sm" id="introNext" onclick="introNext()">Next</button>
+  </div>
+</div>
+
 <!-- SQUAD CHAT PANEL -->
 <div class="panel" id="squadChat">
   <div class="panel-head">
@@ -711,6 +729,22 @@
     <div class="field mt-8"><label for="sqj_server">Squad server address</label><input id="sqj_server" class="input" autocomplete="off" /></div>
   </details>
   <button class="btn btn-primary mt-12" id="sqjJoin" onclick="joinSquadChallenge()"><svg class="ic"><use href="#i-link"/></svg>Join</button>
+</div>
+
+<div class="sheet" id="huaweiSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Import from Huawei Health</div>
+  <div class="sheet-sub mb-12" id="hw_last"></div>
+  <ol class="hw-steps">
+    <li>In the <b>Huawei Health</b> app: <b>Me</b> → tap your name → <b>Privacy Center</b> → <b>Request your data</b> → tick <b>Health</b> → set a password you'll remember → Send.</li>
+    <li>Huawei e-mails you a download link (usually within minutes to a few hours). Open it and <b>download the ZIP</b> (on iPhone it lands in Files → Downloads).</li>
+    <li>Pick that ZIP below, enter the password, tap Import.</li>
+  </ol>
+  <div class="field mt-8"><label for="hw_file">Export ZIP</label><input id="hw_file" type="file" class="input" accept=".zip,application/zip,.json" /></div>
+  <div class="field mt-8"><label for="hw_pw">ZIP password</label><input id="hw_pw" type="password" class="input" autocomplete="off" placeholder="the password you set in step 1" /></div>
+  <label class="check-row mt-8"><input type="checkbox" id="hw_remember" checked /><span>Remember the password on this phone<small class="hint">Next time you only pick the new ZIP (use the same password when requesting).</small></span></label>
+  <button class="btn btn-primary mt-12" id="hwImportBtn" onclick="runHuaweiImport()"><svg class="ic"><use href="#i-download"/></svg>Import</button>
+  <div class="small mt-8" id="hw_status" role="status"></div>
 </div>
 
 <div class="sheet" id="squadSwitchSheet" role="dialog" aria-modal="true">
@@ -987,6 +1021,7 @@
 <script src="js/vendor/confetti.browser.js"></script>
 <script src="js/vendor/jspdf.umd.min.js"></script>
 <script src="js/vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="js/vendor/zip.min.js"></script>
 <script src="js/app/util.js"></script>
 <script src="js/app/ui.js"></script>
 <script src="js/app/motion.js"></script>
@@ -998,6 +1033,7 @@
 <script src="js/app/providers.js"></script>
 <script src="js/app/skills.js"></script>
 <script src="js/app/health.js"></script>
+<script src="js/app/huawei.js"></script>
 <script src="js/app/ai.js"></script>
 <script src="js/app/charts.js"></script>
 <script src="js/app/route.js"></script>
@@ -1013,6 +1049,7 @@
 <script src="js/app/views/squad-stats.js"></script>
 <script src="js/app/views/reports.js"></script>
 <script src="js/app/views/profile.js"></script>
+<script src="js/app/views/intro.js"></script>
 <script src="js/app/demo.js"></script>
 <script src="js/app/main.js"></script>
 </body>

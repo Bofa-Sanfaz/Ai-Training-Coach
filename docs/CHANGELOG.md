@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.6.0 — 2026-10-30 · Huawei, introduction, free-plan proof squad
+- **Huawei Health import** (`huawei.js`, vendored zip.js 2.24.0 BSD-3 for AES ZIPs): reads Huawei's data export (2025 multi-file and legacy layouts, `partTimeMap` quirk), maps sport codes, local time from `timeZone`, HR/GPS/speed/altitude/step-rate samples → one 5-s stream (zones, TRIMP, route, charts), steps/cadence, calories, climbing (1 m hysteresis), pool swims → per-length swim model (segments longer than the pool split evenly). Own id range (−start−3), duplicates and deleted sessions skipped, pre-2026 ignored, password remembered locally (kept out of exported backups). Tested with generated AES-encrypted exports.
+- **First-run introduction** (`views/intro.js`): fresh installs / web app only; name, sex, age → max HR (208 − 0.7 × age), resting HR, weight; zones rebuilt from the person's max HR (not the owner's defaults); workout sources (Huawei first on the web), free Gemini key, squad join (invite link handled inside), done. Profile → Introduction reopens it. No "What's new" for brand-new users.
+- **Web app = Gemini only** for the personal coaches: only the Gemini provider shown, picker goes straight to Gemini models, fallback = another Gemini model, "keep retrying" unchanged. Samsung Health card explains it is Android-only on iPhone.
+- **Squad server CPU** (free plan 10 ms/request, measured with `wrangler tail` on 6 months of heavy history): AI context now comes from a digest the phones build and upload (`PUT /digest`, `SquadCore.digest`; last 14 days in full, 62 days compact); the server falls back to reading history only if the digest misses newer events. AI runs 30–49 ms → 9–12 ms; sync pages 3–8 ms (bodies passed through without re-encoding, 300 per page); explicit challenge columns; index `events(challenge_id, kind, seq)`.
+- Apple Health route evaluated and not used (Huawei rarely passes workouts to Apple Health, never swim lengths).
+
 ## 3.5.0 — 2026-10-29 · Squad
 - **Squad** (`views/squad.js`, `views/squad-stats.js`, shared `squad-core.js`; server `squad/`): shared challenges with friends as its own section with sub-tabs Home · Chat · Feed · Stats · Report · Crew and a challenge switcher.
 - Server: Cloudflare Worker + D1 (free, serverless, cron every 15 min). Invite codes, hashed member tokens, per-challenge event log with `seq`; idempotent client ids; `/changes?since=` sync; owner-only settings and AI setup; leave/rejoin; max 6 members; CORS for the Android app; serves `www/` as the web app.

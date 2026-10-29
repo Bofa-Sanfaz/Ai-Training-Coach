@@ -37,6 +37,12 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
+### New in 3.6 — Huawei watches, an introduction, a faster squad
+- **Huawei Health import** (Profile → Huawei Health): your whole history from Huawei's own data export — heart rate, GPS route, steps, calories and every pool length with strokes and SWOLF; later imports only add what's new
+- **Introduction** for new users (Profile → Introduction): name, heart rate and weight so zones and load fit your body, where workouts come from, the AI coach and the squad
+- **Squad server** stays inside the free plan even after months of training: your phone prepares the AI's context, so Aether answers quickly
+- The iPhone web app uses Google Gemini only ("use another Gemini model" or "keep retrying this one")
+
 ### New in 3.5 — Squad: train together
 - **Squad tab**, its own little app: **Home · Chat · Feed · Stats · Report · Crew**. Start a challenge, send the invite code — friends on iPhone use the same app from Safari (Add to Home Screen)
 - **Scored against yourself**: consistency vs your own target days, minutes vs your own usual, pace vs your own usual pace, personal bests and streaks — different bodies never decide the winner. Weekly duels and a monthly winner
@@ -156,12 +162,17 @@ async function boot() {
   setTimeout(() => { countUp($('#screen-rides')); stagger($$('#rideList .ride-card'), { max: 6 }); }, sessionStorage.getItem('rp_intro_seen') ? 0 : 700);
   try { sessionStorage.setItem('rp_intro_seen', '1'); } catch (e) {}
 
-  if (seen !== APP_VERSION) setTimeout(showWhatsNew, 600);
+  if (seen && seen !== APP_VERSION) setTimeout(showWhatsNew, 600); // a brand-new user gets the introduction instead
   setupPullToRefresh();
   await refreshStaleMetrics();
   try { if ((await dedupeWorkouts()) + (await migrateWalks())) await renderRides(); } catch (e) { console.warn('dedupe/walks', e); }
   maybeAutoSync();
   setTimeout(resumePendingChats, 2000);
+  // First run (fresh install / friend's web app): the introduction, which also handles an invite link
+  let intro = false;
+  try { intro = await introNeeded(); } catch (e) { console.warn('intro', e); }
+  const joinHash = (location.hash.match(/join=([A-Za-z0-9-]{8,9})/) || [])[1];
+  if (intro) { window.__introPending = true; setTimeout(() => openIntro(joinHash), 900); }
   try { await squadInit(); } catch (e) { console.warn('squad', e); }
 }
 

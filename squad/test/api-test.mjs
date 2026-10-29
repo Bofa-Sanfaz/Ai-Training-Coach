@@ -235,6 +235,31 @@ try {
   r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
   ok(r.d.events.some(e => e.author === 'ai' && e.body.mode === 'report' && e.body.reply_to === repAsk), 'monthly report posted as a reply');
 
+  // AI context digest from the phones: used when fresh, ignored when it misses newer events
+  const putDigest = async (tok, body) => { const res = await fetch(`${API}/api/c/${cid}/digest`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body }); return { status: res.status, d: await res.json().catch(() => null) }; };
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  const fold2 = SquadCore.fold(r.d.events);
+  for (const a of fold2.activities.values()) a.title = `${a.title || a.sport} DIGEST-MARKER`;
+  const sc2 = SquadCore.compute({ starts: r.d.challenge.starts, ends: r.d.challenge.ends, rules: r.d.challenge.rules }, r.d.members, Array.from(fold2.activities.values()), r.d.today);
+  const dg = JSON.stringify(SquadCore.digest(r.d.seq, r.d.today, fold2, sc2));
+  let pr = await putDigest(A, dg);
+  ok(pr.status === 200 && pr.d.stored === true, 'digest stored', pr);
+  pr = await putDigest(A, JSON.stringify(SquadCore.digest(r.d.seq - 5, r.d.today, fold2, sc2)));
+  ok(pr.d.stored === false, 'older digest does not replace a newer one', pr);
+  pr = await putDigest(A, '{"v":1,"seq":999999999,"x":1}');
+  ok(pr.status === 400, 'digest from the future refused', pr);
+  pr = await putDigest(A, 'x'.repeat(800000));
+  ok(pr.status === 413, 'oversized digest refused', pr.status);
+  prompts.length = 0;
+  await call('POST', `/api/c/${cid}/events`, { events: [{ id: id('msg'), kind: 'msg', body: { text: '@Aether how are we doing?' } }] }, A);
+  await call('POST', `/api/c/${cid}/ai/run`, {}, A);
+  ok(prompts.length === 1 && /DIGEST-MARKER/.test(prompts[0].text) && /SCOREBOARD/.test(prompts[0].text) && /lengths: 25 m: 0:36/.test(prompts[0].text), 'AI used the fresh digest (scoreboard, lap detail)', prompts.map(p => p.text.slice(0, 200)));
+  await call('POST', `/api/c/${cid}/events`, { events: [{ id: id('act'), kind: 'activity', body: { key: 'late', sport: 'walk', date: today, dur_s: 600, dist_m: 900 } }] }, B);
+  prompts.length = 0;
+  await call('POST', `/api/c/${cid}/events`, { events: [{ id: id('msg'), kind: 'msg', body: { text: '@Aether and now?' } }] }, A);
+  await call('POST', `/api/c/${cid}/ai/run`, {}, A);
+  ok(prompts.length === 1 && !/DIGEST-MARKER/.test(prompts[0].text) && /SCOREBOARD/.test(prompts[0].text), 'stale digest ignored → full history used', prompts.map(p => p.text.slice(0, 200)));
+
   // Screenshot import
   prompts.length = 0;
   r = await call('POST', `/api/c/${cid}/ai/extract`, { image: 'A'.repeat(500), hint: 'Huawei pool swim' }, B);

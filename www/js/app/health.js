@@ -656,6 +656,15 @@ async function wellnessContextText(dateKey, detail = 'short') {
 async function renderHealthCard() {
   const host = $('#healthState');
   if (!host) return;
+  // Web app (iPhone): Samsung Health / Health Connect only exist on Android
+  const web = !isNative();
+  $('#btnHealthConnect').classList.toggle('hidden', web);
+  $$('#healthOnRow, #swimSdkBox, #shExportInput').forEach(el => web && el.classList.add('hidden'));
+  if ($('#shExportInput')) $('#shExportInput').closest('.export-box').classList.toggle('hidden', web);
+  if (web) {
+    host.innerHTML = `<span class="muted">Samsung Health works in the Android app. On iPhone, your workouts come from <b>Huawei Health</b> (card below) or a screenshot in Squad.</span>`;
+    return;
+  }
   const on = (await getConfig('health_enabled')) === '1';
   const s = on ? await wellnessSnapshot() : null;
   $('#btnHealthConnect').classList.toggle('hidden', on);

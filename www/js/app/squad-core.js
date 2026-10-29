@@ -215,6 +215,32 @@ const SquadCore = (() => {
     return out;
   }
 
-  return { fold, actRef, compute, month, METRIC, WEIGHTS: W };
+  /**
+   * AI context digest, built on the phone (which already has everything folded and scored)
+   * and uploaded after each sync, so the server's AI runs never re-read the whole history
+   * (free plan: 10 ms CPU per request). seq = newest event the phone had.
+   */
+  const DIGEST_DAYS = 62;      // sessions the AI can see (month report, quiet days)
+  const DIGEST_FULL_DAYS = 14; // with every detail (lengths, verdict, note); older ones compact
+  const COMPACT = ['ref', 'author', 'seq', 'key', 'date', 'start', 'sport', 'title', 'type', 'dur_s', 'dist_m', 'pace_km', 'pace100', 'speed_kmh', 'swolf', 'avg_hr', 'load', 'steps', 'pb'];
+  function digest(seq, today, folded, score) {
+    const from = dateOf(dayNum(today) - DIGEST_DAYS);
+    const full = dateOf(dayNum(today) - DIGEST_FULL_DAYS);
+    const recent = [], last = {};
+    for (const a of folded.activities.values()) {
+      if (a.pending) continue;
+      if (!last[a.author] || a.date > last[a.author]) last[a.author] = a.date;
+      if (a.date < from) continue;
+      if (a.date >= full) recent.push(a);
+      else { const c = {}; for (const k of COMPACT) if (a[k] !== undefined && a[k] !== null) c[k] = a[k]; recent.push(c); }
+    }
+    const daily = {};
+    for (const [m, days] of Object.entries(folded.daily || {})) {
+      for (const [d, v] of Object.entries(days)) if (d >= from) (daily[m] = daily[m] || {})[d] = v;
+    }
+    return { v: 1, seq, today, score, recent, daily, last_dates: last };
+  }
+
+  return { fold, actRef, compute, month, digest, METRIC, WEIGHTS: W };
 })();
 if (typeof globalThis !== 'undefined') globalThis.SquadCore = SquadCore;

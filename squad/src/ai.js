@@ -24,6 +24,8 @@ const TRIGGER_TTL_MS = 12 * 3600000;
 const CHAT_TRIGGER_MSGS = 10;
 const STREAK_MARKS = [3, 5, 7, 10, 14, 21, 30, 45, 60, 90];
 const AI_NAME = 'Aether';
+// Every column except the (large) ai_digest, which only AI runs read
+export const CH_COLS = 'id, name, invite, owner, starts, ends, rules, tz_offset, seq, ai_config, ai_state, ai_lock, ai_month, ai_spend, created_at';
 
 // ---------- small helpers ----------
 const nowIso = () => new Date().toISOString();
@@ -148,17 +150,68 @@ Durations like 1:02:03 are h:mm:ss; 7'45" pace means 7 min 45 s per km.`;
 }
 
 // ---------- context for the model ----------
+// CPU budget (free plan: 10 ms per request): the database extracts the few fields scoring needs
+// from every activity (D1 time is not Worker CPU); full bodies (lap lines, verdicts…) are parsed
+// only for the last ~2 months, wellness only for the last ~2 months, chat only the last 120 items.
+const ACT_FIELDS = ['key', 'date', 'start', 'sport', 'title', 'type', 'dur_s', 'dist_m', 'pace_km', 'pace100', 'speed_kmh', 'load', 'pb'];
+const DAILY_FIELDS = ['date', 'weight_kg', 'rhr', 'hrv', 'sleep_min', 'steps', 'clear'];
+const FULL_DAYS = 62;
+
 async function loadWorld(env, ch) {
-  const [members, acts, chat] = await Promise.all([
+  // Preferred: the phones' digest, when it already covers the newest shared sessions/wellness
+  const [dg, newest] = await Promise.all([
+    env.DB.prepare('SELECT ai_digest FROM challenges WHERE id=?').bind(ch.id).first(),
+    env.DB.prepare("SELECT MAX(seq) AS s FROM events WHERE challenge_id=? AND kind IN ('activity','delete','daily')").bind(ch.id).first()
+  ]);
+  const digest = dg && dg.ai_digest ? parse(dg.ai_digest, null) : null;
+  if (digest && digest.v === 1 && digest.score && digest.seq >= ((newest && newest.s) || 0)) return worldFromDigest(env, ch, digest);
+  return fullWorld(env, ch);
+}
+
+async function worldFromDigest(env, ch, d) {
+  const [members, chat] = await Promise.all([
     env.DB.prepare("SELECT id, name, sports, baseline, joined_at, token_hash != '' AS active FROM members WHERE challenge_id=? ORDER BY joined_at").bind(ch.id).all(),
-    env.DB.prepare("SELECT seq, id, kind, author, ref, body, created_at FROM events WHERE challenge_id=? AND kind IN ('activity','delete','daily') ORDER BY seq").bind(ch.id).all(),
     env.DB.prepare("SELECT seq, id, kind, author, ref, body, created_at FROM events WHERE challenge_id=? AND kind IN ('msg','comment','reaction') ORDER BY seq DESC LIMIT 120").bind(ch.id).all()
   ]);
   const ms = members.results.map(m => ({ id: m.id, name: m.name, active: !!m.active, sports: parse(m.sports, []), baseline: parse(m.baseline, {}), joined_at: m.joined_at }));
-  const evs = acts.results.concat(chat.results).map(e => Object.assign(e, { body: parse(e.body, {}) }));
-  const st = SquadCore.fold(evs);
-  const rules = parse(ch.rules, {});
+  const st = SquadCore.fold(chat.results.map(e => Object.assign(e, { body: parse(e.body, {}) })));
+  const activities = Array.isArray(d.recent) ? d.recent : [];
+  st.activities = new Map(activities.map(a => [a.ref, a]));
+  st.daily = d.daily || {};
+  return { ch, rules: parse(ch.rules, {}), today: localToday(ch), members: ms, st, activities, score: d.score, lastDates: d.last_dates || {}, fromDigest: true, nameOf: id => id === 'ai' ? AI_NAME : ((ms.find(m => m.id === id) || {}).name || 'someone') };
+}
+
+// Fallback (no digest yet, or it misses the newest events): read the history itself
+async function fullWorld(env, ch) {
   const today = localToday(ch);
+  const recent = new Date(Date.parse(`${today}T00:00:00Z`) - FULL_DAYS * 86400000).toISOString().slice(0, 10);
+  const x = f => `json_extract(body,'$.${f}') AS ${f}`;
+  const [members, acts, full, dels, daily, chat] = await Promise.all([
+    env.DB.prepare("SELECT id, name, sports, baseline, joined_at, token_hash != '' AS active FROM members WHERE challenge_id=? ORDER BY joined_at").bind(ch.id).all(),
+    env.DB.prepare(`SELECT seq, id, author, created_at, ${ACT_FIELDS.map(x).join(', ')} FROM events WHERE challenge_id=? AND kind='activity' ORDER BY seq`).bind(ch.id).all(),
+    env.DB.prepare("SELECT seq, body FROM events WHERE challenge_id=? AND kind='activity' AND json_extract(body,'$.date') >= ?").bind(ch.id, recent).all(),
+    env.DB.prepare("SELECT ref FROM events WHERE challenge_id=? AND kind='delete'").bind(ch.id).all(),
+    env.DB.prepare(`SELECT seq, author, ${DAILY_FIELDS.map(x).join(', ')} FROM events WHERE challenge_id=? AND kind='daily' AND json_extract(body,'$.date') >= ? ORDER BY seq`).bind(ch.id, recent).all(),
+    env.DB.prepare("SELECT seq, id, kind, author, ref, body, created_at FROM events WHERE challenge_id=? AND kind IN ('msg','comment','reaction') ORDER BY seq DESC LIMIT 120").bind(ch.id).all()
+  ]);
+  const ms = members.results.map(m => ({ id: m.id, name: m.name, active: !!m.active, sports: parse(m.sports, []), baseline: parse(m.baseline, {}), joined_at: m.joined_at }));
+  const st = SquadCore.fold(chat.results.map(e => Object.assign(e, { body: parse(e.body, {}) })));
+  for (const d of dels.results) if (d.ref) st.deleted.add(d.ref);
+  // Activities: latest version per workout, deletes removed; full body for recent ones
+  const fullBySeq = new Map(full.results.map(r => [r.seq, r.body]));
+  for (const r of acts.results) {
+    if (!r.key || st.deleted.has(r.id)) continue;
+    const ref = SquadCore.actRef(r.author, r.key);
+    if (st.deleted.has(ref)) { st.activities.delete(ref); continue; }
+    const body = fullBySeq.has(r.seq) ? parse(fullBySeq.get(r.seq), {}) : Object.assign({}, r, { pb: r.pb ? parse(r.pb, []) : undefined });
+    st.activities.set(ref, Object.assign(body, { ref, author: r.author, seq: r.seq, id: r.id, created_at: r.created_at }));
+  }
+  for (const d of daily.results) {
+    if (!d.date) continue;
+    const m = st.daily[d.author] = st.daily[d.author] || {};
+    if (d.clear) delete m[d.date]; else m[d.date] = d;
+  }
+  const rules = parse(ch.rules, {});
   const activities = Array.from(st.activities.values());
   const score = SquadCore.compute({ starts: ch.starts, ends: ch.ends, rules }, ms.filter(m => m.active || activities.some(a => a.author === m.id)), activities, today);
   return { ch, rules, today, members: ms, st, activities, score, nameOf: id => id === 'ai' ? AI_NAME : ((ms.find(m => m.id === id) || {}).name || 'someone') };
@@ -342,7 +395,8 @@ function scanTriggers(w, state, newEvents) {
   state.nudged = state.nudged || {};
   for (const m of w.members.filter(x => x.active)) {
     const mine = w.activities.filter(a => a.author === m.id).map(a => a.date).sort();
-    const from = [mine[mine.length - 1] || '', w.ch.starts, String(m.joined_at || '').slice(0, 10)].sort().pop();
+    const lastDay = (w.lastDates && w.lastDates[m.id]) || mine[mine.length - 1] || '';
+    const from = [lastDay, w.ch.starts, String(m.joined_at || '').slice(0, 10)].sort().pop();
     const quietDays = todayN - Date.parse(`${from}T00:00:00Z`) / 86400000;
     if (quietDays >= 3 && w.today >= w.ch.starts && (!state.nudged[m.id] || now - state.nudged[m.id] > 3 * 86400000) && !list.some(t => t.type === 'quiet' && t.member === m.id)) {
       list.push({ type: 'quiet', at: now, member: m.id, text: `${m.name} has not logged a workout for ${Math.floor(quietDays)} days.` });
@@ -433,9 +487,13 @@ export async function runAI(env, cid, post, opts = {}) {
   const l = await lease(env, cid);
   if (!l) return { ran: false, busy: true };
   const posted = [];
+  // The context is built once per run (CPU budget); messages posted during the run are appended
+  let world = null;
+  const getWorld = async ch => world || (world = await loadWorld(env, ch));
+  const remember = (seq, body) => { if (world && seq) world.st.messages.push({ seq, id: `ai-${seq}`, kind: 'msg', author: 'ai', body, created_at: nowIso() }); };
   try {
     for (let round = 0; round < 4; round++) {
-      const ch = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(cid).first();
+      const ch = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(cid).first();
       if (!ch || !ch.ai_config) break;
       const state = parse(ch.ai_state, {});
       const rules = parse(ch.rules, {});
@@ -445,12 +503,14 @@ export async function runAI(env, cid, post, opts = {}) {
       if (reqs.length) {
         for (const r of reqs) {
           r.body = parse(r.body, {});
-          const w = await loadWorld(env, ch);
+          const w = await getWorld(ch);
+          if (!w.st.messages.some(m => m.id === r.id)) w.st.messages.push(r);
           await l.renew();
           try {
             const out = await modelFor(env, ch, requestPrompt(w, r), { maxTokens: { report: 3000, review: 1500 }[r.body.ai.mode] || 800 });
             const text = String(out.text || '').trim();
-            if (text) posted.push(await post(ch, { kind: 'msg', ref: r.id, body: { text, mode: r.body.ai.mode, reply_to: r.id, target: r.body.ai.ref || null } }));
+            const body = { text, mode: r.body.ai.mode, reply_to: r.id, target: r.body.ai.ref || null };
+            if (text) { const seq = await post(ch, { kind: 'msg', ref: r.id, body }); posted.push(seq); remember(seq, body); }
           } catch (e) {
             posted.push(await post(ch, { kind: 'system', ref: r.id, body: { type: 'ai_error', text: `${AI_NAME} could not answer: ${e.message}` } }));
           }
@@ -463,7 +523,7 @@ export async function runAI(env, cid, post, opts = {}) {
       // 2. Recap
       const rk = recapKind(ch, state);
       if (rk) {
-        const w = await loadWorld(env, ch);
+        const w = await getWorld(ch);
         const today = localToday(ch);
         const quietDay = rk === 'day' && !w.activities.some(a => a.date === today) && !w.st.messages.some(m => m.author !== 'ai' && localToday(ch, Date.parse(m.created_at)) === today);
         if (!quietDay) {
@@ -484,7 +544,7 @@ export async function runAI(env, cid, post, opts = {}) {
       if (rules.interrupts !== false && freeBudgetOk(state, ch)) {
         const last = await env.DB.prepare("SELECT created_at FROM events WHERE challenge_id=? AND kind='msg' AND author != 'ai' ORDER BY seq DESC LIMIT 1").bind(cid).first();
         if (!last || Date.now() - Date.parse(last.created_at) >= quietMs(env)) {
-          const w = await loadWorld(env, ch);
+          const w = await getWorld(ch);
           const fresh = (await env.DB.prepare("SELECT seq, id, kind, author, ref, body, created_at FROM events WHERE challenge_id=? AND seq > ? AND kind='activity' ORDER BY seq LIMIT 200").bind(cid, state.seen_seq || 0).all()).results.map(e => Object.assign(e, { body: parse(e.body, {}) }));
           scanTriggers(w, state, fresh);
           state.seen_seq = ch.seq;

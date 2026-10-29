@@ -43,7 +43,7 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.5</div>
+    <div class="kick">User guide · version 3.6</div>
     <h1>Training Partner</h1>
     <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus everything that changed in 3.3.</div>
   </div>
@@ -60,6 +60,7 @@
     <div><b>10</b>Reports &amp; the PDF</div>
     <div><b>11</b>Backups, privacy, updates</div>
     <div><b>12</b>Squad — training together</div>
+    <div><b>13</b>Huawei, introduction, web app</div>
   </div>
 </div>
 
@@ -398,10 +399,35 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
 
 <h3>Your friend on iPhone</h3>
 <ol>
-  <li>Open the invite link in Safari → Share → <b>Add to Home Screen</b>; join with the code.</li>
-  <li>Huawei Health → Me → Data sharing → <b>Strava</b>; in the web app Profile → Strava with his own free Strava API app.</li>
-  <li>Anything Strava doesn't get (e.g. pool lengths): Squad → <b>Add from screenshot</b> — Aether reads the Huawei screen, he checks the numbers and saves.</li>
+  <li>Open the invite link in Safari → Share → <b>Add to Home Screen</b>. The <b>introduction</b> opens: name, age and heart rate (his own zones), weight, a free Google Gemini key for his coaches, and joining the challenge.</li>
+  <li>Workouts straight from <b>Huawei Health</b> (no Strava): see section 13.</li>
+  <li>A single session can always be added with Squad → <b>Add from screenshot</b>.</li>
 </ol>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 13 · new in 3.6</span>Huawei watches, the introduction and the web app</h2>
+<h3>Importing from Huawei Health</h3>
+<ol>
+  <li>Huawei Health app → <b>Me</b> → your name → <b>Privacy Center</b> → <b>Request your data</b> → tick <b>Health</b> → set a password → send.</li>
+  <li>Huawei e-mails a download link (minutes to hours). Download the ZIP (iPhone: Files → Downloads).</li>
+  <li>Profile → <b>Huawei Health</b> → Import: pick the ZIP, enter the password (it can be remembered on the phone).</li>
+</ol>
+<p>Every session in the export is imported: sport, local start time, duration, distance, calories, a heart-rate stream (zones and training load), the GPS route, speed, steps and cadence, climbing, and for pool swims every length with its time, strokes and SWOLF (best 50/100/200/400 m, splits, the per-length chart — the same as Galaxy Watch swims). Sessions already in the app, deleted ones and those before 2026 are skipped, so importing a newer export later only adds the new ones.</p>
+<table>
+  <tr><th>Huawei sport</th><th>In the app</th></tr>
+  <tr><td>Walk, hike, mountain hike</td><td>Walk</td></tr>
+  <tr><td>Run, cross-country run · indoor run</td><td>Run · treadmill</td></tr>
+  <tr><td>Cycling · indoor cycling</td><td>Ride · indoor ride</td></tr>
+  <tr><td>Pool swim · open-water swim</td><td>Swim (pool with lengths)</td></tr>
+  <tr><td>Cross trainer, CrossFit, other</td><td>Gym &amp; other</td></tr>
+</table>
+<p class="muted">Automatic daily sync straight from Huawei needs Huawei's developer approval (Health Kit) and is planned; Apple Health was checked and not used because Huawei rarely passes workouts to it and never pool lengths.</p>
+<h3>The introduction</h3>
+<p>Shown once on a new phone or the web app (never on a phone that already has workouts) and any time from Profile → <b>Introduction</b>. Max heart rate is estimated from age (208 − 0.7 × age) unless entered; the zone limits are then set at 65 %, 75 %, 83 % and 91 % of that max, so zones, load and coaching fit the person.</p>
+<h3>The web app's AI</h3>
+<p>On the iPhone web app the personal coaches use Google Gemini only (one free key). In each coach's model choice: <b>Use another Gemini model</b> (if the chosen one is busy or out of free quota) or <b>Keep retrying this one</b> (waits and retries until it answers).</p>
 </div>
 
 </body>

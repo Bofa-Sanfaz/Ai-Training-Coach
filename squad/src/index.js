@@ -11,7 +11,7 @@
 // `ai_due`, the client then calls POST /api/c/:id/ai/run, and the cron covers the rest.
 // --------------------------------------------------------
 import '../../www/js/app/squad-core.js';
-import { runAI, aiDue, extractWorkout, publicAiConfig, localToday, rid, parse, nowIso, AI_NAME } from './ai.js';
+import { runAI, aiDue, extractWorkout, publicAiConfig, localToday, rid, parse, nowIso, AI_NAME, CH_COLS } from './ai.js';
 
 const MAX_MEMBERS = 6;
 const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2'];
@@ -92,7 +92,7 @@ async function auth(env, req, cid) {
   if (t.length < 20) fail(401, 'missing member token');
   const me = await env.DB.prepare("SELECT * FROM members WHERE token_hash=? AND challenge_id=? AND token_hash != ''").bind(await sha256(t), cid).first();
   if (!me) fail(403, 'not a member of this challenge');
-  const ch = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(cid).first();
+  const ch = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(cid).first();
   if (!ch) fail(404, 'challenge not found');
   return { me, ch };
 }
@@ -188,7 +188,7 @@ async function createChallenge(env, req) {
           .bind(memberId, cid, me.name, me.color || COLORS[0], await sha256(t), JSON.stringify(me.sports), JSON.stringify(me.baseline), now, now)
       ]);
       await append(env, cid, [systemEvent({ type: 'created', member: memberId, name })]);
-      const ch = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(cid).first();
+      const ch = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(cid).first();
       return json({ challenge: publicChallenge(ch, { id: memberId }), member_id: memberId, token: t }, 201);
     } catch (e) {
       if (!/UNIQUE/i.test(String(e.message))) throw e;
@@ -201,7 +201,7 @@ async function joinChallenge(env, req) {
   const b = await readJson(req);
   const code = str(b.invite, 20).toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 8) fail(400, 'the invite code has 8 characters');
-  const ch = await env.DB.prepare('SELECT * FROM challenges WHERE invite=?').bind(code).first();
+  const ch = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE invite=?`).bind(code).first();
   if (!ch) fail(404, 'no challenge with this invite code');
   const members = await membersOf(env, ch.id);
   const active = members.filter(m => m.active);
@@ -213,14 +213,14 @@ async function joinChallenge(env, req) {
   await env.DB.prepare('INSERT INTO members (id, challenge_id, name, color, token_hash, sports, baseline, joined_at, last_seen) VALUES (?,?,?,?,?,?,?,?,?)')
     .bind(memberId, ch.id, me.name, color, await sha256(t), JSON.stringify(me.sports), JSON.stringify(me.baseline), now, now).run();
   await append(env, ch.id, [systemEvent({ type: 'joined', member: memberId, name: me.name })]);
-  const fresh = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(ch.id).first();
+  const fresh = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(ch.id).first();
   return json({ challenge: publicChallenge(fresh, { id: memberId }), member_id: memberId, token: t }, 201);
 }
 
 async function changes(env, req, url, cid) {
   const { me, ch } = await auth(env, req, cid);
   const since = int(url.searchParams.get('since'), 0, 1e12, 0);
-  const limit = 500;
+  const limit = 300;
   const now = nowIso();
   const [rows, members] = await Promise.all([
     env.DB.prepare('SELECT seq, id, kind, author, ref, body, created_at FROM events WHERE challenge_id=? AND seq > ? ORDER BY seq LIMIT ?').bind(cid, since, limit).all(),
@@ -228,11 +228,14 @@ async function changes(env, req, url, cid) {
     // last_seen at most once a minute (keeps D1 writes tiny)
     env.DB.prepare('UPDATE members SET last_seen=? WHERE id=? AND (last_seen IS NULL OR last_seen < ?)').bind(now, me.id, new Date(Date.now() - 60000).toISOString()).run()
   ]);
-  const events = rows.results.map(e => Object.assign(e, { body: parse(e.body, {}) }));
-  return json({
-    seq: events.length ? events[events.length - 1].seq : Math.max(since, 0), head: ch.seq, more: events.length === limit,
-    events, members, me: me.id, challenge: publicChallenge(ch, me), today: localToday(ch), ai_due: await aiDue(env, ch)
+  // CPU budget: bodies are stored as JSON already, so they are passed through without parse/stringify
+  const ev = rows.results;
+  const eventsJson = ev.map(e => `{"seq":${e.seq},"id":${JSON.stringify(e.id)},"kind":${JSON.stringify(e.kind)},"author":${JSON.stringify(e.author)},"ref":${JSON.stringify(e.ref)},"body":${e.body || '{}'},"created_at":${JSON.stringify(e.created_at)}}`).join(',');
+  const rest = JSON.stringify({
+    seq: ev.length ? ev[ev.length - 1].seq : Math.max(since, 0), head: ch.seq, more: ev.length === limit,
+    members, me: me.id, challenge: publicChallenge(ch, me), today: localToday(ch), ai_due: await aiDue(env, ch)
   });
+  return new Response(`${rest.slice(0, -1)},"events":[${eventsJson}]}`, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
 
 async function postEvents(env, req, cid) {
@@ -244,7 +247,7 @@ async function postEvents(env, req, cid) {
     try { ok.push(await checkEvent(env, ch, me, e)); } catch (err) { rejected.push({ id: e && e.id, error: err.message }); }
   }
   const acks = await append(env, cid, ok);
-  const fresh = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(cid).first();
+  const fresh = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(cid).first();
   return json({ acks, rejected, head: fresh.seq, ai_due: await aiDue(env, fresh) });
 }
 
@@ -283,7 +286,7 @@ async function updateChallenge(env, req, cid) {
   const tz = b.tz_offset !== undefined ? int(b.tz_offset, -840, 840, 0) : ch.tz_offset;
   await env.DB.prepare('UPDATE challenges SET name=?, ends=?, rules=?, tz_offset=? WHERE id=?').bind(name, ends, JSON.stringify(rules), tz, cid).run();
   await append(env, cid, [systemEvent({ type: 'settings', member: me.id })]);
-  const fresh = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(cid).first();
+  const fresh = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(cid).first();
   return json({ challenge: publicChallenge(fresh, me) });
 }
 
@@ -310,7 +313,7 @@ async function setAi(env, req, cid) {
     await env.DB.prepare('UPDATE challenges SET ai_config=? WHERE id=?').bind(JSON.stringify(cfg), cid).run();
   }
   await append(env, cid, [systemEvent({ type: 'ai', member: me.id, enabled: b.config !== null })]);
-  const fresh = await env.DB.prepare('SELECT * FROM challenges WHERE id=?').bind(cid).first();
+  const fresh = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE id=?`).bind(cid).first();
   return json({ ai: publicAiConfig(fresh) });
 }
 
@@ -338,6 +341,16 @@ async function route(req, env, url) {
   if (sub === '/me' && m === 'DELETE') return leave(env, req, cid);
   if (sub === '/ai' && m === 'GET') { const { ch } = await auth(env, req, cid); return json({ ai: publicAiConfig(ch) }); }
   if (sub === '/ai' && m === 'PUT') return setAi(env, req, cid);
+  if (sub === '/digest' && m === 'PUT') {
+    // The AI context built on a phone (see SquadCore.digest); newer digests replace older ones
+    const { ch } = await auth(env, req, cid);
+    const text = await req.text();
+    if (text.length > 700000) fail(413, 'digest too large');
+    const s = (text.match(/^\{"v":1,"seq":(\d+),/) || [])[1];
+    if (!s || Number(s) > ch.seq) fail(400, 'bad digest');
+    const r = await env.DB.prepare("UPDATE challenges SET ai_digest=? WHERE id=? AND (ai_digest IS NULL OR json_extract(ai_digest,'$.seq') <= ?)").bind(text, cid, Number(s)).run();
+    return json({ stored: !!r.meta.changes });
+  }
   if (sub === '/ai/run' && m === 'POST') {
     await auth(env, req, cid);
     return json(await runAI(env, cid, poster(env)));
@@ -353,7 +366,7 @@ async function route(req, env, url) {
 
 async function cron(env) {
   const today = new Date().toISOString().slice(0, 10);
-  const r = await env.DB.prepare("SELECT * FROM challenges WHERE ai_config IS NOT NULL AND (ends IS NULL OR ends >= date(?, '-3 days'))").bind(today).all();
+  const r = await env.DB.prepare(`SELECT ${CH_COLS} FROM challenges WHERE ai_config IS NOT NULL AND (ends IS NULL OR ends >= date(?, '-3 days'))`).bind(today).all();
   for (const ch of r.results) {
     try { if (await aiDue(env, ch, { cron: true })) await runAI(env, ch.id, poster(env), { cron: true }); } catch (e) { console.warn('cron', ch.id, e.message); }
   }

@@ -154,6 +154,36 @@ Start/join challenge (invite code, name, dates, goal type) · members with avata
 - Athlete: create a free Cloudflare account and run one login command (Claude can't create accounts).
 - Assad: link Huawei Health → Strava, create his own Strava API app, open the web link in Safari and add it to the home screen.
 
+---
+
+# Phase 6 — Assad's data straight from Huawei + a full app for him
+
+## 6.1 Goal (from the user, 2026-10-30)
+Assad has **no Strava**. Import his sessions **directly from the Huawei Health app**, accurately (laps, heart rate, everything), preferably **automatically**; otherwise an accurate manual option that is very easy. The app must work fully for him — same personal side and squad side as the athlete — with an **introduction** when he opens it the first time.
+
+## 6.2 Research (2026-10-30)
+| Route | Automatic? | Detail | Needs | Verdict |
+|---|---|---|---|---|
+| **Huawei Health Kit cloud API** (OAuth server app, `access_type=offline`, scopes per data type) | Yes | Exercise records + samples (HR, distance, speed); swim data likely | A **Huawei developer account** (identity verification) and **Huawei approving our app** for Health Kit scopes; each app needs its own approval. Official REST pages are JavaScript-only and could not be read here; whether iPhone-recorded data reaches the API is unconfirmed. | The only automatic Huawei-direct route. Prepared on the server; switched on after approval. |
+| **Huawei data export** (Health app → Me → account → Privacy Center → Request your data → Health; or privacy.consumer.huawei.com/tool) | No (email with a ZIP, AES-encrypted with a password he chooses) | **Everything**: `sportType`, `startTime` (ms), `totalTime` (ms), `timeZone`, summary JSON (`totalDistance` m, `totalCalories`/1000, `wearSportData.swim_pool_length`/100, `mSwimSegments` with `mDistance`, `mDuration`, `mSwolf`, `mPullTimes`), sample lines `tp=h-r` (HR), `tp=s-r` (step rate), `tp=lbs` (GPS), `tp=rs` (speed dm/s), `tp=alt`. 2025 format: several JSON files in `Motion path detail data & description/`. | Nothing | **Build now** — most accurate; imports the whole history; duplicates skipped. |
+| Huawei → Apple Health → iOS Shortcut | Yes | Totals at best; no swim lengths | Huawei must write workouts to Apple Health — users report it often doesn't | Not reliable enough as the main route. |
+| Huawei → Strava | Yes | — | Strava account | He has none (excluded). |
+| Thryve / Terra aggregators | Yes | — | Paid | Excluded (must be free). |
+Sources: CTHRU/Hitrava (format, sport codes), Huawei developer pages (Health Kit, server-app OAuth), Thryve's Huawei page, Apple/Huawei community threads.
+
+## 6.3 Build
+1. **Huawei export importer** (`www/js/app/huawei.js`): pick the ZIP (Files/Mail on iPhone), password remembered on the device, AES ZIP opened in the browser (zip.js), every activity parsed: sport mapping (5 walk, 4 run, 3 ride, 102 pool swim, 104 open-water swim, 101 treadmill, 103 indoor bike, 282/2 hike → walk, 111/117/145 → gym & other, unknown → other), local time from `timeZone`, HR stream → zones/TRIMP, GPS → route, steps/cadence, calories, pool swims → the same per-length swim model as the Galaxy Watch (SWOLF, strokes, best 100 m…). Duplicates skipped (`sameSession`), re-imports add only new sessions; deleted ones never come back. Everything then flows to coaches and the squad like any workout.
+2. **Health Kit automatic sync** (server): OAuth start/callback on the Worker, refresh token stored per member (encrypted), cron pulls new exercise records → private per-member inbox → his app imports them. Off until the owner's Huawei developer app is approved (config `HUAWEI_CLIENT_ID/SECRET` as Worker secrets).
+3. **First-run introduction** (web app and fresh installs): welcome → name, sex, age/HR, weight → where workouts come from (Huawei export / screenshot / Strava / Samsung) → AI coach → join the squad → done; skippable, re-openable from Profile.
+4. **Personal side on the web**: everything works without Android plugins; Android-only cards explain themselves instead of failing.
+
+## 6.4 Status (2026-10-30)
+- ✅ Huawei export importer (tested with generated AES exports in both layouts; **still to verify with Assad's real export**).
+- ✅ Introduction; ✅ Gemini-only personal AI on the web app (user decision); ✅ Samsung card explains itself on iPhone.
+- ✅ Free-plan check: requests, D1 reads/writes, storage, cron and wall time far inside the free limits; CPU per request measured live: polls 1–8 ms, AI runs 9–12 ms on 6 months of heavy history after moving the AI context to a phone-built digest (Cloudflare tolerates occasional overruns; consistent ones are cut off).
+- ❌ Apple Health route: not easier or better (Huawei → Apple Health is unreliable for workouts and has no swim lengths).
+- ⏳ Health Kit automatic link: starts when the owner registers a Huawei developer account (then the docs are readable and every field can be verified).
+
 ## Not verified yet
 - Real Strava sync and Gemini calls (no credentials here) — logic reviewed, demo data used for everything else.
 - On-device behaviour (back button, share sheet, deep link) — needs a phone test.
