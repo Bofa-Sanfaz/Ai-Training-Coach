@@ -141,7 +141,7 @@ Start/join challenge (invite code, name, dates, goal type) · members with avata
 5. **Activity sharing**: automatic summaries after sync; personal bests; opt-in body & wellness. ✅
 6. **AI**: ask/review/roast/monthly report, interruptions with the etiquette rules, daily/weekly/final recap, screenshot → workout. ✅
 7. **Assad's web app**: same build served by the Worker, Safari install (manifest + icons), same sections (no sport filter), Strava with his own API app, screenshot import. ✅ (code); needs the deploy to be reachable
-8. **Deploy** (needs the athlete's free Cloudflare account + `wrangler login`, see `squad/README.md`), test with both phones. ⏳ waiting for the login
+8. **Deploy** ✅ 2026-10-29 — https://training-partner-squad.training-partner-squad.workers.dev (live smoke test 15/15). Still open: first real challenge with Assad on both phones, and a real AI provider in the squad (tested only with a mock).
 
 ## 5.9 Decisions taken while building (3.5)
 - **The AI never runs inside `waitUntil`** (30 s limit could leave the lock held): responses carry `ai_due`, the client calls `POST /ai/run` (the request stays open while the model writes), the cron covers closed phones. One run per challenge via a lease on `challenges.ai_lock`, renewed before each model call.

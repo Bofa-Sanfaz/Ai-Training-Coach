@@ -14,7 +14,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "squad"
-database_id = "00000000-0000-0000-0000-000000000000" # replaced by `wrangler d1 create squad` output
+database_id = "89a09b61-d619-452f-a24d-b43f4d0047e1" # from `wrangler d1 create squad` (useless without the account login)
 migrations_dir = "migrations"
 
 # The AI's own initiatives (interruptions, daily recap) — one cron, every 15 minutes

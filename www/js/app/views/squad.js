@@ -11,7 +11,7 @@
 // The AI ("Aether") runs on the squad server with the owner's key; when the server
 // says the AI is due, the app asks it to run (the server's cron covers closed phones).
 // --------------------------------------------------------
-const SQUAD_DEFAULT_SERVER = ''; // filled in after deploying squad/ (see squad/README.md)
+const SQUAD_DEFAULT_SERVER = 'https://training-partner-squad.training-partner-squad.workers.dev'; // squad/ deployed 2026-10-29
 const SQUAD_POLL = { chat: 4000, tab: 15000, idle: 60000 };
 const SQUAD_REACTIONS = ['🔥', '💪', '👏', '😂', '😮', '🐢'];
 const SQUAD_AI = 'Aether';

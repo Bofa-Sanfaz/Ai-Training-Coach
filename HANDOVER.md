@@ -6,7 +6,7 @@ _Last updated: 2026-10-29. Read this first; it describes the app as it is now. T
 Training Partner (formerly Ride Partner) is a personal, offline-first Android app for one athlete who rides (MTB/XC), runs, swims and trains in the gym. It syncs workouts from **Strava** and from the **Galaxy Watch via Samsung Health → Health Connect**, computes training physiology locally, and provides **AI coaching** (Aether + task-specific coaches) through the athlete's own API keys.
 
 - Package: `com.ridepartner.v2` (kept so updates install in place; display name "Training Partner")
-- Installed on the athlete's phone: see `C:\dev\releases` (one APK only). 3.4.0 (30400) is on the phone; 3.5.0 (30500) is built and waiting to be installed (`adb install -r`, data kept).
+- Installed on the athlete's phone: see `C:\dev\releases` (one APK only). 3.4.0 (30400) is on the phone; 3.5.0 (30501, squad server address built in) is built and waiting to be installed (`adb install -r`, data kept).
 - Source: GitHub `Bofa-Sanfaz/Ai-Training-Coach`, branch **`v3-rebuild`** (not merged into `main`). Local copy: `C:\dev\Ai-Training-Coach`.
 
 ## 2. Where things are
@@ -55,7 +55,7 @@ scripts/                  build-apk.ps1, patch-android.js, phone-update.ps1, pho
 - Local config keys: `squad_challenges` (entries incl. member token, `shared`, `daily_shared`, sharing toggles), `squad_outbox`, `squad_data_<id>` (events, members, challenge), `squad_current`, `squad_server`, `squad_name`.
 - AI: owner's provider config + key stored only on the server; client calls `POST /ai/run` when a response says `ai_due`; lease on `challenges.ai_lock`; etiquette (90 s quiet, 1 per 2 h, 4/day), recaps, monthly report, screenshot → workout (`/ai/extract`).
 - Fairness: scores only against own baseline; weight only as a change (UI, PDF, AI).
-- Not yet live: needs `wrangler login` + deploy by the owner, then `SQUAD_DEFAULT_SERVER` in squad.js. Tested locally only (`squad/test/api-test.mjs`, 68 checks; browser test of the whole UI).
+- **Live** since 2026-10-29: https://training-partner-squad.training-partner-squad.workers.dev (owner's Cloudflare account; wrangler is logged in on this PC). Redeploy with `cd squad; npx wrangler deploy` (also republishes the web app from `www/`). Tests: `squad/test/api-test.mjs` (68 local checks), live smoke test 15/15 (test data removed).
 
 ## 4. Data (IndexedDB "RidePartnerDB", phone only)
 `workouts` (+ `sport`, `indoor`, `data_flags`, `source:'health'` with negative `strava_id`), `streams`, `threads` (session chats; `pending`, `kind`, `ai_*`), `master_chat` (Aether; `pending`, proposals, `ai_*`), `graph_threads`, `reports`, `config`.

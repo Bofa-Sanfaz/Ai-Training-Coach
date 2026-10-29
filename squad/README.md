@@ -15,6 +15,10 @@ squad/
 ../www/js/app/squad-core.js   shared by app and server: event folding, scoring, monthly numbers
 ```
 
+**Live:** https://training-partner-squad.training-partner-squad.workers.dev (deployed 2026-10-29,
+D1 `squad` in Western Europe, cron every 15 min). The Android app has this address built in
+(`SQUAD_DEFAULT_SERVER`); the web app uses its own origin.
+
 ## Deploy (one time, ~5 minutes)
 
 What you need: a free Cloudflare account (cloudflare.com → Sign up). Then, in this folder:
