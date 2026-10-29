@@ -54,7 +54,7 @@ android-res/          launcher icons, adaptive icon, splash (generated from asse
 7. ✅ `app.py` removed (user: APK only)
 8. ✅ Browser test with demo data (all tabs, rollback round-trip, classic opens shared DB, no console errors)
 9. ✅ Build APK — SDK license accepted by user 2026-10-29. Output `C:\dev\releases\RidePartner-v3.0.0-30000.apk` (3.7 MB), package com.ridepartner.v2, signed with persistent-keystore.jks (SHA-256 46:E1:0C:…:C3:15, same as CI)
-12. ⏳ Push to GitHub — not done (git isn't installed on this PC; nothing has been committed or pushed)
+12. ✅ Pushed to GitHub on branch `v3-rebuild` (portable git in `C:\dev\tools\git`). Not merged into `main` — open a PR to review: https://github.com/Bofa-Sanfaz/Ai-Training-Coach/pull/new/v3-rebuild
 10. ✅ CI workflow, README, CHANGELOG, ROLLBACK, BUILD docs
 11. ✅ User asked for a lighter theme → light is default, lab panel/readouts now light too
 
