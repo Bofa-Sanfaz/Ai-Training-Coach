@@ -1,6 +1,6 @@
 {
   "name": "ai-training-coach",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "Offline-First AI Cycling Coach (Ride Partner)",
   "private": true,
   "scripts": {

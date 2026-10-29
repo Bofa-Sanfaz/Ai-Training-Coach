@@ -426,16 +426,26 @@ async function exportDatabaseJson() {
 async function importDatabaseJson(event) {
   const file = event.target.files && event.target.files[0];
   event.target.value = '';
-  if (!file) return;
-  const ok = await uiConfirm('Restore backup?', 'Rides, coach chats and settings are replaced by the backup. API keys and your Strava login stay. A restore point is created first so you can undo this.', { okText: 'Restore' });
+  if (!file) { toast('No file was selected.', 'warn'); return; }
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+    if (!data || !Array.isArray(data.workouts)) throw new Error('this is not a Ride Partner backup');
+  } catch (e) {
+    toast(`Can't read "${file.name}": ${e.message}`, 'error', 6000);
+    return;
+  }
+  const ok = await uiConfirm('Restore backup?', `"${file.name}" contains ${data.workouts.length} rides${Array.isArray(data.streams) ? `, ${data.streams.length} telemetry streams` : ''} and ${(data.threads || []).length + (data.master_chat || []).length} coach messages.\n\nYour current rides, chats and settings are replaced. API keys and your Strava login stay. A restore point is created first so you can undo this.`, { okText: 'Restore' });
   if (!ok) return;
   try {
-    const data = JSON.parse(await file.text());
+    toast('Restoring backup…', 'info', 2500);
     await createRestorePoint('Before importing a backup file', 'auto');
     await restoreDump(data, { preserveSecrets: true });
-    await afterDataReplaced('Backup restored');
+    await afterDataReplaced(`Restored ${data.workouts.length} rides`);
+    haptic('success');
+    switchTab('rides');
   } catch (e) {
-    toast(`Import failed: ${e.message}`, 'error', 6000);
+    toast(`Restore failed: ${e.message}`, 'error', 6000);
   }
 }
 

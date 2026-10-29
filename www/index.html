@@ -408,7 +408,8 @@
         <button class="btn btn-secondary btn-sm" onclick="exportDatabaseJson()"><svg class="ic"><use href="#i-upload"/></svg>Export JSON</button>
         <button class="btn btn-secondary btn-sm" onclick="$('#importDbFile').click()"><svg class="ic"><use href="#i-download"/></svg>Restore JSON</button>
       </div>
-      <input type="file" id="importDbFile" accept=".json,application/json" class="hidden" onchange="importDatabaseJson(event)" />
+      <!-- no "accept" filter: Samsung's picker can hide/grey out .json files copied over USB -->
+      <input type="file" id="importDbFile" class="hidden" onchange="importDatabaseJson(event)" />
       <div class="section-title" style="margin-top:14px"><span>Restore points</span><button class="btn btn-ghost btn-xs" onclick="createManualRestorePoint()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Create</button></div>
       <div id="restorePointList" class="list"></div>
       <div class="callout warn mt-12">
