@@ -457,7 +457,9 @@ async function triggerOfficialPdfDownload() {
       font('normal', 8, PDF.sub);
       const line = [`${a.count} sessions`, formatHours(a.sec), s === 'swim' ? `${Math.round(a.dist * 1000)} m` : s === 'other' ? '' : `${fmtNum(a.dist, 1)} km`,
         s !== 'other' && a.speed ? `avg ${speedText(probe, a.speed)}` : '', a.hr ? `${Math.round(a.hr)} bpm` : '', `${Math.round(a.trimp)} TRIMP`,
-        s === 'ride' || s === 'run' ? `${Math.round(a.asc)} m climbing` : '', pa && pa.count ? `previous period: ${pa.count} sessions, ${formatHours(pa.sec)}` : ''].filter(Boolean).join('  ·  ');
+        s === 'ride' || s === 'run' ? `${Math.round(a.asc)} m climbing` : '',
+        s === 'swim' && list.some(w => swimOf(w) && swimOf(w).swolf) ? `SWOLF ${fmtNum(mean(list.map(w => swimOf(w) && swimOf(w).swolf).filter(Boolean)), 1)}` : '',
+        s === 'run' && list.some(w => w.avg_cadence) ? `cadence ${Math.round(mean(list.map(w => w.avg_cadence).filter(Boolean)))} spm` : '', pa && pa.count ? `previous period: ${pa.count} sessions, ${formatHours(pa.sec)}` : ''].filter(Boolean).join('  ·  ');
       doc.text(doc.splitTextToSize(txt(line), CW), M, y); y += 8;
       // Speed / pace and HR per session → is the same effort getting cheaper?
       const pts = list.filter(w => mv(w, 'avg_hr') > 0);

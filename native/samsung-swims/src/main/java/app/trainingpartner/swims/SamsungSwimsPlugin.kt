@@ -117,12 +117,30 @@ class SamsungSwimsPlugin : Plugin() {
                         s.meanSpeed?.let { o.put("meanSpeed", it.toDouble()) }
                         s.maxSpeed?.let { o.put("maxSpeed", it.toDouble()) }
                         s.customTitle?.let { o.put("title", it) }
+                        s.minHeartRate?.let { o.put("minHr", it.toDouble()) }
+                        s.meanCadence?.let { o.put("meanCadence", it.toDouble()) }
+                        s.maxCadence?.let { o.put("maxCadence", it.toDouble()) }
+                        s.count?.let { o.put("count", it) }
+                        o.put("countType", s.countType.name)
+                        s.altitudeGain?.let { o.put("altitudeGain", it.toDouble()) }
+                        s.meanPower?.let { o.put("meanPower", it.toDouble()) }
+                        s.vo2Max?.let { o.put("vo2Max", it.toDouble()) }
+                        s.meanCalorieBurnRate?.let { o.put("kcalPerHour", it.toDouble()) }
                         s.swimmingLog?.let { sw ->
                             o.put("poolLength", sw.poolLength.toDouble())
                             o.put("poolUnit", sw.poolLengthUnit)
                             sw.totalDistance?.let { o.put("swimDistance", it.toDouble()) }
-                            sw.totalDuration?.let { o.put("swimDurationSec", it.seconds) }
-                            o.put("intervals", sw.swimmingIntervals?.size ?: 0)
+                            sw.totalDuration?.let { o.put("swimDurationSec", it.toMillis() / 1000.0) }
+                            // One entry per interval (Samsung records lengths): time, strokes, stroke type
+                            val laps = JSArray()
+                            sw.swimmingIntervals?.forEach { iv ->
+                                laps.put(JSObject()
+                                    .put("sec", iv.duration.toMillis() / 1000.0)
+                                    .put("strokes", iv.strokeCount)
+                                    .put("n", iv.interval)
+                                    .put("style", iv.strokeType.name))
+                            }
+                            o.put("laps", laps)
                         }
                         if (withLog) {
                             val log = JSArray()
@@ -130,6 +148,8 @@ class SamsungSwimsPlugin : Plugin() {
                                 val e = JSObject().put("t", l.timestamp.toEpochMilli())
                                 l.heartRate?.let { e.put("hr", it.toDouble()) }
                                 l.speed?.let { e.put("sp", it.toDouble()) }
+                                l.cadence?.let { e.put("cad", it.toDouble()) }
+                                l.count?.let { e.put("cnt", it) }
                                 log.put(e)
                             }
                             o.put("log", log)

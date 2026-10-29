@@ -66,45 +66,25 @@ async function renderRideDetail() {
 
   const userW = await getAthleteWeightForDate(w.date);
   const wpk = userW && w.avg_power_w > 0 ? (w.avg_power_w / userW).toFixed(2) : null;
-  const d = distParts(w), s = speedParts(w);
   const box = (v, l, flag, count) => `<div class="hero-box${flag ? ' flagged' : ''}"${flag ? ` onclick="openQualitySheet(${w.id}, '${flag}')"` : ''}><div class="hero-val"${count !== undefined ? ` data-count="${count}"` : ''}>${v}</div><div class="hero-lbl">${l}</div></div>`;
   const fl = k => (isFlagged(w, k) ? k : '');
-  const hero = [
-    sp === 'other' && !(w.distance_km > 0) ? box(w.calories ? String(w.calories) : '--', 'kcal') : box(d.v, d.unit, fl('distance'), num(d.v)),
-    box(escapeHtml(rideDuration(w)), 'Moving'),
-    sp === 'other' ? box(w.max_hr > 0 ? String(w.max_hr) : '--', 'Peak bpm', fl('hr')) : box(s.v, `Avg ${s.unit}`, fl('distance')),
-    sp === 'ride' ? box(w.avg_power_w > 0 ? `${w.avg_power_w} W` : '--', `${w.device_watts ? 'Power' : 'Est. power'}${wpk ? ` · ${wpk} W/kg` : ''}`, fl('power'))
-      : box(hasVal(w.trimp) ? String(Math.round(w.trimp)) : '--', 'Load (TRIMP)', fl('hr')),
-    box(w.avg_hr > 0 ? String(w.avg_hr) : '--', 'Avg bpm', fl('hr'), w.avg_hr || undefined),
-    sp === 'ride' || sp === 'run' ? box(`${Math.round(num(w.elevation_gain_m))} m`, 'Ascent', fl('elevation')) : box(w.calories ? String(w.calories) : '--', 'kcal')
-  ];
-  $('#det_hero').innerHTML = hero.join('');
-
-  const gross = grossAscentRate(w);
-  const vam = w.climbing_vam ? `${w.climbing_vam} m/h <span class="tiny muted">(>3%)</span>` : (gross > 0 ? `${gross} m/h <span class="tiny muted">(gross)</span>` : '--');
-  const pctMax = w.max_hr > 0 ? Math.round((w.max_hr / PHYSIO.max_hr) * 100) : null;
-  $('#det_secondary').innerHTML = `
-    <div class="kv"><span class="k">Athlete weight</span><span class="v">${userW ? `${userW} kg` : 'Not set'}</span></div>
-    <div class="kv"><span class="k">Max speed</span><span class="v">${w.max_speed_kmh ? fmtNum(w.max_speed_kmh, 1) + ' km/h' : '--'}</span></div>
-    <div class="kv"><span class="k">Peak heart rate</span><span class="v">${w.max_hr ? `${w.max_hr} bpm` : '--'}${pctMax ? ` <span class="tiny muted">${pctMax}%</span>` : ''}</span></div>
-    <div class="kv"><span class="k">Training load</span><span class="v">${hasVal(w.trimp) ? `${Math.round(w.trimp)} TRIMP` : '--'}${w.trimp_source === 'avg' ? ' <span class="tiny muted">(avg HR)</span>' : ''}</span></div>
-    <div class="kv"><span class="k">Work done</span><span class="v">${w.kilojoules > 0 ? `${w.kilojoules} kJ` : '--'}</span></div>
-    <div class="kv"><span class="k">Climbing VAM</span><span class="v">${vam}</span></div>
-    <div class="kv"><span class="k">Aerobic decoupling</span><span class="v">${escapeHtml(decouplingDisplay(w))}</span></div>
-    <div class="kv"><span class="k">Elapsed time</span><span class="v">${w.elapsed_sec ? formatDuration(w.elapsed_sec) : '--'}</span></div>
-    ${w.rpe ? `<div class="kv"><span class="k">Session RPE load</span><span class="v">${Math.round(w.rpe * num(w.moving_sec) / 60)} <span class="tiny muted">RPE × min</span></span></div>` : ''}
-    ${powerKvHtml(w, await db.workouts.toArray())}`;
+  const ctx = { box, fl, wpk, userW, all: await db.workouts.toArray() };
+  $('#det_hero').innerHTML = detailHeroBoxes(w, ctx).join('');
+  $('#det_secondary').innerHTML = detailStatsHtml(w, ctx);
+  applyDetailLabels(w);
 
   renderRouteCard(w, activeStream);
   renderFeel(w);
   renderCardiacZones(w);
+  renderSwimSection(w);
   await renderDeltaTable(w);
   await renderBestEfforts(w);
 
+  const hasDist = sp === 'ride' || sp === 'run';
   $('#banner_line1_l').textContent = `⏱ ${rideDuration(w)}`;
-  $('#banner_line1_r').textContent = `📏 ${distText(w)}`;
-  $('#banner_line2_l').textContent = `⚡ Avg ${speedText(w)}`;
-  $('#banner_line2_r').textContent = `❤️ ${w.avg_hr || '--'} bpm · ⛰ ${Math.round(num(w.elevation_gain_m))} m`;
+  $('#banner_line1_r').textContent = hasDist ? `📏 ${distText(w)}` : '';
+  $('#banner_line2_l').textContent = hasDist ? `⚡ Avg ${speedText(w)}` : '';
+  $('#banner_line2_r').textContent = `❤️ ${w.avg_hr || '--'} bpm${hasDist && !isIndoor(w) ? ` · ⛰ ${Math.round(num(w.elevation_gain_m))} m` : ''}`;
 
   setupMetricPills();
   setTimeout(renderStreamPlot, 60);
@@ -161,11 +141,7 @@ async function setRpe(n) {
 // ---------- Best efforts in this ride ----------
 async function renderBestEfforts(w) {
   const wrap = $('#det_best_wrap');
-  const rows = [];
-  const dur = d => BEST_LABELS[d] || `${d}s`;
-  if (mv(w, 'best_spd') && sportOf(w) !== 'other') rows.push([speedName(w), Object.entries(w.best_spd).map(([d, v]) => [dur(d), speedText(w, v)])]);
-  if (mv(w, 'best_hr')) rows.push(['Heart rate', Object.entries(w.best_hr).map(([d, v]) => [dur(d), `${Math.round(v)} bpm`])]);
-  if (w.power_source === 'meter' && w.mmp) rows.push(['Power', Object.entries(w.mmp).filter(([d]) => [5, 60, 300, 1200, 3600].includes(+d)).map(([d, v]) => [dur(d), `${Math.round(v)} W`])]);
+  const rows = bestEffortRows(w);
   if (!rows.length) { wrap.classList.add('hidden'); return; }
   wrap.classList.remove('hidden');
   $('#det_best').innerHTML = rows.map(([name, cells]) => `
@@ -206,7 +182,7 @@ async function renderDeltaTable(w) {
   const { rides, basis } = priorComparable(w, all);
   const host = $('#det_delta');
   if (!rides.length) {
-    host.innerHTML = `<div class="card small muted">First ride recorded for this intent (${escapeHtml(getCleanIntentLabel(w))}) — it becomes the baseline.</div>`;
+    host.innerHTML = `<div class="card small muted">First ${escapeHtml(sportMeta(w).label.toLowerCase())} recorded for this intent (${escapeHtml(getCleanIntentLabel(w))}) — it becomes the baseline.</div>`;
     return;
   }
   const p = aggregateRides(rides);
@@ -214,14 +190,23 @@ async function renderDeltaTable(w) {
   const na = '<span class="neu">--</span>';
   const okD = hasVal(mv(w, 'distance_km'));
   const rows = [];
-  if (sp !== 'other') {
-    rows.push(['Distance', okD ? distText(w) : 'flagged', distText(w, p.avgDist), okD ? deltaCell((num(w.distance_km) - p.avgDist) * (sp === 'swim' ? 1000 : 1), sp === 'swim' ? 0 : 2, sp === 'swim' ? ' m' : ' km') : na]);
+  if (sp === 'swim') {
+    const avgOf = fn => { const v = rides.map(fn).filter(x => x > 0); return v.length ? mean(v) : null; };
+    const pace = swimPace100(w), pPace = avgOf(swimPace100);
+    const sw = swimOf(w), pSwolf = avgOf(r => swimOf(r) && swimOf(r).swolf), pSpl = avgOf(r => swimOf(r) && swimOf(r).spl);
+    rows.push(['Distance', distText(w), `${Math.round(p.avgDist * 1000)} m`, deltaCell((num(w.distance_km) - p.avgDist) * 1000, 0, ' m')]);
+    rows.push(['Pace /100 m', pace ? fmtPace(pace) : '--', pPace ? fmtPace(pPace) : '--', pace && pPace ? deltaCell(pace - pPace, 0, ' s', true) : na]);
+    if (sw && sw.swolf) rows.push(['SWOLF', String(sw.swolf), pSwolf ? fmtNum(pSwolf, 1) : '--', pSwolf ? deltaCell(sw.swolf - pSwolf, 1, '', true) : na]);
+    if (sw && sw.spl) rows.push(['Strokes / length', String(sw.spl), pSpl ? fmtNum(pSpl, 1) : '--', pSpl ? deltaCell(sw.spl - pSpl, 1, '', true) : na]);
+  } else if (sp !== 'other') {
+    rows.push(['Distance', okD ? distText(w) : 'flagged', distText(w, p.avgDist), okD ? deltaCell(num(w.distance_km) - p.avgDist, 2, ' km') : na]);
     rows.push([`${speedName(w)} (weighted)`, okD ? speedText(w) : 'flagged', p.speed ? speedText(w, p.speed) : '--', okD && p.speed ? (sp === 'ride' ? deltaCell(num(w.avg_speed_kmh) - p.speed, 1, ' km/h') : `<span class="${w.avg_speed_kmh > p.speed ? 'pos' : 'neg'}">${w.avg_speed_kmh > p.speed ? 'faster' : 'slower'}</span>`) : na]);
+    if (sp === 'run' && w.avg_cadence) { const c = rides.map(r => r.avg_cadence).filter(Boolean); if (c.length) rows.push(['Cadence', `${w.avg_cadence} spm`, `${Math.round(mean(c))} spm`, deltaCell(w.avg_cadence - mean(c), 0, ' spm')]); }
   } else {
-    rows.push(['Moving time', rideDuration(w), formatDuration(p.sec / rides.length), deltaCell((num(w.moving_sec) - p.sec / rides.length) / 60, 0, ' min')]);
+    rows.push(['Time', rideDuration(w), formatDuration(p.sec / rides.length), deltaCell((num(w.moving_sec) - p.sec / rides.length) / 60, 0, ' min')]);
   }
   rows.push(['HR (weighted)', mv(w, 'avg_hr') ? `${w.avg_hr} bpm` : '--', p.hr ? `${Math.round(p.hr)} bpm` : '--', mv(w, 'avg_hr') && p.hr ? deltaCell(w.avg_hr - p.hr, 0, ' bpm', true) : na]);
-  if (sp === 'ride' || sp === 'run') rows.push(['Ascent', hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged', `${Math.round(p.avgAsc)} m`, hasVal(mv(w, 'elevation_gain_m')) ? deltaCell(num(w.elevation_gain_m) - p.avgAsc, 0, ' m') : na]);
+  if (sp === 'ride' || (sp === 'run' && !isIndoor(w))) rows.push(['Ascent', hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged', `${Math.round(p.avgAsc)} m`, hasVal(mv(w, 'elevation_gain_m')) ? deltaCell(num(w.elevation_gain_m) - p.avgAsc, 0, ' m') : na]);
   if (hasVal(w.trimp) && p.trimp > 0) {
     const avgLoad = p.trimp / rides.filter(r => hasVal(r.trimp)).length;
     rows.push(['Load', `${Math.round(w.trimp)}`, `${Math.round(avgLoad)}`, deltaCell(w.trimp - avgLoad, 0, '')]);
@@ -238,9 +223,12 @@ async function renderDeltaTable(w) {
 // STREAM CHART
 // --------------------------------------------------------
 function setupMetricPills() {
-  const available = ['Speed (km/h)', 'Heart Rate (bpm)', 'Power (Watts)', 'Elevation (m)'];
-  if (activeStream && activeStream.cadence) available.push('Cadence (RPM)');
-  $('#metricPills').innerHTML = available.map(m => `<button class="chip ${selectedMetrics.includes(m) ? 'active' : ''}" onclick="toggleMetric('${m}')">${m}</button>`).join('');
+  const available = currentWorkout ? streamMetricsFor(currentWorkout, activeStream) : [];
+  // Keep the athlete's choice where it fits this sport; otherwise sensible defaults
+  const kept = selectedMetrics.filter(m => available.includes(m));
+  if (!kept.length) selectedMetrics = available.filter(m => /Speed|Pace|Heart|Elevation/.test(m)).slice(0, 3);
+  else selectedMetrics = kept;
+  $('#metricPills').innerHTML = available.length > 1 ? available.map(m => `<button class="chip ${selectedMetrics.includes(m) ? 'active' : ''}" onclick="toggleMetric('${m}')">${m}</button>`).join('') : '';
 }
 
 function toggleMetric(m) {
@@ -258,7 +246,7 @@ function renderStreamPlot() {
   const w = currentWorkout;
   if (!el || !w) return;
   if (!plotReady()) { chartEmpty(el, 'Charts unavailable.'); return; }
-  if (!activeStream || !activeStream.time) { chartEmpty(el, 'Route stream data is not available for this ride.'); return; }
+  if (!activeStream || !activeStream.time) { chartEmpty(el, 'No second-by-second data was recorded for this workout.'); return; }
 
   const n = activeStream.time.data.length;
   const idx = strideIndices(n, 1400);
@@ -287,13 +275,16 @@ function renderStreamPlot() {
     const peak = Math.max(safeMax(src, 0), w.max_power_w || 0, 300);
     traces.push({ x: times, y: norm(src, 0, peak), name: 'Power', text: src.map(v => `${Math.round(v)} W${watts.length ? '' : ' (avg est)'}`), hovertemplate: '⚡ %{text}<extra></extra>', type: 'scatter', line: { color: '#fc5200', width: 1.6, dash: watts.length ? 'solid' : 'dot' } });
   }
-  if (selectedMetrics.includes('Speed (km/h)') && speeds.length) {
+  if ((selectedMetrics.includes('Speed (km/h)') || selectedMetrics.includes('Pace')) && speeds.length) {
     const peak = Math.max(safeMax(speeds, 0), 1);
-    traces.push({ x: times, y: norm(speeds, 0, peak), name: 'Speed', text: speeds.map(s => `${s} km/h`), hovertemplate: '🚴 %{text}<extra></extra>', type: 'scatter', line: { color: '#2563eb', width: 1.8 } });
+    const isRun = sportOf(w) === 'run';
+    traces.push({ x: times, y: norm(speeds, 0, peak), name: isRun ? 'Pace' : 'Speed', text: speeds.map(s => (isRun ? speedText(w, s) : `${s} km/h`)), hovertemplate: `${isRun ? '🏃' : '🚴'} %{text}<extra></extra>`, type: 'scatter', line: { color: isRun ? '#16a34a' : '#2563eb', width: 1.8 } });
   }
-  if (selectedMetrics.includes('Cadence (RPM)') && cad.length) {
-    traces.push({ x: times, y: norm(cad, 0, Math.max(safeMax(cad, 0), 1)), name: 'Cadence', text: cad.map(c => `${c} rpm`), hovertemplate: '🔄 %{text}<extra></extra>', type: 'scatter', line: { color: '#8b5cf6', width: 1.2 } });
+  if ((selectedMetrics.includes('Cadence (RPM)') || selectedMetrics.includes('Cadence (spm)')) && cad.length) {
+    const unit = sportOf(w) === 'run' ? 'spm' : 'rpm';
+    traces.push({ x: times, y: norm(cad, 0, Math.max(safeMax(cad, 0), 1)), name: 'Cadence', text: cad.map(c => `${c} ${unit}`), hovertemplate: '🔄 %{text}<extra></extra>', type: 'scatter', line: { color: '#8b5cf6', width: 1.2 } });
   }
+  if (!traces.length) return chartEmpty(el, 'No samples for the selected metrics.');
 
   drawChart(el, traces, plotLayout({
     margin: { l: 8, r: 8, t: 8, b: 28 },

@@ -159,13 +159,38 @@ function rideCardHtml(w, coachIds) {
   const d = distParts(w), s = speedParts(w);
   const flagged = k => isFlagged(w, k);
   const stat = (v, l, bad) => `<div class="ride-stat${bad ? ' flagged' : ''}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
-  const stats = [
-    sp === 'other' && !(w.distance_km > 0) ? stat(w.calories ? `<span>${w.calories}</span><small>kcal</small>` : '--', 'Energy') : stat(`${d.v}<small>${d.unit}</small>`, 'Distance', flagged('distance')),
+  const hrStat = stat(w.avg_hr > 0 ? `${w.avg_hr}<small>bpm</small>` : '--', 'Avg HR', flagged('hr'));
+  const loadStat = stat(hasVal(w.trimp) ? Math.round(w.trimp) : '--', 'Load', flagged('hr'));
+  const sw = swimOf(w);
+  // Six numbers that matter for each sport
+  const stats = sp === 'swim' ? [
+    stat(`${d.v}<small>${d.unit}</small>`, 'Distance', flagged('distance')),
+    stat(escapeHtml(formatDuration(w.moving_sec)), sw ? 'Swim time' : 'Time'),
+    stat(swimPace100(w) ? `${fmtPace(swimPace100(w))}<small>/100m</small>` : '--', 'Pace', flagged('distance')),
+    hrStat,
+    stat(sw && sw.swolf ? String(sw.swolf) : '--', 'SWOLF'),
+    loadStat
+  ] : sp === 'run' ? [
+    stat(`${d.v}<small>${d.unit}</small>`, 'Distance', flagged('distance')),
     stat(escapeHtml(rideDuration(w)), 'Moving'),
-    sp === 'other' ? stat(w.max_hr > 0 ? `${w.max_hr}<small>bpm</small>` : '--', 'Peak HR', flagged('hr')) : stat(`${s.v}<small>${s.unit}</small>`, speedName(w), flagged('distance')),
-    stat(w.avg_hr > 0 ? `${w.avg_hr}<small>bpm</small>` : '--', 'Avg HR', flagged('hr')),
-    sp === 'ride' || sp === 'run' ? stat(`${Math.round(num(w.elevation_gain_m))}<small>m</small>`, 'Ascent', flagged('elevation')) : stat(w.max_hr > 0 && sp !== 'other' ? `${w.max_hr}<small>bpm</small>` : (w.calories ? `${w.calories}<small>kcal</small>` : '--'), sp !== 'other' ? 'Peak HR' : 'Energy'),
-    stat(hasVal(w.trimp) ? Math.round(w.trimp) : '--', 'Load', flagged('hr'))
+    stat(`${s.v}<small>${s.unit}</small>`, 'Pace', flagged('distance')),
+    hrStat,
+    w.avg_cadence ? stat(`${w.avg_cadence}<small>spm</small>`, 'Cadence') : isIndoor(w) ? stat(w.calories ? `${w.calories}<small>kcal</small>` : '--', 'Energy') : stat(`${Math.round(num(w.elevation_gain_m))}<small>m</small>`, 'Ascent', flagged('elevation')),
+    loadStat
+  ] : sp === 'other' ? [
+    stat(escapeHtml(rideDuration(w)), 'Time'),
+    hrStat,
+    stat(w.max_hr > 0 ? `${w.max_hr}<small>bpm</small>` : '--', 'Peak HR', flagged('hr')),
+    loadStat,
+    stat(w.calories ? `${w.calories}<small>kcal</small>` : '--', 'Energy'),
+    w.reps ? stat(String(w.reps), 'Reps') : stat(escapeHtml(String(w.name || '').slice(0, 14)) || '--', 'Type')
+  ] : [
+    stat(`${d.v}<small>${d.unit}</small>`, 'Distance', flagged('distance')),
+    stat(escapeHtml(rideDuration(w)), 'Moving'),
+    stat(`${s.v}<small>${s.unit}</small>`, 'Speed', flagged('distance')),
+    hrStat,
+    stat(`${Math.round(num(w.elevation_gain_m))}<small>m</small>`, 'Ascent', flagged('elevation')),
+    loadStat
   ];
   const status = !reviewed ? '<span class="badge badge-new">Review</span>' : (w.debrief_stale ? '<span class="badge badge-stale">Update</span>' : '');
   return `

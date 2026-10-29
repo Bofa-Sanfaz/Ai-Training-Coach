@@ -107,6 +107,50 @@ function distParts(w, km = w && w.distance_km) {
 const distText = (w, km) => { const p = distParts(w, km); return `${p.v} ${p.unit}`; };
 
 // --------------------------------------------------------
+// SWIM METRICS (from the watch's per-length log)
+// Every Samsung interval is one pool length: time, stroke count, stroke style.
+//   SWOLF = seconds + strokes for one length (lower = more efficient); kick-board
+//   lengths (no strokes) are left out of SWOLF and strokes per length.
+//   Best 50/100/200/400 m = fastest run of consecutive lengths covering that distance.
+//   Pace and stroke rate use active swimming time (rest between sets excluded).
+// --------------------------------------------------------
+const STROKES = { FREESTYLE: 'Freestyle', BREASTSTROKE: 'Breaststroke', BACKSTROKE: 'Backstroke', BUTTERFLY: 'Butterfly', KICK_BOARD: 'Kick board', MIXED: 'Mixed', UNDEFINED: 'Unknown' };
+const STROKE_COLORS = { FREESTYLE: '#0891b2', BREASTSTROKE: '#16a34a', BACKSTROKE: '#7c3aed', BUTTERFLY: '#db2777', KICK_BOARD: '#f59e0b', MIXED: '#64748b', UNDEFINED: '#94a3b8' };
+
+function buildSwimDetail(s, totalSec) {
+  const pool = num(s.poolLength) * (s.poolUnit === 'yard' ? 0.9144 : 1);
+  const laps = (s.laps || []).map(l => ({ sec: round(num(l.sec), 1), strokes: Math.round(num(l.strokes)), style: STROKES[l.style] ? l.style : 'UNDEFINED' })).filter(l => l.sec > 0);
+  if (!(pool > 0) || !laps.length) return null;
+  const strokeLaps = laps.filter(l => l.strokes > 0);
+  const active = sumBy(laps, l => l.sec);
+  const strokes = sumBy(strokeLaps, l => l.strokes);
+  const swolfs = strokeLaps.map(l => l.sec + l.strokes);
+  const bestOver = meters => {
+    const k = Math.round(meters / pool);
+    if (k < 1 || k > laps.length || Math.abs(k * pool - meters) > pool / 2) return null;
+    let sum = 0, best = Infinity;
+    for (let i = 0; i < laps.length; i++) { sum += laps[i].sec; if (i >= k) sum -= laps[i - k].sec; if (i >= k - 1 && sum < best) best = sum; }
+    return Number.isFinite(best) ? round(best, 1) : null;
+  };
+  const mix = {};
+  for (const l of laps) mix[l.style] = (mix[l.style] || 0) + 1;
+  return {
+    v: 1, pool_m: round(pool, 1), lengths: laps.length, distance_m: round(laps.length * pool, 0), laps,
+    active_sec: round(active, 0), rest_sec: totalSec ? Math.max(0, Math.round(totalSec - active)) : null,
+    strokes, spl: strokeLaps.length ? round(strokes / strokeLaps.length, 1) : null,
+    stroke_rate: strokeLaps.length ? round(strokes / (sumBy(strokeLaps, l => l.sec) / 60), 1) : null,
+    swolf: swolfs.length ? round(mean(swolfs), 1) : null, swolf_best: swolfs.length ? Math.min(...swolfs) : null,
+    best: { 50: bestOver(50), 100: bestOver(100), 200: bestOver(200), 400: bestOver(400) },
+    best_len: round(Math.min(...laps.map(l => l.sec)), 1), mix
+  };
+}
+
+const swimOf = w => (w && w.swim && w.swim.laps ? w.swim : null);
+const fmtSec = s => (hasVal(s) && s > 0 ? fmtPace(s) : '--');
+// Pace per 100 m from the per-length log (active time) or the session average
+const swimPace100 = w => { const sw = swimOf(w); return sw ? (sw.active_sec / sw.distance_m) * 100 : (w.avg_speed_kmh > 0 ? 360 / w.avg_speed_kmh : null); };
+
+// --------------------------------------------------------
 // WORKOUT DATA SHEET (sport, indoor, flags, delete)
 // --------------------------------------------------------
 let qsWorkoutId = null;
@@ -167,7 +211,7 @@ async function deleteWorkout(id) {
   const w = await db.workouts.get(id);
   if (!w) return;
   const chats = await db.threads.where('strava_id').equals(Number(w.strava_id)).count();
-  const ok = await uiConfirm(`Delete ${rideTitle(w)}?`, `${formatNiceDate(w.date)} · ${distText(w)} · ${rideDuration(w)}${chats ? `\n${chats} coach message${chats > 1 ? 's' : ''} will be deleted too.` : ''}\n\nA restore point is created first, and the workout won't be imported again by sync.`, { okText: 'Delete', danger: true });
+  const ok = await uiConfirm(`Delete ${rideTitle(w)}?`, `${formatNiceDate(w.date)} · ${sportOf(w) === 'other' ? '' : `${distText(w)} · `}${rideDuration(w)}${chats ? `\n${chats} coach message${chats > 1 ? 's' : ''} will be deleted too.` : ''}\n\nA restore point is created first, and the workout won't be imported again by sync.`, { okText: 'Delete', danger: true });
   if (!ok) return;
   await createRestorePoint(`Before deleting ${rideTitle(w)}`, 'auto');
   const gone = await getJsonConfig('deleted_workouts', []);
@@ -202,9 +246,25 @@ async function afterWorkoutsChanged(openId) {
 // --------------------------------------------------------
 const MIN_WORKOUT_DATE = '2026-01-01';
 const RUNLIKE_TYPES = ['Walk', 'Hike', 'Snowshoe', 'walking', 'hiking', 'snowshoeing'];
-const NEVER_ASK_TYPES = ['meditation', 'guidedBreathing', 'mindAndBody', 'preparationAndRecovery', 'cooldown', 'transition', 'fishing', 'hunting', 'stretching', 'flexibility', 'play', 'wheelchair'];
+// Outdoor rides always come from Strava, so watch cycling sessions are never offered
+const NEVER_ASK_TYPES = ['cycling', 'biking', 'mountainBiking', 'roadBiking', 'meditation', 'guidedBreathing', 'mindAndBody', 'preparationAndRecovery', 'cooldown', 'transition', 'fishing', 'hunting', 'stretching', 'flexibility', 'play', 'wheelchair'];
 const inboxSport = type => (RUNLIKE_TYPES.includes(type) ? 'run' : 'other');
 const prettyType = t => String(t || 'Activity').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+
+// Two recordings are the same session when they start within 2 minutes of each other or
+// overlap for at least half of the shorter one (e.g. the watch started 12 min after Strava).
+// Back-to-back bouts (a 4-min treadmill run, then an 11-min one) stay separate.
+function sameSession(aStart, aSec, bStart, bSec) {
+  const a0 = +aStart, b0 = +bStart;
+  if (Math.abs(a0 - b0) <= 120000) return true;
+  const a1 = a0 + Math.max(60, num(aSec)) * 1000, b1 = b0 + Math.max(60, num(bSec)) * 1000;
+  const overlap = Math.min(a1, b1) - Math.max(a0, b0);
+  return overlap > 0 && overlap >= 0.5 * Math.min(a1 - a0, b1 - b0);
+}
+const workoutStart = w => parseSafeDate(w.date).getTime();
+const workoutSec = w => num(w.elapsed_sec) || num(w.moving_sec);
+// Is this (start, duration) already a workout in `all`? Returns that workout.
+const findSameWorkout = (all, start, sec, filter = () => true) => all.find(w => filter(w) && sameSession(workoutStart(w), workoutSec(w), start, sec));
 
 async function activityRules() { return getJsonConfig('activity_rules', {}); }
 async function getInbox() { return getJsonConfig('activity_inbox', []); }
@@ -215,11 +275,18 @@ async function routeToInbox(items) {
   const rules = await activityRules();
   const inbox = await getInbox();
   const skipped = new Set(await getJsonConfig('activity_skipped', []));
+  // Skipped / waiting items are also matched by time, so the same walk arriving from
+  // another source (Strava, Health Connect, Samsung Health) isn't asked about twice
+  const skippedAt = await getJsonConfig('activity_skipped_at', []);
   const have = new Set(inbox.map(i => i.key));
+  const all = await db.workouts.toArray();
+  const at = it => parseSafeDate(it.date).getTime();
+  const seen = (it, list) => list.some(x => sameSession(at(x), x.moving_sec, at(it), it.moving_sec));
   const include = [];
   let queued = 0;
   for (const it of items) {
     if (it.date < MIN_WORKOUT_DATE || skipped.has(it.key) || have.has(it.key)) continue;
+    if (seen(it, inbox) || seen(it, skippedAt) || findSameWorkout(all, at(it), it.moving_sec)) continue;
     const rule = rules[`${it.src}:${it.type}`];
     if (rule === 'include') include.push(it);
     else if (rule !== 'skip') { inbox.push(it); queued++; }
@@ -260,8 +327,10 @@ async function applyInbox() {
   $$('#inboxRules select').forEach(s => { if (s.value) rules[s.dataset.rule] = s.value; else delete rules[s.dataset.rule]; });
   await setJsonConfig('activity_rules', rules);
   const chosen = inbox.filter((_, n) => pickN.has(n));
-  const skipped = inbox.filter((_, n) => !pickN.has(n)).map(i => i.key);
+  const skippedItems = inbox.filter((_, n) => !pickN.has(n));
+  const skipped = skippedItems.map(i => i.key);
   await setJsonConfig('activity_skipped', (await getJsonConfig('activity_skipped', [])).concat(skipped).slice(-2000));
+  await setJsonConfig('activity_skipped_at', (await getJsonConfig('activity_skipped_at', [])).concat(skippedItems.map(i => ({ date: i.date, moving_sec: i.moving_sec }))).slice(-2000));
   await setJsonConfig('activity_inbox', []);
   closeSheet('inboxSheet');
   const added = await importInboxItems(chosen);
@@ -293,6 +362,62 @@ async function importInboxItems(items) {
   }
   if (n) await renumberRides();
   return n;
+}
+
+// --------------------------------------------------------
+// DUPLICATE CLEAN-UP (runs once per DEDUPE_VER at start-up)
+// The same session recorded twice (Strava + watch, or two watch sources) is merged:
+// the Strava copy wins, otherwise the copy with more detail. The athlete's intent,
+// rating, note, sport and flags carry over; chats move to the kept copy.
+// --------------------------------------------------------
+const DEDUPE_VER = '1';
+
+async function dedupeWorkouts() {
+  if ((await getConfig('dedupe_ver')) === DEDUPE_VER) return 0;
+  const all = (await db.workouts.toArray()).sort((a, b) => workoutStart(a) - workoutStart(b));
+  const score = w => (w.source !== 'health' ? 100 : 0) + (w.swim && w.swim.laps ? 20 : 0) + (w.avg_hr > 0 ? 5 : 0) + (w.distance_km > 0 ? 5 : 0) + (w.zone_seconds || []).reduce((a, b) => a + num(b), 0) / 1e6;
+  const gone = new Set();
+  const pairs = [];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length && workoutStart(all[j]) - workoutStart(all[i]) < 6 * 3600000; j++) {
+      const a = all[i], b = all[j];
+      if (gone.has(a.id) || gone.has(b.id)) continue;
+      if (!sameSession(workoutStart(a), workoutSec(a), workoutStart(b), workoutSec(b))) continue;
+      const [keep, drop] = score(a) >= score(b) ? [a, b] : [b, a];
+      pairs.push([keep, drop]);
+      gone.add(drop.id);
+    }
+  }
+  if (pairs.length) {
+    await createRestorePoint(`Before merging ${pairs.length} duplicate workout${pairs.length > 1 ? 's' : ''}`, 'auto');
+    const deletedIds = await getJsonConfig('deleted_workouts', []);
+    for (const [keep, drop] of pairs) {
+      const carry = {};
+      for (const k of ['intent_type', 'intent_target', 'rpe', 'feel', 'note', 'data_flags']) if (!hasVal(keep[k]) && hasVal(drop[k])) carry[k] = drop[k];
+      if (Object.keys(carry).length) await db.workouts.update(keep.id, carry);
+      await db.threads.where('strava_id').equals(Number(drop.strava_id)).modify({ strava_id: Number(keep.strava_id) });
+      await db.workouts.delete(drop.id);
+      await db.streams.delete(Number(drop.strava_id));
+      deletedIds.push(Number(drop.strava_id));
+    }
+    await setJsonConfig('deleted_workouts', deletedIds);
+    await renumberRides();
+  }
+  // Skipped watch items carry their start time in the key: remember them by time too
+  const skippedAt = await getJsonConfig('activity_skipped_at', []);
+  for (const k of await getJsonConfig('activity_skipped', [])) {
+    const m = String(k).match(/^health:-(\d+)$/);
+    if (m) { const d = new Date(+m[1] * 1000); skippedAt.push({ date: `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`, moving_sec: 600 }); }
+  }
+  await setJsonConfig('activity_skipped_at', skippedAt.slice(-2000));
+  // Drop inbox items that are already workouts or were skipped from another source
+  const after = await db.workouts.toArray();
+  const at = it => parseSafeDate(it.date).getTime();
+  const inbox = (await getInbox()).filter(it => !findSameWorkout(after, at(it), it.moving_sec) && !skippedAt.some(x => sameSession(at(x), x.moving_sec, at(it), it.moving_sec)));
+  await setJsonConfig('activity_inbox', inbox);
+  await setConfig('dedupe_ver', DEDUPE_VER);
+  if (pairs.length) toast(`Merged ${pairs.length} duplicate workout${pairs.length > 1 ? 's' : ''} (recorded by Strava and the watch)`, 'info', 4500);
+  return pairs.length;
 }
 
 // Sport chips (All · Ride · Run · Swim) — shown only when more than one sport exists

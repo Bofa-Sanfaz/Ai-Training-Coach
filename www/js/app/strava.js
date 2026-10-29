@@ -268,7 +268,7 @@ async function syncStrava(opts = {}) {
       if (a.__sport) w.sport = a.__sport;
       // A workout imported earlier from Samsung Health is replaced by the Strava copy (same start ±5 min);
       // the athlete's corrections and flags carry over
-      const twin = existing.find(x => x.source === 'health' && Math.abs(parseSafeDate(x.date) - parseSafeDate(w.date)) <= 300000);
+      const twin = findSameWorkout(existing, workoutStart(w), workoutSec(w), x => x.source === 'health');
       if (twin) {
         for (const k of ['intent_type', 'intent_target', 'rpe', 'feel', 'note', 'data_flags', 'sport']) if (twin[k] !== undefined && twin[k] !== null) w[k] = twin[k];
         await db.workouts.delete(twin.id);

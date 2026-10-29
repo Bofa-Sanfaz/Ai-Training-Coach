@@ -985,3 +985,14 @@ span.agent-chip { cursor: default; }
 /* Range chips longer than the history (same as All) */
 .chip.dim:not(.active) { opacity: 0.45; }
 
+
+/* ---------- Swim detail ---------- */
+.swim-mix { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.swim-mix span { display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--sc) 12%, var(--surface)); color: var(--text-2); }
+.swim-mix i { width: 8px; height: 8px; border-radius: 50%; background: var(--sc); }
+.splits { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.splits span { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.splits span b { font: 700 0.95rem var(--font-num); }
+.splits span small { font-size: 0.64rem; color: var(--muted); }
+.splits span.best { border-color: var(--swim, #0891b2); background: color-mix(in srgb, #0891b2 10%, var(--surface)); }
+.dtable .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: 0; }

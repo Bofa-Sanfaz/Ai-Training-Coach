@@ -117,9 +117,14 @@ function compareVerdictHtml(a, b) {
   if (sp !== 'other' && dSpd !== null) {
     const faster = dSpd > 0;
     const sTxt = sp === 'ride' ? `${fmtNum(Math.abs(dSpd), 1)} km/h ${faster ? 'faster' : 'slower'}` : `${faster ? 'faster' : 'slower'} (${speedText(b)} vs ${speedText(a)})`;
-    parts.push(`B was ${sTxt}${dHr !== null ? ` at ${Math.abs(dHr)} bpm ${dHr <= 0 ? 'lower' : 'higher'} heart rate` : ''}`);
+    parts.push(`B was ${sTxt}${dHr !== null ? (dHr === 0 ? ' at the same heart rate' : ` at ${Math.abs(dHr)} bpm ${dHr < 0 ? 'lower' : 'higher'} heart rate`) : ''}`);
   } else if (dHr !== null) parts.push(`B's average heart rate was ${Math.abs(dHr)} bpm ${dHr <= 0 ? 'lower' : 'higher'}`);
-  if (ea && eb) {
+  const sa = swimOf(a), sb = swimOf(b);
+  if (sp === 'swim' && sa && sb && sa.swolf && sb.swolf) {
+    const dS = sb.swolf - sa.swolf;
+    tone = dS < -1 ? 'pos' : dS > 1 ? 'neg' : 'neu';
+    parts.push(`SWOLF ${sb.swolf} vs ${sa.swolf} (${dS < 0 ? 'more efficient' : dS > 0 ? 'less efficient' : 'same'})${sb.spl && sa.spl ? `, ${sb.spl} vs ${sa.spl} strokes per length` : ''}`);
+  } else if (ea && eb) {
     const pct = ((eb - ea) / ea) * 100;
     tone = pct > 2 ? 'pos' : pct < -2 ? 'neg' : 'neu';
     parts.push(tone === 'pos' ? `efficiency up ${fmtNum(pct, 1)}% — more speed for every heartbeat` : tone === 'neg' ? `efficiency down ${fmtNum(Math.abs(pct), 1)}% — check terrain, heat or fatigue` : 'efficiency about the same');
@@ -153,13 +158,29 @@ async function renderComparison() {
     ['Peak HR', w => mv(w, 'max_hr') || null, w => (mv(w, 'max_hr') ? `${w.max_hr} bpm` : '--'), true, 0, ' bpm'],
     ['Load', w => mv(w, 'trimp'), w => (hasVal(mv(w, 'trimp')) ? `${Math.round(w.trimp)} TRIMP` : '--'), false, 0, '']
   ];
-  if (sp === 'other') rows.splice(2, 2);
-  if (sp === 'ride' || sp === 'run') rows.splice(4, 0, ['Ascent', w => mv(w, 'elevation_gain_m'), w => (hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged'), false, 0, ' m']);
+  if (sp === 'other') {
+    rows.splice(0, 4, ['Time', w => num(w.moving_sec) / 60, w => rideDuration(w), false, 0, ' min']);
+    rows.push(['Energy', w => w.calories || null, w => (w.calories ? `${w.calories} kcal` : '--'), false, 0, ' kcal']);
+  }
+  if (sp === 'swim') {
+    // Swims: per-length metrics replace speed and efficiency (lower pace / SWOLF / strokes = better)
+    const sw = w => swimOf(w);
+    rows.splice(0, 4,
+      ['Distance', w => num(w.distance_km) * 1000, w => distText(w), false, 0, ' m'],
+      ['Swim time', w => num(w.moving_sec) / 60, w => formatDuration(w.moving_sec), false, 0, ' min'],
+      ['Pace /100 m', w => swimPace100(w), w => fmtSec(swimPace100(w)), true, 0, ' s'],
+      ['SWOLF', w => sw(w) && sw(w).swolf, w => (sw(w) && sw(w).swolf ? String(sw(w).swolf) : '--'), true, 1, ''],
+      ['Strokes / length', w => sw(w) && sw(w).spl, w => (sw(w) && sw(w).spl ? String(sw(w).spl) : '--'), true, 1, ''],
+      ['Fastest 100 m', w => sw(w) && sw(w).best[100], w => fmtSec(sw(w) && sw(w).best[100]), true, 0, ' s'],
+      ['Stroke rate', w => sw(w) && sw(w).stroke_rate, w => (sw(w) && sw(w).stroke_rate ? `${sw(w).stroke_rate} /min` : '--'), false, 1, '/min']);
+  }
+  if (sp === 'run') rows.splice(4, 0, ['Cadence', w => w.avg_cadence || null, w => (w.avg_cadence ? `${w.avg_cadence} spm` : '--'), false, 0, ' spm']);
+  if (sp === 'ride' || (sp === 'run' && !isIndoor(w1) && !isIndoor(w2))) rows.splice(4, 0, ['Ascent', w => mv(w, 'elevation_gain_m'), w => (hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged'), false, 0, ' m']);
   if (sp === 'ride') {
     rows.push(['Climbing VAM', w => mv(w, 'climbing_vam'), w => (mv(w, 'climbing_vam') ? `${w.climbing_vam} m/h` : '--'), false, 0, ' m/h']);
     rows.push(['Max speed', w => mv(w, 'max_speed_kmh'), w => (mv(w, 'max_speed_kmh') ? `${fmtNum(w.max_speed_kmh, 1)} km/h` : '--'), false, 1, ' km/h']);
   }
-  if (m[0] && m[1]) rows.push(['Body weight', (w, i) => m[i], (w, i) => (m[i] ? `${m[i]} kg` : '--'), true, 1, ' kg']);
+  if (sp === 'ride' && m[0] && m[1]) rows.push(['Body weight', (w, i) => m[i], (w, i) => (m[i] ? `${m[i]} kg` : '--'), true, 1, ' kg']);
 
   const color = SPORTS[sp].color;
   const cells = rows.map(([name, val, disp, lower, d, unit]) => {

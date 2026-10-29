@@ -36,6 +36,13 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
+### New in 3.4 — every sport its own numbers
+- **Swims**: pace per 100 m (swimming time), **SWOLF**, strokes per length, stroke rate, stroke mix, rest time, fastest length and **best 50/100/200/400 m**, a per-length chart (coloured by stroke, with SWOLF) and 100 m splits — straight from your Galaxy Watch
+- **Runs**: pace, **cadence**, steps, watch VO2max; treadmill runs drop GPS climbing
+- **Gym**: time, heart rate, peak/lowest HR, load, calories and reps — no distance or speed
+- Trends, records, best efforts, Compare, Reports, the PDF and the AI coaches all use the right metrics per sport
+- Swims, treadmill, gym bike and gym sessions now come **automatically from Samsung Health**; workouts recorded twice (Strava + watch) are merged; skipped walks are never offered again
+
 ### New in 3.3 — Training Partner
 - **Rides, runs, swims and gym**: runs from Strava, plus **pool swims, treadmill runs, the gym bike, elliptical, stepper, rowing and strength sessions straight from your Galaxy Watch** (Samsung Health). Every screen and every coach looks at all sports together and each on its own
 - **New activities inbox**: walks, hikes, yoga and other types wait for you — include (walks & hikes count as runs) or skip, and remember the choice. Only workouts from 2026 on are imported
@@ -141,6 +148,7 @@ async function boot() {
   if (seen !== APP_VERSION) setTimeout(showWhatsNew, 600);
   setupPullToRefresh();
   await refreshStaleMetrics();
+  try { if (await dedupeWorkouts()) await renderRides(); } catch (e) { console.warn('dedupe', e); }
   maybeAutoSync();
   setTimeout(resumePendingChats, 2000);
 }

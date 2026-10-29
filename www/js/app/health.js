@@ -227,13 +227,14 @@ async function importHealthWorkouts(H, from, to) {
   }
   const all = await db.workouts.toArray();
   const recBefore = recordSignature(all);
-  const onStrava = start => all.some(w => w.source !== 'health' && Math.abs(parseSafeDate(w.date) - start) <= 300000);
+  const sessSec = s => num(s.duration) || (new Date(s.endDate) - new Date(s.startDate)) / 1000;
+  const onStrava = (start, sec = 0) => !!findSameWorkout(all, +start, sec, w => w.source !== 'health');
   // Strava often files watch treadmill / gym-bike sessions as a generic "Workout": take the watch's sport
   for (const s of sessions) {
     const [sport, label, indoor] = HC_TYPES[s.workoutType];
     if (sport === 'other') continue;
     const start = new Date(s.startDate);
-    const twin = all.find(w => w.source !== 'health' && Math.abs(parseSafeDate(w.date) - start) <= 300000);
+    const twin = findSameWorkout(all, +start, sessSec(s), w => w.source !== 'health');
     if (twin && !twin.sport && sportOf(twin) === 'other' && ['Workout', 'WeightTraining'].includes(twin.sport_type)) {
       await db.workouts.update(twin.id, { sport, indoor, name: twin.name && !/workout/i.test(twin.name) ? twin.name : label });
       Object.assign(twin, { sport, indoor });
@@ -241,7 +242,7 @@ async function importHealthWorkouts(H, from, to) {
   }
   // Walks, hikes, football… → inbox (or straight in, if the athlete chose "always include")
   const localDate = d => `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const always = await routeToInbox(unknown.filter(s => !onStrava(new Date(s.startDate))).map(s => ({
+  const always = await routeToInbox(unknown.filter(s => !onStrava(new Date(s.startDate), sessSec(s))).map(s => ({
     key: `health:${-Math.round(new Date(s.startDate).getTime() / 1000)}`, src: 'health', type: s.workoutType, name: prettyType(s.workoutType),
     date: localDate(new Date(s.startDate)), distance_km: round(num(s.totalDistance) / 1000, 2), moving_sec: num(s.duration), raw: s
   })));
@@ -302,11 +303,33 @@ async function connectSamsungSwims() {
   renderHealthCard();
 }
 
+// Sport-specific detail from a Samsung Health session (stored on the workout)
+function shdExtras(s, sport) {
+  const x = { shd_v: 2, hr_min: Math.round(num(s.minHr)) || null, kcal_per_h: s.kcalPerHour ? Math.round(s.kcalPerHour) : null };
+  if (sport === 'swim') {
+    const sw = buildSwimDetail(s, num(s.durationSec));
+    x.swim = sw;
+    if (sw) { x.distance_km = round(sw.distance_m / 1000, 3); x.moving_sec = sw.active_sec; x.avg_speed_kmh = round((sw.distance_m / 1000) / (sw.active_sec / 3600), 2); x.pool_length_m = sw.pool_m; }
+  }
+  if (sport === 'run') {
+    // Samsung reports running cadence as steps per minute
+    if (s.meanCadence > 0) x.avg_cadence = Math.round(s.meanCadence);
+    if (s.maxCadence > 0) x.max_cadence = Math.round(s.maxCadence);
+    if (s.countType === 'STRIDE' && s.count > 0) x.steps = s.count;
+    if (s.altitudeGain > 0) x.elevation_gain_m = Math.round(s.altitudeGain);
+    if (s.vo2Max > 0) x.vo2max_watch = round(s.vo2Max, 1);
+  }
+  if (sport === 'other' && s.countType === 'REPETITION' && s.count > 0) x.reps = s.count;
+  return x;
+}
+
 async function importSamsungSwims(full = false) {
   const P = swimPlugin();
   if (!P || (await getConfig('swims_sdk')) !== '1') return 0;
   const last = await getConfig('swims_sdk_scanned');
-  const from = full || !last ? parseSafeDate(MIN_WORKOUT_DATE) : addDays(new Date(), -21);
+  // SHD_VER 2 added per-length swim detail and run cadence: re-read everything once to back-fill
+  const upgrade = (await getConfig('shd_ver')) !== '2';
+  const from = full || upgrade || !last ? parseSafeDate(MIN_WORKOUT_DATE) : addDays(new Date(), -21);
   let res;
   try { res = await P.readSessions({ startDate: from.toISOString(), endDate: new Date().toISOString(), withLog: true }); } catch (e) { console.warn('swim read', e); return 0; }
   const all = await db.workouts.toArray();
@@ -321,7 +344,7 @@ async function importSamsungSwims(full = false) {
     if (formatLocalDate(start) < MIN_WORKOUT_DATE || deleted.has(sid) || !(num(s.durationSec) >= 180) || SHD_SKIP.includes(s.type)) continue;
     const known = SHD_TYPES[s.type];
     if (!known) {
-      if (!all.some(w => Math.abs(parseSafeDate(w.date) - start) <= 300000) && num(s.durationSec) >= 600) {
+      if (!findSameWorkout(all, +start, s.durationSec) && num(s.durationSec) >= 600) {
         const t = s.type.toLowerCase().replace(/_(\w)/g, (_, c) => c.toUpperCase());
         inboxItems.push({ key: `health:${sid}`, src: 'health', type: t, name: s.title || prettyType(t), date: localDate(start), distance_km: round(num(s.distance) / 1000, 2), moving_sec: Math.round(s.durationSec), raw: null,
           sh: { code: s.type, start: s.start, dur: Math.round(s.durationSec), dist: num(s.distance), hr: num(s.meanHr), max: num(s.maxHr), kcal: num(s.calories) } });
@@ -330,11 +353,16 @@ async function importSamsungSwims(full = false) {
     }
     const kind = [known[1], known[2]];
     const sport = known[0];
-    const twin = all.find(w => Number(w.strava_id) === sid || Math.abs(parseSafeDate(w.date) - start) <= 300000);
+    const twin = all.find(w => Number(w.strava_id) === sid) || findSameWorkout(all, +start, s.durationSec);
     if (twin) {
       // Strava filed a watch treadmill / gym-bike session as a generic "Workout": take the watch's sport
       if (twin.source !== 'health' && !twin.sport && sportOf(twin) === 'other' && sport !== 'other' && ['Workout', 'WeightTraining'].includes(twin.sport_type)) {
         await db.workouts.update(twin.id, { sport, indoor: kind[1] });
+      }
+      // Sessions imported earlier from Samsung Health gain the newer detail (laps, SWOLF, cadence…)
+      if (String(twin.hc_type || '').startsWith('shd:') && twin.shd_v !== 2) {
+        await db.workouts.update(twin.id, shdExtras(s, sport));
+        continue;
       }
       // A swim already here (e.g. from the export) gains the watch's distance / log if it lacked them
       if (twin.source === 'health' && !(twin.distance_km > 0) && (s.swimDistance || s.distance)) {
@@ -345,7 +373,7 @@ async function importSamsungSwims(full = false) {
     }
     const dur = Math.max(1, Math.round(num(s.swimDurationSec) || num(s.durationSec)));
     const meters = s.poolUnit === 'yard' ? num(s.swimDistance || s.distance) * 0.9144 : num(s.swimDistance || s.distance);
-    const log = (s.log || []).map(p => ({ t: Math.round((p.t - start.getTime()) / 1000), hr: num(p.hr), sp: num(p.sp) })).filter(p => p.t >= 0 && p.t <= dur + 60);
+    const log = (s.log || []).map(p => ({ t: Math.round((p.t - start.getTime()) / 1000), hr: num(p.hr), sp: num(p.sp), cad: num(p.cad) })).filter(p => p.t >= 0 && p.t <= num(s.durationSec) + 60);
     const hrPts = log.filter(p => p.hr > 30);
     const w = {
       strava_id: sid, ride_number: 0, exercise_code: '', source: 'health', hc_type: `shd:${s.type}`,
@@ -360,10 +388,12 @@ async function importSamsungSwims(full = false) {
       pool_length_m: s.poolLength ? round(s.poolUnit === 'yard' ? s.poolLength * 0.9144 : s.poolLength, 1) : null,
       source_name: 'Samsung Health (watch)', debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
     };
+    Object.assign(w, shdExtras(s, sport));
     // Heart rate for zones/load; speed too for treadmill/runs (pace best efforts). Swim speed per sample isn't meaningful.
     const withSpeed = sport === 'run' && log.some(p => p.sp > 0);
     const pts = withSpeed ? log.filter(p => p.hr > 30 || p.sp > 0) : hrPts;
-    const stream = pts.length > 5 ? Object.assign({ time: { data: pts.map(p => p.t) }, heartrate: { data: pts.map(p => Math.round(p.hr) || null) } }, withSpeed ? { velocity_smooth: { data: pts.map(p => p.sp) } } : {}) : null;
+    const withCad = sport === 'run' && log.some(p => p.cad > 0);
+    const stream = pts.length > 5 ? Object.assign({ time: { data: pts.map(p => p.t) }, heartrate: { data: pts.map(p => Math.round(p.hr) || null) } }, withSpeed ? { velocity_smooth: { data: pts.map(p => p.sp) } } : {}, withCad ? { cadence: { data: pts.map(p => Math.round(p.cad) || null) } } : {}) : null;
     w.id = await db.workouts.add(w);
     await db.streams.put({ strava_id: sid, stream_data: stream });
     await ensureRideMetrics(w, stream, true);
@@ -373,6 +403,7 @@ async function importSamsungSwims(full = false) {
   // Walks, squash, "other"… → inbox (or straight in when the athlete chose "always include")
   if (inboxItems.length) for (const it of await routeToInbox(inboxItems)) if (await addSamsungSummary(it)) added++;
   await setConfig('swims_sdk_scanned', new Date().toISOString());
+  await setConfig('shd_ver', '2');
   if (added) {
     await renumberRides();
     await announceNewRecords(recBefore, all.slice(-added).map(w => w.id));
@@ -448,7 +479,7 @@ async function importSamsungExport(event) {
     const dur = Math.round(num(r[C.dur]) / 1000) || Math.round((shDate(r[C.end]) - start) / 1000);
     if (!(dur >= 180)) continue;
     const sid = -Math.round(start.getTime() / 1000);
-    if (deleted.has(sid) || all.some(w => Number(w.strava_id) === sid || Math.abs(parseSafeDate(w.date) - start) <= 300000)) { skipped++; continue; }
+    if (deleted.has(sid) || all.some(w => Number(w.strava_id) === sid) || findSameWorkout(all, +start, dur)) { skipped++; continue; }
     const dist = num(r[C.dist]);
     if (!SH_TYPES[code]) {
       if (code in SH_INBOX || code > 0) inboxItems.push({ key: `health:${sid}`, src: 'health', type: SH_INBOX[code] || `samsung${code}`, name: prettyType(SH_INBOX[code] || 'activity'), date: `${formatLocalDate(start)} ${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, distance_km: round(dist / 1000, 2), moving_sec: dur, raw: null, sh: { code, start: start.toISOString(), dur, dist, hr: num(r[C.hr]), max: num(r[C.max]), kcal: num(r[C.kcal]) } });
@@ -514,7 +545,7 @@ async function addHealthSession(H, s, sport, label, indoor, all) {
   const sid = -Math.round(start.getTime() / 1000);
   if (formatLocalDate(start) < MIN_WORKOUT_DATE) return null;
   if (all.some(w => Number(w.strava_id) === sid) || (await deletedWorkoutIds()).has(sid)) return null;
-  if (all.some(w => w.source !== 'health' && Math.abs(parseSafeDate(w.date) - start) <= 300000)) return null;
+  if (findSameWorkout(all, +start, num(s.duration) || (end - start) / 1000, w => w.source !== 'health')) return null;
   const dur = Math.max(1, num(s.duration) || Math.round((end - start) / 1000));
   let hr = [];
   try {

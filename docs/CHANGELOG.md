@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.4.0 — 2026-10-29 · every sport its own metrics
+- Swim metrics from the per-length log (`buildSwimDetail` in sport.js): pool length, lengths, swim vs rest time, pace /100 m on swim time, SWOLF avg/best, strokes per length, stroke rate, stroke mix, fastest length, best 50/100/200/400 m, 100 m splits. Native reader returns intervals (time, strokes, style), cadence, steps, VO2max, reps, min HR; existing watch sessions back-filled (`shd_ver` 2).
+- Per-sport workout detail (`views/detail-sport.js`): hero numbers, stats, best efforts, stream metrics; swim per-length chart + splits + length table; irrelevant fields removed (e.g. no speed/elevation/VAM/power for swims and gym, no weight for swims/gym, no climbing on treadmill).
+- Per-sport feed cards, Trends progression metrics (with defaults per sport) and best efforts (swim distances), records (fastest 100 m, best SWOLF, highest cadence), Compare rows and verdict (SWOLF), PDF sport pages (SWOLF, cadence), AI session block (swim technique, splits; drift only for rides/runs).
+- Duplicates: sessions are the same when they start within 2 min or overlap ≥ 50 % (`sameSession`); one-time merge (`dedupeWorkouts`, restore point first); watch cycling never goes to the inbox; skipped inbox items remembered by time.
+- Fixes: delete dialog for gym sessions, Compare verdict wording, Trends metric selection per sport, chart text inside swim bars.
+
 ## 3.3.6 — 2026-10-29
 - **Automatic swims, treadmill and gym from Samsung Health** via the Samsung Health Data SDK (native module `native/samsung-swims`, added by `patch-android.js` only when the SDK AAR is in `C:\dev\tools\samsung-health-data-sdk`; never committed). Read-only, Samsung Health developer mode for data read. Imports pool/open-water swims (distance, pool length, active swim time, per-second HR → zones/load), treadmill and outdoor runs (HR + speed), stationary bike, elliptical, rowing, stairs, strength sets; walks/squash/other → inbox; outdoor rides and rest breaks skipped. Runs on every wellness sync; Profile → Samsung Health shows status. First import on the phone: 38 sessions (9 swims, 14 treadmill runs…).
 - Strava "Workout" twins of watch treadmill / gym-bike sessions take the watch's sport.

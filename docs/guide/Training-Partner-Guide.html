@@ -43,7 +43,7 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.3</div>
+    <div class="kick">User guide · version 3.4</div>
     <h1>Training Partner</h1>
     <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus everything that changed in 3.3.</div>
   </div>
@@ -81,6 +81,7 @@
 <div class="new"><b>More complete, more compact context</b>Aether sees every workout: the last six weeks one by one (with your note and the coach's verdict from that session's chat), older ones as weekly/monthly totals, plus a "data completeness" line. A bug that gave every Gemini model the reduced "small model" context ("ge<b>mini</b>") is fixed.</div>
 <div class="new"><b>Samsung Health improvements</b>Resting heart rate is estimated from the watch's heart rate (Samsung doesn't share a resting value), the coaches are told when sleep wasn't recorded instead of treating it as bad sleep, and HRV is reported as unavailable.</div>
 <div class="new"><b>Reports &amp; PDF</b>Choose All / Rides / Runs / Swims / Gym. The PDF now has a cover band, coach verdict, KPI tiles vs the previous period, each sport, fitness/fatigue and weekly-volume charts, an intensity donut, a week-by-week table, a page per sport (trend chart, zones, top sessions), highlights &amp; records, plan adherence, a recovery log, data-quality notes, coach memory, the review and every session.</div>
+<div class="new"><b>Every sport its own numbers (3.4)</b>Swims: SWOLF, strokes per length, stroke rate, stroke mix, rest, best 50–400 m, per-length chart and 100 m splits. Runs: cadence, steps, VO2max. Gym: time, heart rate, load, calories, reps. Feed, detail, Trends, records, Compare, Reports, PDF and the AI coaches use only what fits each sport.</div>
 <div class="new"><b>Motion</b>Screens slide in the direction you move, a tapped workout grows into its detail page, numbers roll up, routes draw themselves, a light sweep crosses the week card, the tab indicator slides, buttons ripple, and new records get confetti. All of it is switched off if the phone asks for reduced motion.</div>
 </div>
 
@@ -253,6 +254,17 @@ IF = NP / FTP      TSS = hours × IF² × 100</span>
 <h3>Intensity distribution</h3>
 <p>Low = Z1+Z2, middle = Z3, high = Z4+Z5 of zone time. Polarization index = (low + high) ÷ middle; above 2 means a polarized distribution.</p>
 
+<h3>Swim metrics</h3>
+<p>The watch logs every pool length: its time, stroke count and stroke style. From that the app computes:</p>
+<span class="formula">Swim time = Σ length times (rest between sets excluded)      Rest = total − swim time
+Pace /100 m = swim time ÷ distance × 100
+SWOLF (one length) = seconds + strokes      Avg SWOLF = mean over stroke lengths (kick-board lengths excluded)
+Strokes per length = strokes ÷ stroke lengths      Stroke rate = strokes ÷ stroke-length minutes
+Best 50/100/200/400 m = fastest run of consecutive lengths covering that distance
+100 m splits = consecutive groups of 100 m of lengths</span>
+<p>Lower SWOLF, fewer strokes per length and a lower pace mean more efficient swimming. Heart-rate zones and load come from the watch's second-by-second heart rate over the whole session.</p>
+<h3>Run and gym metrics</h3>
+<p>Runs add cadence (steps per minute, average and max), total steps and the watch's VO2max estimate; treadmill runs have no GPS climbing. Gym sessions show time, average/peak/lowest heart rate, load, calories and repetitions (when the watch counts them) — no distance or speed.</p>
 <h3>Records</h3>
 <p>Per sport, ignoring excluded workouts and flagged values: longest distance, longest time, most climbing and best VAM (rides/runs), best average speed or pace (rides ≥ 10 km, runs ≥ 3 km, swims ≥ 400 m), top speed (rides), hardest session (TRIMP), biggest week. New records after a sync trigger a toast and confetti.</p>
 

@@ -221,7 +221,8 @@ function rideLedgerLine(w, mass, note, verdict) {
   const noteStr = notes ? ` | athlete: "${String(notes).replace(/\s+/g, ' ').slice(0, 160)}"` : '';
   const pmTxt = w.power_source === 'meter' && w.np_w && !isFlagged(w, 'power') ? ` | NP ${w.np_w}W` : '';
   const flags = flagNotes(w);
-  const dist = hasVal(mv(w, 'distance_km')) ? `${distText(w)}, ${speedText(w)}` : `distance/speed ${FLAGGED}`;
+  const sw = swimOf(w);
+  const dist = hasVal(mv(w, 'distance_km')) ? `${distText(w)}, ${sp === 'swim' && swimPace100(w) ? `${fmtPace(swimPace100(w))}/100m` : speedText(w)}${sw && sw.swolf ? `, SWOLF ${sw.swolf}` : ''}${w.avg_cadence ? `, ${w.avg_cadence} spm` : ''}` : sp === 'other' ? `${w.name || 'gym'}${w.reps ? `, ${w.reps} reps` : ''}` : `distance/speed ${FLAGGED}`;
   const asc = sp === 'swim' ? '' : hasVal(mv(w, 'elevation_gain_m')) ? `, ${Math.round(num(w.elevation_gain_m))}m` : `, climbing ${FLAGGED}`;
   const hr = hasVal(mv(w, 'avg_hr')) ? `${w.avg_hr || '--'}bpm` : `HR ${FLAGGED}`;
   const extra = sp === 'ride' ? ` | ${isFlagged(w, 'elevation') ? 'VAM n/a' : vamText(w)} | ${driftText(w)}` : '';
@@ -306,6 +307,26 @@ function driftPromptText(w) {
   return `${signed(w.cardiac_drift_bpm, 0)} bpm HR drift${pct} (moving time, first 12 min skipped)`;
 }
 
+// Sport-specific lines for the session block (swim lengths, run cadence, gym reps)
+function sportDetailLines(w) {
+  const sp = sportOf(w);
+  const sw = swimOf(w);
+  if (sp === 'swim' && sw) {
+    const k = Math.max(1, Math.round(100 / sw.pool_m));
+    const splits = [];
+    for (let i = 0; i + k <= sw.laps.length; i += k) splits.push(fmtPace(sumBy(sw.laps.slice(i, i + k), l => l.sec)));
+    const mix = Object.entries(sw.mix).map(([s, n]) => `${STROKES[s]} ${n}`).join(', ');
+    return `- Swim: ${sw.pool_m} m pool, ${sw.lengths} lengths (${sw.distance_m} m) | swim time ${formatDuration(sw.active_sec)}${sw.rest_sec ? `, rest ${formatDuration(sw.rest_sec)}` : ''} | pace ${fmtPace(swimPace100(w))}/100m
+- Technique: SWOLF avg ${sw.swolf || '--'} (best ${sw.swolf_best || '--'}) | ${sw.spl || '--'} strokes/length | stroke rate ${sw.stroke_rate || '--'}/min | ${sw.strokes} strokes | stroke mix: ${mix}
+- Best: ${[50, 100, 200, 400].filter(m => sw.best[m]).map(m => `${m} m ${fmtPace(sw.best[m])}`).join(', ') || 'n/a'} | fastest length ${sw.best_len} s
+- 100 m splits: ${splits.join(', ') || 'n/a'}
+`;
+  }
+  if (sp === 'swim') return `- Swim: no per-length data (pace ${fmtSec(swimPace100(w))}/100m from totals)\n`;
+  if (sp === 'run') return `${w.avg_cadence ? `- Cadence ${w.avg_cadence} spm${w.max_cadence ? ` (max ${w.max_cadence})` : ''}${w.steps ? ` | ${w.steps} steps` : ''}` : '- Cadence: not recorded'}${w.vo2max_watch ? ` | watch VO2max ${w.vo2max_watch}` : ''}${isIndoor(w) ? ' | treadmill (no GPS climbing)' : ''}\n`;
+  if (sp === 'other') return `- Gym session: ${w.name || 'workout'}${w.reps ? ` | ${w.reps} reps` : ''}${w.calories ? ` | ${w.calories} kcal` : ''}${w.hr_min ? ` | HR min ${w.hr_min}` : ''}\n`;
+  return '';
+}
 async function rideBlock(w, all) {
   const sp = sportOf(w);
   let pm = `${w.avg_power_w || '--'} W (Strava estimate)`;
@@ -320,7 +341,7 @@ async function rideBlock(w, all) {
   if (bs) best.push(`${speedName(w).toLowerCase()} ${Object.entries(bs).map(([d, v]) => `${BEST_LABELS[d]} ${speedText(w, v)}`).join(', ')}`);
   if (bh) best.push(`HR ${Object.entries(bh).map(([d, v]) => `${BEST_LABELS[d]} ${Math.round(v)}bpm`).join(', ')}`);
   if (w.power_source === 'meter' && w.mmp && !isFlagged(w, 'power')) best.push(`power ${[5, 60, 300, 1200].filter(d => w.mmp[d]).map(d => `${BEST_LABELS[d]} ${Math.round(w.mmp[d])}W`).join(', ')}`);
-  const flags = flagNotes(w);
+  const flags = flagNotes(w).filter(n => sp === 'ride' || !n.startsWith('indoor'));
   const distLine = hasVal(mv(w, 'distance_km'))
     ? `- Distance ${distText(w)} | ${speedName(w)} avg ${speedText(w)}${sp === 'ride' ? ` / max ${fmtNum(w.max_speed_kmh, 1)} km/h` : ''}`
     : `- Distance/speed: ${FLAGGED} (not real — ignore)`;
@@ -328,10 +349,10 @@ async function rideBlock(w, all) {
   return `- Session: ${sp.toUpperCase()} ${w.exercise_code}${w.name ? ` "${w.name}"` : ''} — ${formatFullDateWithDay(w.date)}${w.source === 'health' ? ' (recorded by Galaxy Watch, via Samsung Health)' : ''}
 ${flags.length ? `- DATA QUALITY: ${flags.join('; ')}\n` : ''}${distLine} | Moving ${rideDuration(w)} | Elapsed ${w.elapsed_sec ? formatDuration(w.elapsed_sec) : 'n/a'}
 - ${hrLine}${w.avg_cadence ? ` | Cadence ${w.avg_cadence} ${sp === 'run' ? 'spm' : 'rpm'}` : ''}${w.calories ? ` | ${w.calories} kcal` : ''}
-${sp === 'ride' ? `- Power: ${pm} | Work ${isFlagged(w, 'power') ? FLAGGED : `${w.kilojoules || '--'} kJ`}\n` : ''}${sp !== 'swim' ? `- Ascent ${isFlagged(w, 'elevation') ? FLAGGED : `${Math.round(num(w.elevation_gain_m))} m | VAM ${vamText(w, true)}`}\n` : ''}- Load ${hasVal(mv(w, 'trimp')) ? `${Math.round(w.trimp)} TRIMP${w.trimp_source === 'avg' ? ' (from average HR)' : ''}` : 'n/a'}${w.rpe ? ` | Session-RPE load ${Math.round(w.rpe * num(w.moving_sec) / 60)}` : ''}
+${sportDetailLines(w)}${sp === 'ride' ? `- Power: ${pm} | Work ${isFlagged(w, 'power') ? FLAGGED : `${w.kilojoules || '--'} kJ`}\n` : ''}${sp === 'ride' || (sp === 'run' && !isIndoor(w)) ? `- Ascent ${isFlagged(w, 'elevation') ? FLAGGED : `${Math.round(num(w.elevation_gain_m))} m | VAM ${vamText(w, true)}`}\n` : ''}- Load ${hasVal(mv(w, 'trimp')) ? `${Math.round(w.trimp)} TRIMP${w.trimp_source === 'avg' ? ' (from average HR)' : ''}` : 'n/a'}${w.rpe ? ` | Session-RPE load ${Math.round(w.rpe * num(w.moving_sec) / 60)}` : ''}
 - Intent set by athlete: ${getCleanIntentLabel(w)}
 - Zone minutes (moving): ${formatFullZoneSummary(w.zone_seconds)}
-- Halves: ${w.halves_profile || 'n/a'} | Drift: ${driftPromptText(w)}
+${sp === 'ride' || sp === 'run' ? `- Halves: ${w.halves_profile || 'n/a'} | Drift: ${driftPromptText(w)}` : '- Drift: not applicable to this sport'}
 - Best efforts: ${best.join(' | ') || 'n/a'}
 - Athlete rating: ${w.rpe ? `RPE ${w.rpe}/10` : 'no RPE'}${w.feel ? `, felt ${w.feel}` : ''}${w.note ? `, note: "${String(w.note).slice(0, 300)}"` : ''}`;
 }

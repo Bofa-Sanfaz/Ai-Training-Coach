@@ -634,6 +634,17 @@ function computeRecords(workouts, sport = 'ride') {
     const peak = best(w => mv(w, 'max_speed_kmh'));
     if (peak) add({ label: 'Top speed', icon: 'zap', value: `${fmtNum(peak.max_speed_kmh, 1)} km/h`, field: 'distance' }, peak);
   }
+  if (sport === 'swim') {
+    const lowest = fn => { const ok = pool.filter(w => fn(w) > 0); return ok.length ? ok.reduce((p, c) => (fn(c) < fn(p) ? c : p)) : null; };
+    const b100 = lowest(w => (swimOf(w) && swimOf(w).best[100]) || 0);
+    if (b100) add({ label: 'Fastest 100 m', icon: 'zap', value: `${fmtPace(swimOf(b100).best[100])}` }, b100);
+    const sw = lowest(w => (swimOf(w) && swimOf(w).swolf) || 0);
+    if (sw) add({ label: 'Best average SWOLF', icon: 'gauge', value: String(swimOf(sw).swolf) }, sw);
+  }
+  if (sport === 'run') {
+    const cad = best(w => w.avg_cadence || 0);
+    if (cad) add({ label: 'Highest cadence', icon: 'activity', value: `${cad.avg_cadence} spm` }, cad);
+  }
   const l = best(w => mv(w, 'trimp'));
   if (l) add({ label: 'Hardest session', icon: 'flame', value: `${Math.round(l.trimp)} TRIMP`, field: 'hr' }, l);
   const weeks = weeklyTotals(pool);
