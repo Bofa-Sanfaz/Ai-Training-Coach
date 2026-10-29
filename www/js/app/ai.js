@@ -1,123 +1,7 @@
 'use strict';
 // --------------------------------------------------------
-// GEMINI CLIENT + PROMPT BUILDERS
+// AI PROMPT BUILDERS (the provider client lives in providers.js)
 // --------------------------------------------------------
-const GEMINI_MODELS = [
-  ['gemini-3.8-flash', 'Gemini 3.8 Flash (Latest)'],
-  ['gemini-3.7-flash', 'Gemini 3.7 Flash'],
-  ['gemini-3.6-flash', 'Gemini 3.6 Flash'],
-  ['gemini-3.5-flash', 'Gemini 3.5 Flash'],
-  ['gemini-3.5-flash-lite', 'Gemini 3.5 Flash-Lite']
-];
-const AI_TIMEOUT_MS = 90000;
-
-let isRequestInProgress = false;
-
-async function getActiveModel() {
-  const m = String(await getConfig('selected_gemini_model') || '');
-  if (!m || m.includes('2.5')) return GEMINI_MODELS[0][0];
-  return m;
-}
-
-async function modelOptionsHtml() {
-  const custom = String(await getConfig('custom_gemini_model') || '').trim();
-  const opts = GEMINI_MODELS.slice();
-  if (custom && !opts.some(o => o[0] === custom)) opts.push([custom, `${custom} (custom)`]);
-  return opts.map(([v, l]) => `<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');
-}
-
-async function refreshModelSelectors() {
-  const html = await modelOptionsHtml();
-  const active = await getActiveModel();
-  $$('.model-select').forEach(sel => { sel.innerHTML = html; sel.value = active; });
-}
-
-async function syncModelSelection(modelName) {
-  await setConfig('selected_gemini_model', modelName);
-  $$('.model-select').forEach(sel => { sel.value = modelName; });
-}
-
-function extractText(data) {
-  const parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
-  if (!Array.isArray(parts)) return null;
-  const text = parts.filter(p => !p.thought).map(p => p.text || '').join('').trim();
-  return text || null;
-}
-
-async function postGemini(model, key, body, timeoutMs) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// Returns the reply text, or null (an error toast has already been shown).
-async function callGemini(prompt, imageB64 = null) {
-  if (isRequestInProgress) { toast('An AI request is already running — please wait.', 'warn'); return null; }
-  if (!navigator.onLine) { toast('Connect to the internet to use the AI coach.', 'warn'); return null; }
-  const key = String(await getConfig('gemini_api_key') || '').trim();
-  if (!key) { toast('Add your Gemini API key in Profile → Connections.', 'warn', 4500); return null; }
-
-  isRequestInProgress = true;
-  const model = await getActiveModel();
-  const parts = [{ text: prompt }];
-  if (imageB64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64.includes(',') ? imageB64.split(',')[1] : imageB64 } });
-  const body = JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens: 8192 } });
-
-  try {
-    let res = await postGemini(model, key, body, AI_TIMEOUT_MS);
-
-    // Server-side errors: fall back to the next models in the list
-    if (res.status >= 500) {
-      const idx = GEMINI_MODELS.findIndex(m => m[0] === model);
-      const fallbacks = GEMINI_MODELS.slice(idx + 1).concat(GEMINI_MODELS.slice(0, Math.max(idx, 0))).slice(0, 2).map(m => m[0]);
-      for (const fb of fallbacks) {
-        toast(`${model} is busy — trying ${fb}…`, 'info', 2500);
-        const r2 = await postGemini(fb, key, body, AI_TIMEOUT_MS);
-        if (r2.ok) { res = r2; break; }
-      }
-    }
-
-    if (res.ok) {
-      const data = await res.json();
-      const text = extractText(data);
-      if (!text) {
-        const reason = (data.candidates && data.candidates[0] && data.candidates[0].finishReason) || (data.promptFeedback && data.promptFeedback.blockReason) || 'EMPTY';
-        toast(`AI response blocked or empty (${reason}). Try rephrasing.`, 'error', 5000);
-        return null;
-      }
-      if (data.candidates[0].finishReason === 'MAX_TOKENS') toast('Reply hit the length limit and may be cut off.', 'warn');
-      return text;
-    }
-
-    const errData = await res.json().catch(() => ({}));
-    const msg = (errData.error && errData.error.message) || '';
-    if (res.status === 429) {
-      const m = msg.match(/retry in (\d+(\.\d+)?)s/i);
-      toast(`Gemini rate limit on ${model}. Switch model or wait ${m ? Math.ceil(parseFloat(m[1])) : 45}s.`, 'warn', 6000);
-    } else if (res.status === 404) {
-      toast(`Model "${model}" not found. Pick another model in Profile.`, 'error', 6000);
-    } else if (res.status === 400 || res.status === 403) {
-      toast(`Gemini rejected the request (${res.status}): ${msg.slice(0, 140) || 'check your API key'}`, 'error', 7000);
-    } else {
-      toast(`Gemini error (${res.status}): ${msg.slice(0, 140)}`, 'error', 6000);
-    }
-  } catch (e) {
-    toast(e.name === 'AbortError' ? `Request timed out after ${AI_TIMEOUT_MS / 1000}s on ${model}. Retry or switch model.` : `Network error: ${e.message}`, 'error', 6000);
-  } finally {
-    isRequestInProgress = false;
-  }
-  return null;
-}
-
 // --------------------------------------------------------
 // SHARED PROMPT CONTEXT
 // --------------------------------------------------------
@@ -151,8 +35,11 @@ function rideLedgerLine(w, mass, note) {
   const massTag = mass ? `${mass}kg` : 'Mass Unspecified';
   const pm = w.device_watts ? ' | power meter' : '';
   const load = hasVal(w.trimp) ? ` | TRIMP ${Math.round(w.trimp)}` : '';
-  const noteStr = note ? ` | Note: "${String(note).slice(0, 60)}"` : '';
-  return `• R${w.ride_number} [${formatFullDateWithDay(w.date)} | ${massTag} | ${getCleanIntentLabel(w)} | Dur: ${rideDuration(w)}${pm}${load} | ${vamText(w)} | ${driftText(w)} | ${formatFullZoneSummary(w.zone_seconds)}]: ${fmtNum(w.distance_km, 2)}km, ${fmtNum(w.avg_speed_kmh, 1)}km/h, ${w.avg_hr || '--'}bpm, ${Math.round(num(w.elevation_gain_m))}m asc${noteStr}`;
+  const feel = w.rpe || w.feel ? ` | ${w.rpe ? `RPE ${w.rpe}/10` : ''}${w.rpe && w.feel ? ', ' : ''}${w.feel ? `felt ${w.feel}` : ''}` : '';
+  const notes = [w.note, note].filter(Boolean).join(' / ');
+  const noteStr = notes ? ` | Note: "${String(notes).slice(0, 80)}"` : '';
+  const pmTxt = w.power_source === 'meter' && w.np_w ? ` | NP ${w.np_w}W` : '';
+  return `• R${w.ride_number} [${formatFullDateWithDay(w.date)} | ${massTag} | ${getCleanIntentLabel(w)} | Dur: ${rideDuration(w)}${pm}${pmTxt}${load}${feel} | ${vamText(w)} | ${driftText(w)} | ${formatFullZoneSummary(w.zone_seconds)}]: ${fmtNum(w.distance_km, 2)}km, ${fmtNum(w.avg_speed_kmh, 1)}km/h, ${w.avg_hr || '--'}bpm, ${Math.round(num(w.elevation_gain_m))}m asc${noteStr}`;
 }
 
 async function loadContextText() {
@@ -188,7 +75,16 @@ function driftPromptText(w) {
 }
 
 async function rideBlock(w) {
-  const pm = w.device_watts ? `${w.avg_power_w} W avg / ${w.norm_power_w || '--'} W NP (power meter)` : `${w.avg_power_w || '--'} W (Strava estimate)`;
+  let pm = `${w.avg_power_w || '--'} W (Strava estimate)`;
+  if (w.device_watts) {
+    const ftp = currentFtp(await db.workouts.toArray());
+    const st = rideStress(w, ftp);
+    pm = `${w.avg_power_w} W avg / ${w.np_w || w.norm_power_w || '--'} W NP (power meter)${st ? `, IF ${st.IF.toFixed(2)}, TSS ${st.TSS} (FTP ${ftp.w} W)` : ''}`;
+  }
+  const best = [];
+  if (w.best_spd) best.push(`speed ${Object.entries(w.best_spd).map(([d, v]) => `${BEST_LABELS[d]} ${fmtNum(v, 1)}km/h`).join(', ')}`);
+  if (w.best_hr) best.push(`HR ${Object.entries(w.best_hr).map(([d, v]) => `${BEST_LABELS[d]} ${Math.round(v)}bpm`).join(', ')}`);
+  if (w.power_source === 'meter' && w.mmp) best.push(`power ${[5, 60, 300, 1200].filter(d => w.mmp[d]).map(d => `${BEST_LABELS[d]} ${Math.round(w.mmp[d])}W`).join(', ')}`);
   return `- Session: ${w.exercise_code}${w.name ? ` "${w.name}"` : ''}
 - Calendar Date & Time: ${formatFullDateWithDay(w.date)}
 - Distance: ${fmtNum(w.distance_km, 2)} km | Moving: ${rideDuration(w)} | Elapsed: ${w.elapsed_sec ? formatDuration(w.elapsed_sec) : 'n/a'}
@@ -200,7 +96,9 @@ async function rideBlock(w) {
 - Target Session Intent: ${getCleanIntentLabel(w)}
 - Moving In-Zone Minutes (all 5 zones): ${formatFullZoneSummary(w.zone_seconds)}
 - Halves Profile: ${w.halves_profile || 'N/A'}
-- Intraday Drift / Decoupling: ${driftPromptText(w)}`;
+- Intraday Drift / Decoupling: ${driftPromptText(w)}
+- Best efforts in ride: ${best.join(' | ') || 'n/a'}
+- Athlete's own rating: ${w.rpe ? `RPE ${w.rpe}/10` : 'RPE not given'}${w.feel ? `, felt ${w.feel}` : ''}${w.note ? `, note: "${String(w.note).slice(0, 300)}"` : ''}`;
 }
 
 async function buildRideDebriefPrompt(w) {

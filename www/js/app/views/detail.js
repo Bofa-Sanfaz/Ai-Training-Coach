@@ -33,7 +33,10 @@ async function renderRideDetail() {
   const badges = [intentBadge(w, true)];
   if (w.trainer) badges.push('<span class="badge badge-play">Indoor</span>');
   if (w.device_watts) badges.push('<span class="badge badge-ok">Power meter</span>');
-  if (w.sport_type && w.sport_type !== 'Ride') badges.push(`<span class="badge badge-play">${escapeHtml(w.sport_type)}</span>`);
+  if (w.sport_type && w.sport_type !== 'Ride') {
+    const pretty = w.sport_type.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/E Bike|E Mountain/g, m => m.replace(' ', '-')).toLowerCase().replace(/^./, c => c.toUpperCase());
+    badges.push(`<span class="badge badge-play">${escapeHtml(pretty)}</span>`);
+  }
   if (!parseIntent(w) && w.intent_type !== 'PLAY') badges.push(`<button class="btn btn-secondary btn-xs" onclick="editCurrentRideIntent()">${icon('target', 'ic-sm')}Set intent</button>`);
   $('#det_badges').innerHTML = badges.join('');
 
@@ -59,10 +62,14 @@ async function renderRideDetail() {
     <div class="kv"><span class="k">Climbing VAM</span><span class="v">${vam}</span></div>
     <div class="kv"><span class="k">Aerobic decoupling</span><span class="v">${escapeHtml(decouplingDisplay(w))}</span></div>
     <div class="kv"><span class="k">Elapsed time</span><span class="v">${w.elapsed_sec ? formatDuration(w.elapsed_sec) : '--'}</span></div>
-    ${w.norm_power_w > 0 ? `<div class="kv"><span class="k">Normalized power</span><span class="v">${w.norm_power_w} W</span></div>` : ''}`;
+    ${w.rpe ? `<div class="kv"><span class="k">Session RPE load</span><span class="v">${Math.round(w.rpe * num(w.moving_sec) / 60)} <span class="tiny muted">RPE × min</span></span></div>` : ''}
+    ${powerKvHtml(w, await db.workouts.toArray())}`;
 
+  renderRouteCard(w, activeStream);
+  renderFeel(w);
   renderCardiacZones(w);
   await renderDeltaTable(w);
+  await renderBestEfforts(w);
 
   $('#banner_line1_l').textContent = `⏱ ${rideDuration(w)}`;
   $('#banner_line1_r').textContent = `📏 ${fmtNum(w.distance_km, 2)} km`;
@@ -73,6 +80,67 @@ async function renderRideDetail() {
   setTimeout(renderStreamPlot, 60);
   await refreshDebriefState();
   await renderChatThread();
+}
+
+// Power-meter rides only: NP, IF, TSS (Coggan, as in GoldenCheetah)
+function powerKvHtml(w, all) {
+  if (w.power_source !== 'meter' || !(w.np_w > 0)) return '';
+  const ftp = currentFtp(all);
+  const st = rideStress(w, ftp);
+  return `<div class="kv"><span class="k">Normalized power</span><span class="v">${w.np_w} W</span></div>
+    <div class="kv"><span class="k">IF / TSS</span><span class="v">${st ? `${st.IF.toFixed(2)} / ${st.TSS}` : '--'} <span class="tiny muted">${ftp ? `FTP ${ftp.w}${ftp.source === 'set' ? '' : ' auto'}` : 'set FTP'}</span></span></div>`;
+}
+
+// ---------- Feel, RPE, note ----------
+const FEELINGS = [['awful', '😫', 'Awful'], ['bad', '😕', 'Tough'], ['ok', '😐', 'OK'], ['good', '🙂', 'Good'], ['great', '😄', 'Great']];
+const RPE_LABELS = ['', 'Very easy', 'Easy', 'Easy', 'Moderate', 'Moderate', 'Hard', 'Hard', 'Very hard', 'Very hard', 'Max'];
+
+function rpeColor(n) {
+  return n <= 3 ? '#16a34a' : n <= 5 ? '#eab308' : n <= 7 ? '#fc5200' : '#ef4444';
+}
+
+function renderFeel(w) {
+  $('#det_feel').innerHTML = FEELINGS.map(([k, e, t]) => `<button class="feel-btn ${w.feel === k ? 'selected' : ''}" onclick="setFeel('${k}')"><span class="e">${e}</span><span class="t">${t}</span></button>`).join('');
+  $('#det_rpe').innerHTML = Array.from({ length: 10 }, (_, i) => i + 1).map(n => `<button class="rpe-btn ${w.rpe === n ? 'selected' : ''}" style="${w.rpe === n ? `background:${rpeColor(n)}` : ''}" onclick="setRpe(${n})">${n}</button>`).join('');
+  $('#det_rpe_label').textContent = w.rpe ? `RPE ${w.rpe} · ${RPE_LABELS[w.rpe]}` : 'not rated yet';
+  const note = $('#det_note');
+  note.value = w.note || '';
+  note.oninput = debounce(() => saveRideField('note', note.value.trim().slice(0, 1000)), 600);
+}
+
+async function saveRideField(field, value) {
+  if (!currentWorkout) return;
+  currentWorkout[field] = value;
+  await db.workouts.update(currentWorkout.id, { [field]: value });
+}
+
+async function setFeel(k) {
+  const v = currentWorkout && currentWorkout.feel === k ? null : k;
+  await saveRideField('feel', v);
+  haptic('light');
+  renderFeel(currentWorkout);
+}
+
+async function setRpe(n) {
+  const v = currentWorkout && currentWorkout.rpe === n ? null : n;
+  await saveRideField('rpe', v);
+  haptic('light');
+  renderFeel(currentWorkout);
+}
+
+// ---------- Best efforts in this ride ----------
+async function renderBestEfforts(w) {
+  const wrap = $('#det_best_wrap');
+  const rows = [];
+  const dur = d => BEST_LABELS[d] || `${d}s`;
+  if (w.best_spd) rows.push(['Speed', Object.entries(w.best_spd).map(([d, v]) => [dur(d), `${fmtNum(v, 1)} km/h`])]);
+  if (w.best_hr) rows.push(['Heart rate', Object.entries(w.best_hr).map(([d, v]) => [dur(d), `${Math.round(v)} bpm`])]);
+  if (w.power_source === 'meter' && w.mmp) rows.push(['Power', Object.entries(w.mmp).filter(([d]) => [5, 60, 300, 1200, 3600].includes(+d)).map(([d, v]) => [dur(d), `${Math.round(v)} W`])]);
+  if (!rows.length) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  $('#det_best').innerHTML = rows.map(([name, cells]) => `
+    <div class="table-wrap mb-8"><table class="dtable"><thead><tr><th>${name}</th>${cells.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>
+    <tbody><tr><td>Best</td>${cells.map(c => `<td>${c[1]}</td>`).join('')}</tr></tbody></table></div>`).join('');
 }
 
 function renderCardiacZones(w) {
@@ -270,7 +338,7 @@ async function runSingleRideDebrief(targetRide) {
   if (viewing()) { await renderChatThread(typingHtml('Coach is analysing your ride')); scrollDetailToEnd(); }
   try {
     const prompt = await buildRideDebriefPrompt(w);
-    const reply = await callGemini(prompt, null);
+    const reply = await callGemini(prompt, null, { onDelta: viewing() ? liveBubble($('#chatThread'), 'AI Coach', scrollDetailToEnd) : null });
     if (reply) {
       await db.threads.where('[strava_id+role]').equals([Number(w.strava_id), 'coach']).delete();
       await db.threads.add({ strava_id: Number(w.strava_id), ride_number: w.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
@@ -313,8 +381,9 @@ async function executeRideMessageDispatch(payload) {
     const w = await db.workouts.where('strava_id').equals(Number(payload.strava_id)).first();
     if (!w) throw new Error('Ride no longer exists.');
     const prompt = await buildRideChatPrompt(w, payload.text, !!payload.image_b64);
-    const reply = await callGemini(prompt, payload.image_b64);
+    const reply = await callGemini(prompt, payload.image_b64, { onDelta: liveBubble($('#chatThread'), 'AI Coach', scrollDetailToEnd) });
     if (reply) {
+      haptic('success');
       const now = new Date().toISOString();
       await db.threads.add({ strava_id: Number(payload.strava_id), ride_number: payload.ride_number, role: 'athlete', message: payload.text, image_b64: payload.image_b64, created_at: now });
       await db.threads.add({ strava_id: Number(payload.strava_id), ride_number: payload.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });

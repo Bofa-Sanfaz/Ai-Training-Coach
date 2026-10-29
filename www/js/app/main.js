@@ -30,6 +30,12 @@ const WHATS_NEW = `
 - Toasts and in-app dialogs instead of pop-up alerts; Android **Back** button now works everywhere
 
 ### New features
+- **AI providers**: Gemini, Groq, OpenRouter, Mistral (free tiers) or Claude, OpenAI, DeepSeek (paid) — with a monthly spend cap, automatic fallback and replies that stream in as they're written
+- **AI week plan**: a 7-day plan from your form, phase and goals, with a checklist and today's session on the Rides tab
+- **Route map** coloured by heart-rate zone, and a **shareable ride card** image
+- Rate each ride's **feel and effort (RPE)** and add private notes — the coach reads them
+- **Weekly goals**, **training calendar** and **best efforts** (speed, heart rate, and power when you ride with a power meter)
+- Pull down on Rides to sync; optional auto-sync when the app opens; haptic feedback
 - **Fitness · Fatigue · Form** chart from heart-rate training load (TRIMP)
 - Weekly summary with streak, weekly volume chart and all-time records
 - Search and filter rides; month grouping
@@ -66,6 +72,7 @@ async function boot() {
   }
 
   await loadPhysioConfig();
+  await loadAiSettings();
   applyTheme(currentThemeChoice());
   checkNetwork();
   window.addEventListener('online', checkNetwork);
@@ -77,7 +84,7 @@ async function boot() {
     });
   }
 
-  $$('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+  $$('.nav-btn').forEach(b => b.addEventListener('click', () => { if (Router.current !== b.dataset.tab) haptic('light'); switchTab(b.dataset.tab); }));
   setupRideFilters();
   setupTrendsControls();
   setupReportControls();
@@ -97,7 +104,58 @@ async function boot() {
   window.__rpBootOk();
 
   if (seen !== APP_VERSION) setTimeout(showWhatsNew, 600);
-  refreshStaleMetrics();
+  setupPullToRefresh();
+  await refreshStaleMetrics();
+  maybeAutoSync();
+}
+
+// Auto-sync on open: Strava connected, online, enabled, last sync > 3 h ago
+async function maybeAutoSync() {
+  try {
+    if ((await getConfig('auto_sync')) === '0' || !navigator.onLine) return;
+    if (!(await getConfig('strava_refresh_token'))) return;
+    const last = await getConfig('last_sync_at');
+    if (last && Date.now() - parseSafeDate(last).getTime() < 3 * 3600000) return;
+    setTimeout(() => syncStrava({ auto: true }), 1200);
+  } catch (e) {
+    console.warn('Auto-sync check failed', e);
+  }
+}
+
+// Pull down on the Rides list to sync
+function setupPullToRefresh() {
+  const ptr = $('#ptr');
+  let startY = null, dy = 0;
+  const THRESHOLD = 80;
+  window.addEventListener('touchstart', e => {
+    if (Router.current !== 'rides' || window.scrollY > 0 || $$('.panel.open, .sheet.open').length || isSyncInProgress) { startY = null; return; }
+    startY = e.touches[0].clientY;
+    dy = 0;
+  }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (startY === null) return;
+    dy = Math.max(0, e.touches[0].clientY - startY);
+    if (!dy) return;
+    const p = Math.min(1, dy / THRESHOLD);
+    ptr.style.opacity = String(p);
+    ptr.style.transform = `translateY(${Math.min(dy, THRESHOLD + 20) * 0.6 - 40}px) rotate(${p * 270}deg) scale(${0.6 + p * 0.4})`;
+    const ready = dy >= THRESHOLD;
+    if (ready && !ptr.classList.contains('ready')) haptic('light');
+    ptr.classList.toggle('ready', ready);
+  }, { passive: true });
+  window.addEventListener('touchend', async () => {
+    if (startY === null) return;
+    const go = dy >= THRESHOLD;
+    startY = null;
+    if (!go) { ptr.style.opacity = '0'; ptr.classList.remove('ready'); return; }
+    ptr.classList.add('spin');
+    ptr.style.transform = 'translateY(8px)';
+    try { await syncStrava(); } finally {
+      ptr.classList.remove('spin', 'ready');
+      ptr.style.opacity = '0';
+      ptr.style.transform = '';
+    }
+  });
 }
 
 // After an update or a zone change, rides carry metrics from older formulas.

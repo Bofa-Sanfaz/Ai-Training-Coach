@@ -78,7 +78,14 @@
       return tables.reduce(function (p, t) {
         return p.then(function () { return idbAll(dbh, t).then(function (rows) { dump[t] = rows; }); });
       }, Promise.resolve()).then(function () {
-        dump.config = (dump.config || []).filter(function (c) { return secret.indexOf(c.key) < 0; });
+        dump.config = (dump.config || []).filter(function (c) { return secret.indexOf(c.key) < 0; }).map(function (c) {
+          if (c.key !== 'ai_providers') return c;
+          try {
+            var s = JSON.parse(c.val);
+            (s.providers || []).forEach(function (p) { p.apiKey = ''; });
+            return { key: c.key, val: JSON.stringify(s) };
+          } catch (e) { return null; }
+        }).filter(Boolean);
         return JSON.stringify(dump);
       });
     }).then(function (json) {
@@ -112,7 +119,8 @@
     }).then(function (dbh) {
       var tables = ['workouts', 'threads', 'master_chat', 'graph_threads', 'reports', 'config'];
       return idbAll(dbh, 'config').then(function (cfg) {
-        var keep = cfg.filter(function (c) { return /gemini_api_key|strava_/.test(c.key); });
+        // Keep current keys and AI provider settings (restore points never contain API keys)
+        var keep = cfg.filter(function (c) { return /gemini_api_key|strava_|ai_providers/.test(c.key); });
         return new Promise(function (resolve, reject) {
           var tx = dbh.transaction(tables, 'readwrite');
           tables.forEach(function (t) {

@@ -4,7 +4,7 @@
 // --------------------------------------------------------
 const DEFAULT_STRAVA_CLIENT_ID = '277202';
 const RIDE_TYPES = ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide', 'EMountainBikeRide', 'Velomobile', 'Handcycle'];
-const STREAM_KEYS = 'time,distance,altitude,heartrate,velocity_smooth,watts,cadence,grade_smooth,moving';
+const STREAM_KEYS = 'time,distance,latlng,altitude,heartrate,velocity_smooth,watts,cadence,grade_smooth,moving,temp';
 
 let isSyncInProgress = false;
 let isOauthExchanging = false;
@@ -158,6 +158,8 @@ function buildWorkoutFromActivity(a) {
     kilojoules: Math.round(num(a.kilojoules)),
     calories: a.calories || Math.round(num(a.kilojoules) * 1.05),
     trainer: !!a.trainer,
+    map_polyline: (a.map && a.map.summary_polyline) || '',
+    gear_id: a.gear_id || '',
     debrief_stale: false,
     intent_type: null,
     zone_seconds: [0, 0, 0, 0, 0],
@@ -193,9 +195,10 @@ function setSyncStatus(text, pct) {
   $('#syncProgress').style.width = `${Math.max(3, Math.min(100, pct || 0))}%`;
 }
 
-async function syncStrava() {
+async function syncStrava(opts = {}) {
+  const auto = !!(opts && opts.auto);
   if (isSyncInProgress) return;
-  if (!navigator.onLine) { toast('Connect to the internet to sync with Strava.', 'warn'); return; }
+  if (!navigator.onLine) { if (!auto) toast('Connect to the internet to sync with Strava.', 'warn'); return; }
 
   const btn = $('#btnSync');
   isSyncInProgress = true;
@@ -208,8 +211,10 @@ async function syncStrava() {
       token = await getStravaAccessToken();
     } catch (e) {
       if (e.message === 'NOT_CONNECTED') {
-        toast('Sign in to Strava in Profile first.', 'warn');
-        switchTab('profile');
+        if (!auto) {
+          toast('Sign in to Strava in Profile first.', 'warn');
+          switchTab('profile');
+        }
         return;
       }
       throw e;
@@ -256,6 +261,7 @@ async function syncStrava() {
       if (w.device_watts === undefined) w.device_watts = !!a.device_watts;
       if (!w.name) w.name = a.name || '';
       if (!w.sport_type) w.sport_type = a.sport_type || a.type || 'Ride';
+      if (!w.map_polyline && a.map && a.map.summary_polyline) w.map_polyline = a.map.summary_polyline;
     });
 
     const all = await renumberRides();
@@ -307,7 +313,8 @@ async function syncStrava() {
     parts.push(added.length ? `${added.length} new ride${added.length > 1 ? 's' : ''}` : 'No new rides');
     if (fetched) parts.push(`${fetched} stream${fetched > 1 ? 's' : ''} downloaded`);
     if (rateLimited) parts.push(`${missing} still pending (Strava limit — sync again in ~15 min)`);
-    toast(parts.join(' · '), rateLimited ? 'warn' : 'success', rateLimited ? 6500 : 3800);
+    if (!auto || added.length || rateLimited) toast(parts.join(' · '), rateLimited ? 'warn' : 'success', rateLimited ? 6500 : 3800);
+    if (added.length) haptic('success');
     await setConfig('last_sync_at', new Date().toISOString());
 
     if (added.length) {
@@ -315,7 +322,8 @@ async function syncStrava() {
       openNextIntentModal();
     }
   } catch (err) {
-    toast(`Sync failed: ${err.message}`, 'error', 6000);
+    if (!auto) toast(`Sync failed: ${err.message}`, 'error', 6000);
+    else console.warn('Auto-sync failed', err);
   } finally {
     setSyncStatus('');
     setBusy(btn, false);

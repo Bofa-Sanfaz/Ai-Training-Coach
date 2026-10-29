@@ -85,7 +85,7 @@ async function generateAIComparison() {
   setBusy(btn, true, 'Comparing rides…');
   $('#compareAIBox').innerHTML = typingHtml('Computing physiological differences');
   try {
-    const reply = await callGemini(await buildComparePrompt(sessions), null);
+    const reply = await callGemini(await buildComparePrompt(sessions), null, { onDelta: liveBubble($('#compareAIBox'), 'Comparative breakdown') });
     $('#compareAIBox').innerHTML = reply ? bubbleHtml({ role: 'coach', message: reply, created_at: new Date().toISOString() }, 'Comparative breakdown') : '';
   } catch (e) {
     $('#compareAIBox').innerHTML = '';

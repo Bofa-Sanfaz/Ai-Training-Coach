@@ -8,13 +8,26 @@ aerobic decoupling and training load, and uses Google Gemini as a personal coach
 ## What's in the app (v3)
 | Tab | What it does |
 |-----|--------------|
-| **Rides** | Weekly summary (rides, km, time, climb, streak, form), search & filters, rides grouped by month with zone strip |
-| **Ride detail** | Key stats, W/kg, zone time, VAM, decoupling, load; comparison with prior rides of the same intent; stream chart; AI debrief and chat (with screenshots) |
-| **Trends** | Fitness / Fatigue / Form (CTL / ATL / TSB from TRIMP), weekly volume, ride-by-ride progression, AI season audit |
+| **Rides** | Week summary with goals, streak and form; today's planned session; search & filters; pull to sync; rides grouped by month with zone strip |
+| **Ride detail** | Route map coloured by HR zone, key stats, feel + RPE + private note, zone time, VAM, decoupling, load, best efforts (NP/IF/TSS with a power meter), comparison with prior rides of the same intent, stream chart, AI debrief and chat (streaming, screenshots), shareable ride card |
+| **Trends** | Fitness / Fatigue / Form (CTL / ATL / TSB from TRIMP), training calendar, weekly volume, best efforts (all time vs 6 weeks), ride-by-ride progression, AI season audit |
 | **Compare** | Two or three rides side by side + AI comparison |
-| **Coach** | Master season coach with full memory + every ride thread |
+| **Coach** | AI 7-day plan with checklist, master season coach with full memory, every ride thread |
 | **Reports** | 7d / 30d / 1y / all-time KPIs vs previous period, zone strain, all-time records, AI review, A4 PDF export |
-| **Profile** | Athlete, weight log, training phases, max/resting HR + zones, Strava & Gemini, light/dark theme, backups, restore points, Classic (v2) rollback, diagnostics, demo rides |
+| **Profile** | Athlete, weekly goals, weight log, training phases, HR zones + FTP, Strava, **AI providers** (free + paid, fallback) and **monthly spend cap**, theme, auto-sync, haptics, backups, restore points, Classic (v2) rollback, diagnostics, demo rides |
+
+## AI providers
+| Provider | Cost | Notes |
+|----------|------|-------|
+| Google Gemini | Free tier | Default. Key: aistudio.google.com |
+| Groq | Free tier | Very fast, daily limits |
+| OpenRouter | Free `:free` models, paid others | Prices read automatically |
+| Mistral | Free mode | Account limits |
+| Anthropic Claude | Paid | Prices filled in automatically |
+| OpenAI / DeepSeek | Paid | Enter prices for spend tracking |
+| Custom | Your choice | Any OpenAI-compatible URL, e.g. local Ollama |
+
+Paid providers stop being used once the monthly cap is reached; free providers are never counted.
 
 ## Project layout
 ```

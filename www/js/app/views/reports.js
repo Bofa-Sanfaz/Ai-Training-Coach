@@ -121,7 +121,7 @@ async function generateExecutiveReport() {
   setBusy(btn, true, 'Synthesizing review…');
   $('#reportSummaryBox').innerHTML = typingHtml('Writing your longitudinal review');
   try {
-    const report = await callGemini(await buildReportPrompt(rides, prior, startDate, endDate, tf), null);
+    const report = await callGemini(await buildReportPrompt(rides, prior, startDate, endDate, tf), null, { onDelta: liveBubble($('#reportSummaryBox'), `Review · ${tf.toUpperCase()}`) });
     if (report) {
       await db.reports.put({ id: `tf_${tf}`, ref_code: `REPORT_${tf}`, created_at: new Date().toISOString(), timeframe: tf, analysis_text: report, ride_count: rides.length, date_range: scopeKey(rides) });
       toast('Review ready', 'success', 1800);

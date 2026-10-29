@@ -47,14 +47,21 @@ function rideSubtitle(w) {
   return w.name && w.name.trim() ? `${rideCode(w)} · ${date}` : date;
 }
 
-function deltaTxt(prevText) {
-  return prevText ? `<div class="d">last wk ${prevText}</div>` : '';
+// One stat in the week card: value, label, optional goal progress, last week's value
+function weekStatHtml(value, label, prevText, goalPct, goalText) {
+  return `<div class="week-stat">
+    <div class="v">${value}</div><div class="l">${label}${goalText ? ` <span class="of">/ ${goalText}</span>` : ''}</div>
+    ${goalPct !== null ? `<div class="mini-track"><i style="width:${Math.min(100, goalPct)}%"></i></div>` : ''}
+    ${prevText ? `<div class="d">last wk ${prevText}</div>` : ''}
+  </div>`;
 }
 
-function renderWeekCard(all) {
+async function renderWeekCard(all) {
   const host = $('#weekCard');
   if (!all.length) { host.innerHTML = ''; return; }
   const { cur, prev, streak } = weekSummary(all);
+  const goals = await getWeeklyGoals();
+  const todayItem = todayPlanItem(await getWeekPlan());
   const snap = currentLoadSnapshot(computeLoadSeries(all));
   const fs = snap ? formStatus(snap.tsb) : null;
   const ws = startOfWeek(new Date());
@@ -68,13 +75,17 @@ function renderWeekCard(all) {
         ${fs ? `<span class="form-chip" title="${escapeHtml(fs.label)}">${icon('activity', 'ic-sm')}Form ${signed(snap.tsb, 0)}</span>` : ''}
       </div>
       <div class="week-grid">
-        <div class="week-stat"><div class="v">${cur.count}</div><div class="l">Rides</div>${deltaTxt(prev.count ? String(prev.count) : '')}</div>
-        <div class="week-stat"><div class="v">${fmtNum(cur.dist, cur.dist >= 100 ? 0 : 1)}</div><div class="l">km</div>${deltaTxt(prev.dist ? fmtNum(prev.dist, 0) : '')}</div>
-        <div class="week-stat"><div class="v">${formatHours(cur.sec)}</div><div class="l">Time</div>${deltaTxt(prev.sec ? formatHours(prev.sec) : '')}</div>
-        <div class="week-stat"><div class="v">${Math.round(cur.asc)}</div><div class="l">Climb m</div>${deltaTxt(prev.asc ? String(Math.round(prev.asc)) : '')}</div>
+        ${weekStatHtml(cur.count, 'rides', prev.count ? String(prev.count) : '', goals.rides ? (cur.count / goals.rides) * 100 : null, goals.rides ? String(goals.rides) : '')}
+        ${weekStatHtml(fmtNum(cur.dist, cur.dist >= 100 ? 0 : 1), 'km', prev.dist ? fmtNum(prev.dist, 0) : '', goals.km ? (cur.dist / goals.km) * 100 : null, goals.km ? String(goals.km) : '')}
+        ${weekStatHtml(formatHours(cur.sec), 'time', prev.sec ? formatHours(prev.sec) : '', goals.hours ? (cur.sec / 3600 / goals.hours) * 100 : null, goals.hours ? `${goals.hours}h` : '')}
+        ${weekStatHtml(Math.round(cur.asc), 'climb m', prev.asc ? String(Math.round(prev.asc)) : '', null, '')}
       </div>
-      ${fs ? `<div class="card-sub mt-8" style="position:relative; z-index:1">${escapeHtml(fs.label)} — fitness ${Math.round(snap.ctl)}, fatigue ${Math.round(snap.atl)}</div>` : ''}
-    </div>`;
+      ${fs ? `<div class="week-foot">${escapeHtml(fs.label)} · fitness ${Math.round(snap.ctl)} · fatigue ${Math.round(snap.atl)}</div>` : ''}
+    </div>
+    ${todayItem ? `<div class="today-plan ${todayItem.done ? 'done' : ''}" onclick="switchTab('coach')">
+      <span class="plan-dot" style="background:${(PLAN_TYPES[todayItem.type] || PLAN_TYPES.other).color}"></span>
+      <span class="grow"><b>Today: ${escapeHtml(todayItem.title)}</b><br><span class="tiny muted">${todayItem.type === 'rest' ? 'Rest day' : `${todayItem.duration_min} min${todayItem.zone ? ` · ${escapeHtml(todayItem.zone)}` : ''}`}${todayItem.done ? ' · done ✓' : ''}</span></span>
+      ${icon('chevron', 'ic-sm muted')}</div>` : ''}`;
 }
 
 function rideMatches(w, coachIds) {
@@ -94,7 +105,7 @@ async function renderRides() {
   $('#ridesSub').textContent = all.length
     ? `${all.length} ride${all.length > 1 ? 's' : ''}${lastSync ? ` · synced ${relativeTime(lastSync)}` : ''}`
     : 'Connect Strava to get started';
-  renderWeekCard(all);
+  await renderWeekCard(all);
 
   if (!all.length) {
     list.innerHTML = `<div class="empty mt-16">${icon('bike')}<div><b>No rides stored yet</b></div>

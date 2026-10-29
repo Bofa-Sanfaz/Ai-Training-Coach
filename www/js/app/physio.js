@@ -6,7 +6,11 @@
 // --------------------------------------------------------
 
 // Bump when a calculation changes so stored ride metrics are recomputed automatically.
-const METRICS_VERSION = 'm3.0';
+const METRICS_VERSION = 'm3.1';
+
+// Best-effort windows. Power curves use real power-meter data only (no app-side power estimate).
+const BEST_DURATIONS = [5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600];
+const BEST_LABELS = { 5: '5s', 15: '15s', 30: '30s', 60: '1m', 120: '2m', 300: '5m', 600: '10m', 1200: '20m', 1800: '30m', 3600: '60m' };
 
 const ZONE_META = [
   { key: 'Z1', name: 'Recovery', long: 'Active Recovery', color: '#94a3b8' },
@@ -24,6 +28,7 @@ const PHYSIO = {
   resting_hr: 60,
   bounds: [135, 155, 171, 189],
   trimp_sex: 'M',
+  ftp_user: 0,
   zones: [],
   getZoneIndex(hr) {
     if (!hr || hr <= 0) return -1;
@@ -67,6 +72,7 @@ async function loadPhysioConfig() {
   PHYSIO.resting_hr = rest;
   PHYSIO.bounds = validateBounds(bounds, max) ? DEFAULT_PHYSIO.bounds.slice() : bounds.map(Number);
   PHYSIO.trimp_sex = (await getConfig('trimp_sex')) || 'M';
+  PHYSIO.ftp_user = num(await getConfig('ftp_w'), 0);
   rebuildZones();
 
   ATHLETE.name = (await getConfig('athlete_name')) || 'Mustafa';
@@ -74,6 +80,7 @@ async function loadPhysioConfig() {
   ATHLETE.height = (await getConfig('athlete_height')) || '';
 }
 
+// Anything that changes stored ride metrics is part of the signature → stale rides get recomputed
 function physioSignature() {
   return `${METRICS_VERSION}|${PHYSIO.max_hr}|${PHYSIO.resting_hr}|${PHYSIO.bounds.join(',')}|${PHYSIO.trimp_sex}`;
 }
@@ -159,6 +166,70 @@ function trimpFromAverage(w) {
 // --------------------------------------------------------
 // PER-RIDE METRICS FROM STREAMS
 // --------------------------------------------------------
+// Resample a stream to 1 Hz (sample-and-hold); gaps > 10 s become 0 (or null with keepGaps)
+function to1Hz(times, vals, keepGaps = false) {
+  const last = Math.min(num(times[times.length - 1]), 12 * 3600);
+  const out = new Array(Math.max(1, Math.floor(last) + 1)).fill(keepGaps ? null : 0);
+  for (let i = 1; i < times.length; i++) {
+    const t0 = Math.floor(num(times[i - 1])), t1 = Math.min(Math.floor(num(times[i])), out.length - 1);
+    const gap = t1 - t0 > 10;
+    const v = Number.isFinite(vals[i]) ? vals[i] : (keepGaps ? null : 0);
+    for (let t = t0 + 1; t <= t1; t++) out[t] = gap ? (keepGaps ? null : 0) : v;
+  }
+  if (times.length) out[0] = Number.isFinite(vals[0]) ? vals[0] : out[0];
+  return out;
+}
+
+// Best (maximal) average for each window length, sliding over a 1 Hz series; nulls break a window
+function bestAverages(arr, durations, decimals) {
+  const res = {};
+  for (const d of durations) {
+    if (arr.length < d) continue;
+    let sum = 0, valid = 0, best = -Infinity;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (v !== null && v !== undefined) { sum += v; valid++; }
+      if (i >= d) {
+        const o = arr[i - d];
+        if (o !== null && o !== undefined) { sum -= o; valid--; }
+      }
+      if (i >= d - 1 && valid === d) best = Math.max(best, sum / d);
+    }
+    if (best > -Infinity) res[d] = round(best, decimals);
+  }
+  return Object.keys(res).length ? res : null;
+}
+
+// Coggan normalized power: 30 s rolling mean → ^4 → mean → ^¼ (as in GoldenCheetah)
+function normalizedPower(p1Hz) {
+  if (p1Hz.length < 60) return null;
+  let sum = 0, total = 0, count = 0;
+  for (let i = 0; i < p1Hz.length; i++) {
+    sum += p1Hz[i];
+    if (i >= 30) sum -= p1Hz[i - 30];
+    if (i >= 29) { total += Math.pow(sum / 30, 4); count++; }
+  }
+  return count ? Math.round(Math.pow(total / count, 0.25)) : null;
+}
+
+// FTP: the value set in Profile, else 95% of the best measured 20-min power of the last 120 days
+function currentFtp(workouts) {
+  if (PHYSIO.ftp_user > 0) return { w: PHYSIO.ftp_user, source: 'set' };
+  const cutoff = Date.now() - 120 * 86400000;
+  let best = 0;
+  for (const w of workouts) {
+    const v = w.mmp && w.mmp[1200];
+    if (v && w.power_source === 'meter' && parseSafeDate(w.date).getTime() >= cutoff && v > best) best = v;
+  }
+  return best ? { w: Math.round(best * 0.95), source: 'auto' } : null;
+}
+
+function rideStress(w, ftp) {
+  if (!ftp || !(w.np_w > 0) || !(w.moving_sec > 0)) return null;
+  const IF = w.np_w / ftp.w;
+  return { IF: round(IF, 2), TSS: Math.round((w.moving_sec / 3600) * IF * IF * 100) };
+}
+
 function computeRideMetrics(workout, s) {
   const out = {
     zone_seconds: [0, 0, 0, 0, 0],
@@ -169,6 +240,11 @@ function computeRideMetrics(workout, s) {
     halves_profile: '',
     trimp: null,
     trimp_source: null,
+    power_source: null,
+    np_w: null,
+    mmp: null,
+    best_spd: null,
+    best_hr: null,
     metrics_sig: physioSignature()
   };
 
@@ -239,7 +315,22 @@ function computeRideMetrics(workout, s) {
     if (climbSec >= 120 && climbGain > 5) out.climbing_vam = Math.round(climbGain / (climbSec / 3600));
   }
 
-  // 3) Halves profile & aerobic decoupling on moving time (first 12 min of moving time skipped)
+  // 3) Measured power only (power meter): NP and power best efforts; speed & HR best efforts for every ride
+  try {
+    if (watts) {
+      const pw = watts.map(num);
+      const pw1 = to1Hz(times, pw);
+      out.power_source = 'meter';
+      out.np_w = normalizedPower(pw1);
+      out.mmp = bestAverages(pw1, BEST_DURATIONS, 0);
+    }
+    if (spds.length) out.best_spd = bestAverages(to1Hz(times, spds.map(v => num(v) * 3.6)), [60, 300, 1200, 3600], 1);
+    if (hrs) out.best_hr = bestAverages(to1Hz(times, hrs.map(num), true), [60, 300, 1200, 3600], 0);
+  } catch (e) {
+    console.warn('Power/best-effort calc failed', e);
+  }
+
+  // 4) Halves profile & aerobic decoupling on moving time (first 12 min of moving time skipped)
   if (hrs) {
     let mSec = 0;
     const samples = [];

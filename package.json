@@ -1,6 +1,6 @@
 {
   "name": "ai-training-coach",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Offline-First AI Cycling Coach (Ride Partner)",
   "private": true,
   "scripts": {
@@ -13,6 +13,7 @@
     "@capacitor/app": "^6.0.0",
     "@capacitor/core": "^6.0.0",
     "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/haptics": "^6.0.0",
     "@capacitor/share": "^6.0.0"
   },
   "devDependencies": {

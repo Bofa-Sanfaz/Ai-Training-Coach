@@ -20,6 +20,43 @@ function isNative() {
   return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 }
 
+// ---------- Haptics (no-op in the browser) ----------
+function haptic(kind = 'light') {
+  try {
+    if (localStorage.getItem('rp_haptics') === 'off') return;
+  } catch (e) {}
+  const H = capPlugin('Haptics');
+  if (!H) return;
+  if (kind === 'success' || kind === 'warning' || kind === 'error') {
+    H.notification({ type: kind.toUpperCase() }).catch(() => {});
+  } else {
+    H.impact({ style: kind === 'medium' ? 'MEDIUM' : 'LIGHT' }).catch(() => {});
+  }
+}
+
+// ---------- Streaming AI bubble ----------
+// Returns an onDelta(text) callback that renders the growing reply into `host`,
+// replacing the typing indicator. Throttled to one paint per frame.
+function liveBubble(host, label, onPaint) {
+  let el = null, pending = '', raf = 0;
+  return text => {
+    pending = text;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (!el || !el.isConnected) {
+        el = document.createElement('div');
+        el.className = 'bubble bubble-coach fresh';
+        el.innerHTML = `<div class="bubble-sender"><span>${escapeHtml(label)}</span><span>writing…</span></div><div class="md"></div>`;
+        const typing = host.querySelector('.typing');
+        if (typing) typing.replaceWith(el); else host.appendChild(el);
+      }
+      el.querySelector('.md').innerHTML = renderMarkdown(pending) + '<span class="caret"></span>';
+      if (onPaint) onPaint();
+    });
+  };
+}
+
 // ---------- Toasts ----------
 function toast(message, type = 'info', ms = 3400) {
   const host = $('#toasts');

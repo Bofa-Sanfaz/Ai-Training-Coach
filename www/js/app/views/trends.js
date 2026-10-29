@@ -37,7 +37,9 @@ async function renderTrends() {
   trendsCache = { workouts, series: computeLoadSeries(workouts) };
   renderLoadKpis();
   renderLoadChart();
+  renderCalendar();
   renderWeeklyChart();
+  renderBestEffortsTable();
   renderGlobalGraph();
   await renderGraphChatThread();
 }
@@ -97,6 +99,89 @@ function renderWeeklyChart() {
     marker: { color: xs.map((_, i) => (i === xs.length - 1 ? '#fc5200' : 'rgba(252,82,0,0.45)')), line: { width: 0 } },
     hovertemplate: `Week of %{x|%d %b}: <b>%{y} ${unit}</b><br>%{text}<extra></extra>`
   }], plotLayout({ hovermode: 'closest', bargap: 0.25, xaxis: { type: 'date', tickformat: '%d %b' } }), PLOT_CONFIG);
+}
+
+// --------------------------------------------------------
+// TRAINING CALENDAR (month grid, colour = daily load)
+// --------------------------------------------------------
+let calMonthOffset = 0;
+
+function shiftCalendar(delta) {
+  calMonthOffset = Math.min(0, calMonthOffset + delta);
+  haptic('light');
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const host = $('#calendar');
+  if (!trendsCache) return;
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + calMonthOffset, 1);
+  $('#calTitle').textContent = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const byDay = new Map();
+  for (const w of trendsCache.workouts) {
+    const k = String(w.date).slice(0, 10);
+    const e = byDay.get(k) || { load: 0, rides: [] };
+    e.load += hasVal(w.trimp) ? num(w.trimp) : num(w.moving_sec) / 60;
+    e.rides.push(w);
+    byDay.set(k, e);
+  }
+  const maxLoad = Math.max(1, ...[...byDay.values()].map(e => e.load));
+  const start = startOfWeek(first);
+  const today = formatLocalDate(now);
+  let html = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="cal-head">${d[0]}</div>`).join('');
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(start, i);
+    if (i >= 35 && d.getMonth() !== first.getMonth()) break;
+    const k = formatLocalDate(d);
+    const e = byDay.get(k);
+    const inMonth = d.getMonth() === first.getMonth();
+    const a = e ? 0.25 + 0.75 * Math.min(1, e.load / maxLoad) : 0;
+    html += `<div class="cal-day ${e ? 'has' : ''} ${inMonth ? '' : 'out'} ${k === today ? 'today' : ''}" ${e ? `style="background:rgba(252,82,0,${a.toFixed(2)});color:${a < 0.6 ? '#7c2d12' : '#fff'}" onclick="openCalendarDay('${k}')"` : ''}>
+      ${d.getDate()}${e && e.rides.length > 1 ? `<span class="n">×${e.rides.length}</span>` : ''}</div>`;
+  }
+  host.innerHTML = html;
+}
+
+async function openCalendarDay(dateKey) {
+  const rides = trendsCache.workouts.filter(w => String(w.date).startsWith(dateKey));
+  if (rides.length === 1) { openRide(rides[0].id); return; }
+  switchTab('rides');
+  rideQuery = dateKey;
+  $('#rideSearch').value = dateKey;
+  renderRides();
+}
+
+// --------------------------------------------------------
+// BEST EFFORTS (speed / HR always; power only from power meters)
+// --------------------------------------------------------
+function bestOf(workouts, field, d) {
+  let best = null;
+  for (const w of workouts) {
+    if (field === 'mmp' && w.power_source !== 'meter') continue;
+    const v = w[field] && w[field][d];
+    if (v && (!best || v > best.v)) best = { v, w };
+  }
+  return best;
+}
+
+function renderBestEffortsTable() {
+  const host = $('#bestEfforts');
+  const all = trendsCache.workouts;
+  const recent = all.filter(w => parseSafeDate(w.date) >= addDays(new Date(), -42));
+  const groups = [
+    { name: 'Speed', field: 'best_spd', durs: [60, 300, 1200, 3600], fmt: v => `${fmtNum(v, 1)} km/h` },
+    { name: 'Heart rate', field: 'best_hr', durs: [60, 300, 1200, 3600], fmt: v => `${Math.round(v)} bpm` },
+    { name: 'Power (meter)', field: 'mmp', durs: [5, 60, 300, 1200, 3600], fmt: v => `${Math.round(v)} W` }
+  ].filter(g => all.some(w => w[g.field] && (g.field !== 'mmp' || w.power_source === 'meter')));
+  if (!groups.length) { host.innerHTML = '<div class="card small muted">Best efforts appear once rides with streams are synced.</div>'; return; }
+  host.innerHTML = groups.map(g => `
+    <div class="table-wrap mb-8"><table class="dtable">
+      <thead><tr><th>${g.name}</th>${g.durs.map(d => `<th>${BEST_LABELS[d]}</th>`).join('')}</tr></thead>
+      <tbody>
+        <tr><td>All time</td>${g.durs.map(d => { const b = bestOf(all, g.field, d); return `<td>${b ? `<a class="pb-link" onclick="openRide(${b.w.id})">${g.fmt(b.v)}</a>` : '--'}</td>`; }).join('')}</tr>
+        <tr><td>6 weeks</td>${g.durs.map(d => { const b = bestOf(recent, g.field, d); return `<td>${b ? g.fmt(b.v) : '--'}</td>`; }).join('')}</tr>
+      </tbody></table></div>`).join('') + '<div class="hint">Tap an all-time value to open that ride.</div>';
 }
 
 function setupGlobalMetricPills() {
@@ -188,7 +273,7 @@ async function generateGraphDebrief() {
   setBusy(btn, true, 'Auditing season…');
   await renderGraphChatThread(typingHtml('Auditing progression curves'));
   try {
-    const reply = await callGemini(await buildGraphPrompt(workouts, globalSelectedMetrics), null);
+    const reply = await callGemini(await buildGraphPrompt(workouts, globalSelectedMetrics), null, { onDelta: liveBubble($('#graphChatThread'), 'Season analyst') });
     if (reply) await db.graph_threads.add({ metric_key: graphMetricKey(), role: 'coach', message: reply, created_at: new Date().toISOString() });
   } catch (e) {
     toast(`Audit failed: ${e.message}`, 'error');
@@ -211,7 +296,7 @@ async function sendGraphAthleteReply() {
   try {
     const past = await db.graph_threads.where('metric_key').equals(key).toArray();
     const dialogue = past.slice(-8).map(t => `${t.role.toUpperCase()}: ${t.message}`).join('\n');
-    const reply = await callGemini(buildGraphReplyPrompt(globalSelectedMetrics, dialogue), null);
+    const reply = await callGemini(buildGraphReplyPrompt(globalSelectedMetrics, dialogue), null, { onDelta: liveBubble($('#graphChatThread'), 'Season analyst') });
     if (reply) await db.graph_threads.add({ metric_key: key, role: 'coach', message: reply, created_at: new Date().toISOString() });
   } finally {
     graphAiBusy = false;

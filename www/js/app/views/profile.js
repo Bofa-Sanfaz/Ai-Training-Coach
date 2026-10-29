@@ -10,14 +10,19 @@ async function renderProfile() {
   $('#cfg_max_hr').value = PHYSIO.max_hr;
   $('#cfg_rest_hr').value = PHYSIO.resting_hr;
   $('#cfg_trimp_sex').value = PHYSIO.trimp_sex;
+  $('#cfg_ftp').value = PHYSIO.ftp_user || '';
+  $('#cfg_autosync').checked = (await getConfig('auto_sync')) !== '0';
+  let hapticsOn = true;
+  try { hapticsOn = localStorage.getItem('rp_haptics') !== 'off'; } catch (e) {}
+  $('#cfg_haptics').checked = hapticsOn;
+  await renderGoalsForm();
   PHYSIO.bounds.forEach((b, i) => { $(`#zb${i}`).value = b; });
   previewZones();
 
   $('#cfg_client_id').value = (await getConfig('strava_client_id')) || DEFAULT_STRAVA_CLIENT_ID;
   $('#cfg_client_secret').value = await getConfig('strava_client_secret');
-  $('#cfg_gemini_key').value = await getConfig('gemini_api_key');
-  $('#cfg_custom_model').value = await getConfig('custom_gemini_model');
-  await refreshModelSelectors();
+  await renderProviders();
+  await renderSpend();
 
   const connected = !!(await getConfig('strava_refresh_token'));
   $('#stravaState').innerHTML = connected
@@ -46,13 +51,228 @@ async function saveAthleteProfile() {
 async function saveConnections() {
   await setConfig('strava_client_id', $('#cfg_client_id').value.trim() || DEFAULT_STRAVA_CLIENT_ID);
   await setConfig('strava_client_secret', $('#cfg_client_secret').value.trim());
-  await setConfig('gemini_api_key', $('#cfg_gemini_key').value.trim());
-  const custom = $('#cfg_custom_model').value.trim();
-  await setConfig('custom_gemini_model', custom);
-  if (custom) await setConfig('selected_gemini_model', custom);
-  else if ((await getActiveModel()) === (await getConfig('custom_gemini_model'))) await setConfig('selected_gemini_model', GEMINI_MODELS[0][0]);
+  toast('Strava settings saved', 'success');
+  haptic('success');
+}
+
+// ---------- AI providers ----------
+let editingProviderId = null;
+
+async function renderProviders() {
+  if (!AI) await loadAiSettings();
+  $('#cfg_ai_fallback').checked = !!AI.fallback;
+  $('#providerList').innerHTML = AI.providers.map(p => {
+    const ready = providerReady(p);
+    const active = p.id === AI.active;
+    return `<div class="list-item prov-row" onclick="openProviderSheet('${escapeHtml(p.id)}')">
+      <div class="avatar ${active ? 'master' : ''}">${escapeHtml(p.name.slice(0, 2).toUpperCase())}</div>
+      <span class="grow"><b>${escapeHtml(p.name)}</b>${active ? ' <span class="badge badge-intent">Main</span>' : ''}<br>
+        <span class="tiny muted"><span class="dot-status" style="background:${!p.enabled ? 'var(--muted)' : ready ? 'var(--good)' : 'var(--warn)'}"></span>${!p.enabled ? 'Disabled' : ready ? escapeHtml(p.model) : 'Needs key or model'}</span></span>
+      <span class="badge ${p.paid ? 'badge-stale' : 'badge-ok'}">${p.paid ? 'Paid' : 'Free'}</span>
+      ${icon('chevron', 'ic-sm muted')}
+    </div>`;
+  }).join('') || '<div class="small muted">No providers yet — tap Add.</div>';
   await refreshModelSelectors();
-  toast('Connections saved', 'success');
+}
+
+async function setAiFallback(on) {
+  AI.fallback = !!on;
+  await saveAiSettings();
+  toast(on ? 'Fallback on' : 'Fallback off', 'info', 1400);
+}
+
+function openAddProvider() {
+  $('#presetList').innerHTML = Object.entries(PROVIDER_PRESETS).map(([key, p]) => `
+    <div class="list-item prov-row" onclick="addProvider('${key}')">
+      <div class="avatar">${escapeHtml(p.name.slice(0, 2).toUpperCase())}</div>
+      <span class="grow"><b>${escapeHtml(p.name)}</b><br><span class="tiny muted">${escapeHtml(p.note)}</span></span>
+      <span class="badge ${p.paid ? 'badge-stale' : 'badge-ok'}">${p.paid ? 'Paid' : 'Free'}</span>
+    </div>`).join('');
+  openSheet('addProviderSheet');
+}
+
+async function addProvider(preset) {
+  const p = newProvider(preset);
+  if (preset === 'anthropic') applyModelPrice(p, p.model);
+  AI.providers.push(p);
+  await saveAiSettings();
+  closeSheet('addProviderSheet');
+  await renderProviders();
+  setTimeout(() => openProviderSheet(p.id), 250);
+}
+
+function fillModelSelect(p) {
+  const sel = $('#prov_model_sel');
+  const models = (p.models || []).length ? p.models : (p.type === 'gemini' ? GEMINI_MODELS.map(([id, label]) => ({ id, label })) : []);
+  const ids = new Set(models.map(m => m.id));
+  const opts = models.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.label || m.id)}</option>`);
+  if (p.model && !ids.has(p.model)) opts.unshift(`<option value="${escapeHtml(p.model)}">${escapeHtml(p.model)}</option>`);
+  sel.innerHTML = opts.length ? opts.join('') : '<option value="">Tap Load to list models</option>';
+  sel.value = p.model || '';
+}
+
+function openProviderSheet(id) {
+  const p = providerById(id);
+  if (!p) return;
+  editingProviderId = id;
+  const preset = PROVIDER_PRESETS[p.preset] || PROVIDER_PRESETS.custom;
+  $('#provTitle').textContent = p.name;
+  $('#provNote').textContent = preset.note;
+  $('#provBadge').innerHTML = `<span class="badge ${p.paid ? 'badge-stale' : 'badge-ok'}">${p.paid ? 'Paid' : 'Free'}</span>`;
+  $('#prov_name').value = p.name;
+  $('#prov_base').value = p.baseUrl;
+  $('#provBaseRow').classList.toggle('hidden', p.preset !== 'custom' && p.preset !== 'openai' && p.preset !== 'deepseek');
+  $('#prov_key').value = p.apiKey || '';
+  $('#prov_key').type = 'password';
+  const link = $('#provKeyLink');
+  link.classList.toggle('hidden', !preset.keyUrl);
+  link.href = preset.keyUrl || '#';
+  link.textContent = preset.keyUrl ? `Get a key → ${preset.keyUrl.replace(/^https:\/\//, '').split('/')[0]}` : '';
+  $('#prov_model').value = p.model || '';
+  fillModelSelect(p);
+  $('#prov_paid').checked = !!p.paid;
+  $('#prov_pin').value = p.priceIn || '';
+  $('#prov_pout').value = p.priceOut || '';
+  $('#provPriceRow').classList.toggle('hidden', !p.paid);
+  $('#prov_enabled').checked = p.enabled !== false;
+  $('#provStatus').textContent = '';
+  $('#btnDeleteProvider').classList.toggle('hidden', AI.providers.length <= 1);
+  openSheet('providerSheet', () => { editingProviderId = null; });
+}
+
+function toggleKeyVisibility() {
+  const k = $('#prov_key');
+  k.type = k.type === 'password' ? 'text' : 'password';
+}
+
+function readProviderSheet(p) {
+  p.name = $('#prov_name').value.trim() || p.name;
+  p.baseUrl = $('#prov_base').value.trim().replace(/\/$/, '') || p.baseUrl;
+  p.apiKey = $('#prov_key').value.trim();
+  p.model = $('#prov_model').value.trim();
+  p.paid = $('#prov_paid').checked;
+  p.priceIn = num($('#prov_pin').value);
+  p.priceOut = num($('#prov_pout').value);
+  p.enabled = $('#prov_enabled').checked;
+}
+
+function pickProviderModel(id) {
+  const p = providerById(editingProviderId);
+  if (!p || !id) return;
+  $('#prov_model').value = id;
+  const tmp = Object.assign({}, p);
+  applyModelPrice(tmp, id);
+  if (tmp.priceIn || tmp.priceOut || tmp.paid !== p.paid) {
+    $('#prov_paid').checked = !!tmp.paid;
+    $('#prov_pin').value = tmp.priceIn || '';
+    $('#prov_pout').value = tmp.priceOut || '';
+    $('#provPriceRow').classList.toggle('hidden', !tmp.paid);
+  }
+}
+
+async function loadProviderModels() {
+  const p = providerById(editingProviderId);
+  if (!p) return;
+  readProviderSheet(p);
+  if (!p.apiKey && p.preset !== 'custom') { toast('Paste the API key first.', 'warn'); return; }
+  const btn = $('#btnLoadModels');
+  setBusy(btn, true, '');
+  try {
+    const n = await testProvider(p);
+    fillModelSelect(p);
+    $('#prov_model').value = p.model;
+    pickProviderModel(p.model);
+    $('#provStatus').innerHTML = `<span class="pos">● Key works — ${n} models available</span>`;
+    haptic('success');
+  } catch (e) {
+    $('#provStatus').innerHTML = `<span class="neg">● ${escapeHtml(String(e.message || e).slice(0, 160))}</span>`;
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+async function testProviderFromSheet() {
+  const p = providerById(editingProviderId);
+  if (!p) return;
+  readProviderSheet(p);
+  if (!p.model) { toast('Choose or type a model first.', 'warn'); return; }
+  const btn = $('#btnTestProvider');
+  setBusy(btn, true, 'Testing…');
+  $('#provStatus').textContent = '';
+  try {
+    const text = await requestProvider(p, 'Reply with exactly: OK, ready to coach.', null, { maxTokens: 300 });
+    $('#provStatus').innerHTML = `<span class="pos">● Working — "${escapeHtml(text.slice(0, 60))}"</span>`;
+    haptic('success');
+  } catch (e) {
+    $('#provStatus').innerHTML = `<span class="neg">● ${escapeHtml(describeAiError(e))}</span>`;
+    haptic('error');
+  } finally {
+    setBusy(btn, false);
+    await renderSpend();
+  }
+}
+
+async function saveProviderSheet() {
+  const p = providerById(editingProviderId);
+  if (!p) return;
+  readProviderSheet(p);
+  if (p.paid && !(p.priceIn > 0 || p.priceOut > 0)) {
+    toast('Enter the prices for this paid model so spending can be capped.', 'warn', 4500);
+    return;
+  }
+  await saveAiSettings();
+  closeSheet('providerSheet');
+  await renderProviders();
+  toast(`${p.name} saved`, 'success', 1600);
+  haptic('success');
+}
+
+async function makeProviderActive() {
+  const p = providerById(editingProviderId);
+  if (!p) return;
+  readProviderSheet(p);
+  AI.active = p.id;
+  await saveAiSettings();
+  closeSheet('providerSheet');
+  await renderProviders();
+  toast(`${p.name} is now the main AI provider`, 'success');
+}
+
+async function deleteProviderFromSheet() {
+  const p = providerById(editingProviderId);
+  if (!p || AI.providers.length <= 1) return;
+  if (!(await uiConfirm(`Remove ${p.name}?`, 'Its key and settings are deleted from this phone.', { okText: 'Remove', danger: true }))) return;
+  AI.providers = AI.providers.filter(x => x.id !== p.id);
+  if (AI.active === p.id) AI.active = AI.providers[0].id;
+  await saveAiSettings();
+  closeSheet('providerSheet');
+  await renderProviders();
+}
+
+// ---------- Spending ----------
+async function renderSpend() {
+  if (!AI) await loadAiSettings();
+  const u = await getUsage();
+  $('#cfg_cap').value = AI.capUsd;
+  $('#spendText').textContent = `$${u.total.toFixed(2)} spent in ${new Date().toLocaleDateString('en-GB', { month: 'long' })}`;
+  $('#spendCapText').textContent = AI.capUsd > 0 ? `cap $${num(AI.capUsd).toFixed(2)}` : 'no cap';
+  const pct = AI.capUsd > 0 ? Math.min(100, (u.total / AI.capUsd) * 100) : 0;
+  const bar = $('#spendBar');
+  bar.style.width = `${Math.max(pct, u.total > 0 ? 2 : 0)}%`;
+  bar.style.background = pct >= 100 ? 'var(--bad)' : pct >= 80 ? 'var(--warn)' : '';
+  const rows = Object.values(u.byProvider);
+  $('#spendBreakdown').innerHTML = rows.length
+    ? rows.map(e => `<div class="list-item"><span>${escapeHtml(e.name)}<br><span class="tiny muted">${e.calls} request${e.calls === 1 ? '' : 's'} · ${Math.round((e.in + e.out) / 1000)}k tokens</span></span><b>${e.cost > 0 ? `$${e.cost.toFixed(3)}` : 'free'}</b></div>`).join('')
+    : '<div class="small muted">No AI requests yet this month.</div>';
+}
+
+async function saveSpendCap() {
+  const v = parseFloat($('#cfg_cap').value);
+  if (!(v >= 0)) { toast('Enter a cap of 0 or more (0 = no cap).', 'warn'); return; }
+  AI.capUsd = v;
+  await saveAiSettings();
+  await renderSpend();
+  toast(v > 0 ? `Monthly cap set to $${v.toFixed(2)}` : 'Spend cap removed', 'success');
 }
 
 // ---------- Weight ----------
@@ -157,8 +377,20 @@ async function saveZones() {
   await setConfig('resting_hr', String(rest));
   await setJsonConfig('zone_bounds', bounds);
   await setConfig('trimp_sex', $('#cfg_trimp_sex').value);
+  const ftp = parseInt($('#cfg_ftp').value, 10);
+  await setConfig('ftp_w', ftp > 0 && ftp < 700 ? String(ftp) : '');
   await loadPhysioConfig();
   await recalculateAll(true);
+}
+
+async function setPref(key, on) {
+  await setConfig(key, on ? '1' : '0');
+  haptic('light');
+}
+
+function setHaptics(on) {
+  try { localStorage.setItem('rp_haptics', on ? 'on' : 'off'); } catch (e) {}
+  if (on) haptic('light');
 }
 
 async function recalculateAll(silentConfirm = false) {
@@ -207,6 +439,7 @@ async function importDatabaseJson(event) {
 
 async function afterDataReplaced(msg) {
   await loadPhysioConfig();
+  await loadAiSettings();
   await recomputeAllMetrics();
   await renderProfile();
   toast(msg, 'success');

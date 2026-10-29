@@ -57,6 +57,7 @@
     <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4z"/></symbol>
     <symbol id="i-scale" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 10a5 5 0 0 1 8 0M12 10l1.5-2.5"/></symbol>
     <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
   </defs>
 </svg>
 
@@ -79,6 +80,7 @@
 
   <!-- ===================== RIDES ===================== -->
   <section id="screen-rides" class="screen active">
+    <div id="ptr" class="ptr" aria-hidden="true"><svg class="ic"><use href="#i-refresh"/></svg></div>
     <div class="screen-head">
       <div>
         <div class="screen-title">Rides</div>
@@ -131,6 +133,16 @@
     </div>
     <div class="hint" style="margin:2px 4px 0">Load = heart-rate TRIMP per ride. Set max &amp; resting HR in Profile for accurate values.</div>
 
+    <div class="section-title">
+      <span>Training calendar</span>
+      <span class="row" style="gap:4px">
+        <button class="icon-btn" style="width:32px;height:32px" onclick="shiftCalendar(-1)" aria-label="Previous month"><svg class="ic ic-sm"><use href="#i-back"/></svg></button>
+        <span id="calTitle" class="small" style="min-width:110px;text-align:center"></span>
+        <button class="icon-btn" style="width:32px;height:32px" onclick="shiftCalendar(1)" aria-label="Next month"><svg class="ic ic-sm"><use href="#i-chevron"/></svg></button>
+      </span>
+    </div>
+    <div class="card cal-card"><div id="calendar" class="calendar"></div><div class="hint mt-8">Colour = training load that day. Tap a day to see its rides.</div></div>
+
     <div class="section-title"><span>Weekly volume (16 weeks)</span></div>
     <div class="segmented" id="weeklySeg">
       <button class="active" data-m="dist">km</button>
@@ -147,6 +159,9 @@
       <div class="row between"><span id="global_banner_l">Macro trajectory</span><span id="global_banner_r"></span></div>
       <div class="sub" id="global_banner_sub">Tap a point to inspect it.</div>
     </div>
+
+    <div class="section-title"><span>Best efforts</span><span class="tiny muted">all time · last 6 weeks</span></div>
+    <div id="bestEfforts"></div>
 
     <div class="section-title"><span>AI season progression audit</span></div>
     <div class="model-bar"><span class="label tiny"><svg class="ic ic-sm"><use href="#i-sparkle"/></svg>AI engine</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
@@ -265,6 +280,17 @@
     </div>
 
     <div class="card">
+      <div class="card-title"><svg class="ic"><use href="#i-flame"/></svg>Weekly goals</div>
+      <div class="card-sub">Shown as progress bars on the Rides tab and used by the AI week planner. Leave blank for no goal.</div>
+      <div class="input-row mt-12">
+        <div class="field"><label>Distance (km)</label><input id="goal_km" class="input" type="number" min="0" inputmode="numeric" /></div>
+        <div class="field"><label>Time (h)</label><input id="goal_hours" class="input" type="number" min="0" step="0.5" inputmode="decimal" /></div>
+        <div class="field"><label>Rides</label><input id="goal_rides" class="input" type="number" min="0" inputmode="numeric" /></div>
+      </div>
+      <button class="btn btn-secondary" onclick="saveWeeklyGoals()">Save goals</button>
+    </div>
+
+    <div class="card">
       <div class="card-title"><svg class="ic"><use href="#i-target"/></svg>Training phase</div>
       <div class="card-sub">Your broad focus. Each change is saved as a dated phase for coach prompts.</div>
       <div class="field mt-12"><input type="text" id="cfg_goal_input" class="input" placeholder="e.g. Aerobic base, Gran Fondo prep, Intervals" /></div>
@@ -278,7 +304,8 @@
     <div class="card">
       <div class="card-title"><svg class="ic"><use href="#i-heart"/></svg>Heart rate &amp; zones</div>
       <div class="card-sub">Used for zone time, training load, the intent picker, charts and every AI prompt.</div>
-      <div class="input-row mt-12">
+      <div class="field mt-12"><label>FTP (W, optional)</label><input id="cfg_ftp" class="input" type="number" min="0" inputmode="numeric" placeholder="Only if you ride with a power meter" /><span class="hint">Used for IF / TSS on power-meter rides. Leave blank to estimate it from your best measured 20-minute power.</span></div>
+      <div class="input-row">
         <div class="field"><label>Max HR</label><input id="cfg_max_hr" class="input" type="number" inputmode="numeric" oninput="previewZones()" /></div>
         <div class="field"><label>Resting HR</label><input id="cfg_rest_hr" class="input" type="number" inputmode="numeric" /></div>
         <div class="field"><label>TRIMP weighting</label>
@@ -315,10 +342,28 @@
           <button class="btn btn-secondary btn-sm" onclick="manualExchangeCode()">Exchange</button>
         </div>
       </details>
-      <div class="field mt-16"><label>Gemini API key</label><input type="password" id="cfg_gemini_key" class="input" autocomplete="off" /></div>
-      <div class="field"><label>Default AI model</label><select id="cfg_model" class="input model-select" onchange="syncModelSelection(this.value)"></select></div>
-      <div class="field"><label>Custom model ID (optional)</label><input type="text" id="cfg_custom_model" class="input" placeholder="e.g. gemini-4.0-flash" /><span class="hint">Use this when Google releases a model that isn't in the list yet.</span></div>
-      <button class="btn btn-secondary" onclick="saveConnections()">Save connections</button>
+      <button class="btn btn-secondary mt-12" onclick="saveConnections()">Save Strava settings</button>
+    </div>
+
+    <div class="card">
+      <div class="row between">
+        <div class="card-title"><svg class="ic"><use href="#i-sparkle"/></svg>AI providers</div>
+        <button class="btn btn-secondary btn-xs" onclick="openAddProvider()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Add</button>
+      </div>
+      <div class="card-sub">The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.</div>
+      <div id="providerList" class="list mt-8"></div>
+      <label class="switch-row mt-8"><span><b>Automatic fallback</b><br><span class="hint">If the active provider fails or hits a limit, try the others (free ones first).</span></span><input type="checkbox" id="cfg_ai_fallback" onchange="setAiFallback(this.checked)" /></label>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><svg class="ic"><use href="#i-gauge"/></svg>AI spending</div>
+      <div class="card-sub">Paid providers stop being used once this month's spend reaches the cap. Free providers are never counted.</div>
+      <div class="input-row mt-12" style="align-items:flex-end">
+        <div class="field" style="margin:0"><label>Monthly cap (USD)</label><input type="number" id="cfg_cap" class="input" min="0" step="0.5" inputmode="decimal" /></div>
+        <button class="btn btn-primary btn-sm" style="flex:0 0 auto" onclick="saveSpendCap()">Save cap</button>
+      </div>
+      <div class="spend-meter mt-12"><div class="row between small"><span id="spendText">$0.00 this month</span><span id="spendCapText" class="muted"></span></div><div class="progress mt-8"><i id="spendBar"></i></div></div>
+      <div id="spendBreakdown" class="list mt-8"></div>
     </div>
 
     <div class="card">
@@ -328,6 +373,8 @@
         <button data-theme-choice="light">Light</button>
         <button data-theme-choice="dark">Dark</button>
       </div>
+      <label class="switch-row mt-8"><span><b>Auto-sync on open</b><br><span class="hint">Checks Strava when the app opens (at most every 3 hours).</span></span><input type="checkbox" id="cfg_autosync" onchange="setPref('auto_sync', this.checked)" /></label>
+      <label class="switch-row"><span><b>Haptic feedback</b><br><span class="hint">Light vibration on taps and confirmations.</span></span><input type="checkbox" id="cfg_haptics" onchange="setHaptics(this.checked)" /></label>
     </div>
 
     <div class="card">
@@ -380,19 +427,32 @@
   <div class="panel-head">
     <button class="icon-btn" onclick="closePanel('rideDetail')" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button>
     <div class="panel-title"><div class="t" id="det_title"></div><div class="s" id="det_sub"></div></div>
+    <button class="icon-btn" onclick="shareRideCard()" aria-label="Share ride card"><svg class="ic"><use href="#i-share"/></svg></button>
     <button class="icon-btn" onclick="editCurrentRideIntent()" aria-label="Edit intent"><svg class="ic"><use href="#i-target"/></svg></button>
     <button class="icon-btn" onclick="resetActiveRideThread()" aria-label="Reset coach thread"><svg class="ic"><use href="#i-trash"/></svg></button>
   </div>
   <div class="panel-body" id="detBody">
     <div class="inner">
       <div id="det_badges" class="row wrap mb-12"></div>
+      <div id="det_route" class="route-card hidden"></div>
       <div class="hero-grid" id="det_hero"></div>
+      <div class="section-title"><span>How did it feel?</span><span id="det_rpe_label" class="tiny muted"></span></div>
+      <div class="card feel-card">
+        <div class="feel-row" id="det_feel"></div>
+        <div class="label mt-12">Effort (RPE 1–10)</div>
+        <div class="rpe-row" id="det_rpe"></div>
+        <textarea id="det_note" class="input mt-12" rows="2" placeholder="Private note: legs, sleep, weather, bike… (the coach reads this)"></textarea>
+      </div>
       <div class="section-title">Biometrics &amp; performance</div>
       <div class="kv-grid" id="det_secondary"></div>
       <div class="section-title"><span>Heart-rate zones (moving time)</span><span id="det_zone_note" class="tiny"></span></div>
       <div class="card" id="det_zone_bars"></div>
       <div class="section-title"><span>Vs prior comparable rides</span></div>
       <div id="det_delta"></div>
+      <div id="det_best_wrap" class="hidden">
+        <div class="section-title"><span>Best efforts in this ride</span></div>
+        <div id="det_best"></div>
+      </div>
       <div class="section-title">Ride stream studio</div>
       <div class="chip-rack" id="metricPills"></div>
       <div class="chart-card mt-8"><div id="detailChart" class="chart" style="min-height:300px"></div></div>
@@ -476,6 +536,48 @@
   <button class="btn btn-ghost btn-sm mt-8" style="width:100%" onclick="closeIntentModalQueue()">Decide later</button>
 </div>
 
+<!-- AI PROVIDER EDITOR -->
+<div class="sheet" id="providerSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="row between">
+    <div class="grow"><div class="sheet-title" id="provTitle">Provider</div><div class="sheet-sub" id="provNote"></div></div>
+    <span id="provBadge"></span>
+  </div>
+  <div class="field mt-16"><label>Name</label><input id="prov_name" class="input" /></div>
+  <div class="field" id="provBaseRow"><label>Base URL</label><input id="prov_base" class="input" placeholder="https://…/v1" autocomplete="off" /></div>
+  <div class="field"><label>API key</label>
+    <div class="row"><input id="prov_key" type="password" class="input grow" autocomplete="off" placeholder="Paste key" /><button class="icon-btn" type="button" onclick="toggleKeyVisibility()" aria-label="Show key"><svg class="ic"><use href="#i-key"/></svg></button></div>
+    <a id="provKeyLink" class="hint" href="#" target="_blank" rel="noopener">Get a key</a>
+  </div>
+  <div class="field"><label>Model</label>
+    <div class="row"><select id="prov_model_sel" class="input grow" onchange="pickProviderModel(this.value)"></select><button id="btnLoadModels" class="btn btn-secondary btn-sm" style="flex:0 0 auto" onclick="loadProviderModels()">Load</button></div>
+    <input id="prov_model" class="input mt-8" placeholder="or type a model ID" autocomplete="off" />
+  </div>
+  <label class="switch-row"><span><b>Paid provider</b><br><span class="hint">Counts toward your monthly spend cap.</span></span><input type="checkbox" id="prov_paid" onchange="$('#provPriceRow').classList.toggle('hidden', !this.checked)" /></label>
+  <div class="input-row mt-8" id="provPriceRow">
+    <div class="field"><label>Input $ / 1M tokens</label><input id="prov_pin" type="number" min="0" step="0.01" class="input" inputmode="decimal" /></div>
+    <div class="field"><label>Output $ / 1M tokens</label><input id="prov_pout" type="number" min="0" step="0.01" class="input" inputmode="decimal" /></div>
+  </div>
+  <label class="switch-row"><span><b>Enabled</b></span><input type="checkbox" id="prov_enabled" /></label>
+  <div id="provStatus" class="small mt-8"></div>
+  <div class="btn-row mt-16">
+    <button class="btn btn-secondary" id="btnTestProvider" onclick="testProviderFromSheet()">Test</button>
+    <button class="btn btn-primary" onclick="saveProviderSheet()">Save</button>
+  </div>
+  <div class="btn-row mt-8">
+    <button class="btn btn-ghost btn-sm" onclick="makeProviderActive()">Use as main provider</button>
+    <button class="btn btn-ghost btn-sm" id="btnDeleteProvider" style="color:var(--bad)" onclick="deleteProviderFromSheet()">Remove</button>
+  </div>
+</div>
+
+<!-- ADD PROVIDER -->
+<div class="sheet" id="addProviderSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Add an AI provider</div>
+  <div class="sheet-sub mb-12">Free tiers have daily limits; paid ones are capped by your monthly spend limit.</div>
+  <div id="presetList" class="list"></div>
+</div>
+
 <!-- WHAT'S NEW SHEET -->
 <div class="sheet" id="whatsNewSheet" role="dialog" aria-modal="true">
   <div class="sheet-grip"></div>
@@ -507,8 +609,11 @@
 <script src="js/app/physio.js"></script>
 <script src="js/app/athlete.js"></script>
 <script src="js/app/strava.js"></script>
+<script src="js/app/providers.js"></script>
 <script src="js/app/ai.js"></script>
 <script src="js/app/charts.js"></script>
+<script src="js/app/route.js"></script>
+<script src="js/app/plan.js"></script>
 <script src="js/app/views/rides.js"></script>
 <script src="js/app/views/detail.js"></script>
 <script src="js/app/views/trends.js"></script>

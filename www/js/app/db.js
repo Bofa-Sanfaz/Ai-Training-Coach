@@ -77,8 +77,36 @@ async function firstAthleteNote(stravaId) {
 // --------------------------------------------------------
 // FULL DUMP / RESTORE (used by JSON backups and restore points)
 // --------------------------------------------------------
+// AI provider settings hold API keys inside one JSON value — strip or merge them explicitly
+function stripProviderKeys(row) {
+  if (!row || row.key !== 'ai_providers') return row;
+  try {
+    const s = JSON.parse(row.val);
+    (s.providers || []).forEach(p => { p.apiKey = ''; });
+    return { key: row.key, val: JSON.stringify(s) };
+  } catch (e) {
+    return null;
+  }
+}
+
+function mergeProviderKeys(restoredRow, currentRow) {
+  try {
+    const cur = JSON.parse(currentRow.val);
+    if (!restoredRow) return currentRow;
+    const res = JSON.parse(restoredRow.val);
+    for (const p of res.providers || []) {
+      const match = (cur.providers || []).find(c => c.id === p.id);
+      if (match && !p.apiKey) p.apiKey = match.apiKey;
+    }
+    return { key: 'ai_providers', val: JSON.stringify(res) };
+  } catch (e) {
+    return currentRow;
+  }
+}
+
 async function buildDump({ includeSecrets = false } = {}) {
-  const config = await db.config.toArray();
+  let config = await db.config.toArray();
+  if (!includeSecrets) config = config.filter(c => !SENSITIVE_KEYS.includes(c.key)).map(stripProviderKeys).filter(Boolean);
   return {
     app: 'RidePartner',
     version: 3,
@@ -89,15 +117,19 @@ async function buildDump({ includeSecrets = false } = {}) {
     master_chat: await db.master_chat.toArray(),
     graph_threads: await db.graph_threads.toArray(),
     reports: await db.reports.toArray(),
-    config: includeSecrets ? config : config.filter(c => !SENSITIVE_KEYS.includes(c.key))
+    config
   };
 }
 
 async function restoreDump(data, { preserveSecrets = true } = {}) {
   if (!data || !Array.isArray(data.workouts)) throw new Error('Invalid backup format: workouts table missing.');
-  const keep = preserveSecrets
-    ? (await db.config.toArray()).filter(c => SENSITIVE_KEYS.includes(c.key) || c.key === 'strava_client_id')
-    : [];
+  const current = await db.config.toArray();
+  const keep = preserveSecrets ? current.filter(c => SENSITIVE_KEYS.includes(c.key) || c.key === 'strava_client_id') : [];
+  const curProviders = current.find(c => c.key === 'ai_providers');
+  if (preserveSecrets && curProviders) {
+    const restored = Array.isArray(data.config) ? data.config.find(c => c.key === 'ai_providers') : null;
+    keep.push(mergeProviderKeys(restored, curProviders));
+  }
 
   await db.transaction('rw', db.workouts, db.threads, db.master_chat, db.graph_threads, db.reports, db.config, async () => {
     for (const t of DATA_TABLES) await db.table(t).clear();

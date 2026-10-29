@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.1.0 — 2026-10-29
+### AI providers (fixes + new)
+- **Fixed:** v2 offered `gemini-3.7-flash` and `gemini-3.5-flash`, which are not on Google's current model list → requests could fail. Retired IDs now switch to `gemini-3.8-flash` automatically.
+- New provider system (`www/js/app/providers.js`): Google Gemini, Groq, OpenRouter, Mistral (free tiers), Anthropic Claude, OpenAI, DeepSeek (paid) and any OpenAI-compatible endpoint (e.g. local Ollama / LM Studio).
+- Models are loaded live from each provider ("Load"); "Test" sends a real one-line request.
+- **Monthly spend cap** for paid providers with real token-based cost tracking (Claude prices filled in automatically, OpenRouter prices read from its model list).
+- **Automatic fallback**: if the main provider fails or hits a limit, free providers are tried first.
+- Replies **stream in** as they're written (blinking caret), everywhere the coach answers.
+- Native HTTP fallback on Android when a provider blocks browser requests (CORS).
+- API keys are never written to backups, restore points or recovery exports; restores keep the keys you already have.
+
+### New features
+- **AI week plan**: 7 days built from form (TSB), training phase, weekly goals and the last 21 days; checklist in Coach, today's session on Rides.
+- **Weekly goals** (distance / time / rides) shown as progress under each stat in the week card.
+- **Route map** (offline SVG, coloured by heart-rate zone) from the GPS stream or Strava's summary polyline.
+- **Shareable ride card** (1080×1350 PNG) via the share sheet.
+- **Feel + RPE (1–10) + private note** per ride; session-RPE load; all passed to the coach.
+- **Training calendar** (daily load heat-map, tap a day to open its rides).
+- **Best efforts**: speed and heart rate over 1/5/20/60 min for every ride; power curve, NP, IF and TSS **only for power-meter rides** (Coggan method as implemented in GoldenCheetah). Strava's own power estimate is still shown as "Est. power"; the app adds no power estimate of its own.
+- Optional FTP setting (else 95% of best measured 20-min power).
+- Pull down on Rides to sync, optional auto-sync on open (max every 3 h), haptic feedback (toggle in Profile).
+
+### Fixes / polish
+- Week card simplified (goals inline, one status line); calendar contrast; Strava sport type shown as words; plan card collapses to 3 days.
+- Weight changes no longer trigger needless recalculation of every ride.
+
 ## 3.0.0 — 2026-10-29
 Full rebuild of the app (same Android package `com.ridepartner.v2`, installs as an update; your data stays).
 

@@ -58,6 +58,14 @@ android-res/          launcher icons, adaptive icon, splash (generated from asse
 10. ✅ CI workflow, README, CHANGELOG, ROLLBACK, BUILD docs
 11. ✅ User asked for a lighter theme → light is default, lab panel/readouts now light too
 
+## v3.1 (user requests 2026-10-29)
+- "Add all useful features, fix APIs, no bugs, learn from GitHub" → see CHANGELOG 3.1.0.
+- User clarified: **no app-side power estimate** (inaccurate) — keep Strava's single estimate as "Est. power"; NP/IF/TSS/power curve only from real power-meter data.
+- User asked for **free + paid AI APIs, add-your-own, spend cap** → `www/js/app/providers.js`.
+- Learned from GitHub: GoldenCheetah `src/Metrics/Coggan.cpp` (NP/IF/TSS), Anthropic `frontend-design` skill (UI principles), google/fonts (Barlow).
+- Verified: Gemini model list (ai.google.dev, Oct 2026), Gemini REST streaming + models list, Anthropic Messages API headers/streaming (claude-api skill), free-tier providers (OpenRouter blog et al.).
+- Tested in browser: fallback (Gemini 429 → Groq streamed), Claude request shape + cost math, spend cap blocking, back button, exports without keys, all tabs error-free.
+
 ## Not verified yet
 - Real Strava sync and Gemini calls (no credentials here) — logic reviewed, demo data used for everything else.
 - On-device behaviour (back button, share sheet, deep link) — needs a phone test.

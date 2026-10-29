@@ -21,7 +21,8 @@ async function renderCoachList() {
     byRide.set(k, e);
   }
 
-  let html = `
+  let html = `${await planCardHtml()}
+    <div class="section-title"><span>Conversations</span></div>
     <div class="thread-row" onclick="openMasterThread()">
       <div class="avatar master">${icon('star')}</div>
       <div class="thread-body">
@@ -103,8 +104,9 @@ async function executeHubMessageDispatch(payload) {
   await renderHubChat(typingHtml('Reviewing your season'));
   scrollMasterToEnd();
   try {
-    const reply = await callGemini(await buildMasterPrompt(payload.text, !!payload.image_b64), payload.image_b64);
+    const reply = await callGemini(await buildMasterPrompt(payload.text, !!payload.image_b64), payload.image_b64, { onDelta: liveBubble($('#hubChatContainer'), 'Master coach', scrollMasterToEnd) });
     if (reply) {
+      haptic('success');
       await db.master_chat.add({ role: 'athlete', message: payload.text, image_b64: payload.image_b64, created_at: new Date().toISOString() });
       await db.master_chat.add({ role: 'coach', message: reply, created_at: new Date().toISOString() });
       lastPendingHubPayload = null;

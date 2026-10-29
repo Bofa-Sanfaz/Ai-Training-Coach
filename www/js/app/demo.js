@@ -20,7 +20,7 @@ function makeDemoRide(i, date, kind, rnd) {
   const rest = PHYSIO.resting_hr, max = PHYSIO.max_hr;
   const baseAlt = 300 + rnd() * 400;
   const hilliness = kind === 'long' ? 130 : 55 + rnd() * 55;
-  const p1 = 600 + rnd() * 900, p2 = 180 + rnd() * 240;
+  const p1 = 300 + rnd() * 400, p2 = 90 + rnd() * 120;
   const stopAt = [Math.floor(n * 0.37), Math.floor(n * 0.71)];
   let d = 0, h = rest + 20;
   const fitness = 0.92 + i * 0.004; // slow improvement across the block
@@ -53,6 +53,16 @@ function makeDemoRide(i, date, kind, rnd) {
     moving.push(!stopped);
     cad.push(stopped ? 0 : Math.round(78 + intensity * 15 + (rnd() - 0.5) * 6));
   }
+
+  // A wobbly GPS loop so the route map and share card can be tried out
+  const loopM = Math.max(1, d);
+  const r = loopM / (2 * Math.PI);
+  const c0 = { lat: 39.92 + (i % 4) * 0.01, lon: 32.85 + (i % 3) * 0.012 };
+  const latlng = dist.map(m => {
+    const th = (m / loopM) * 2 * Math.PI;
+    const rr = r * (1 + 0.18 * Math.sin(th * 5 + i));
+    return [round(c0.lat + (rr * Math.sin(th)) / 111320, 6), round(c0.lon + (rr * (1 - Math.cos(th))) / (111320 * Math.cos((c0.lat * Math.PI) / 180)), 6)];
+  });
 
   const movingSec = moving.filter(Boolean).length * step;
   let gain = 0;
@@ -96,7 +106,7 @@ function makeDemoRide(i, date, kind, rnd) {
   }, intent);
 
   const stream = {
-    time: { data: time }, distance: { data: dist }, altitude: { data: alt }, heartrate: { data: hr },
+    time: { data: time }, distance: { data: dist }, latlng: { data: latlng }, altitude: { data: alt }, heartrate: { data: hr },
     velocity_smooth: { data: vel }, grade_smooth: { data: grade }, moving: { data: moving }, cadence: { data: cad }
   };
   return { workout, stream };
