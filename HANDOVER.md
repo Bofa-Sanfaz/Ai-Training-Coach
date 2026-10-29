@@ -6,7 +6,7 @@ _Last updated: 2026-10-29. Read this first; it describes the app as it is now. T
 Training Partner (formerly Ride Partner) is a personal, offline-first Android app for one athlete who rides (MTB/XC), runs, swims and trains in the gym. It syncs workouts from **Strava** and from the **Galaxy Watch via Samsung Health → Health Connect**, computes training physiology locally, and provides **AI coaching** (Aether + task-specific coaches) through the athlete's own API keys.
 
 - Package: `com.ridepartner.v2` (kept so updates install in place; display name "Training Partner")
-- Installed on the athlete's phone: see `C:\dev\releases` (one APK only). 3.5.0 (30500) installed 2026-10-29; data kept.
+- Installed on the athlete's phone: see `C:\dev\releases` (one APK only). 3.4.0 (30400) is on the phone; 3.5.0 (30500) is built and waiting to be installed (`adb install -r`, data kept).
 - Source: GitHub `Bofa-Sanfaz/Ai-Training-Coach`, branch **`v3-rebuild`** (not merged into `main`). Local copy: `C:\dev\Ai-Training-Coach`.
 
 ## 2. Where things are
