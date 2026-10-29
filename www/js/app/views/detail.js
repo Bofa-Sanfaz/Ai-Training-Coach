@@ -301,7 +301,7 @@ function renderStreamPlot() {
     yaxis: { range: [0, 105], showticklabels: false, dtick: 25 }
   }));
 
-  el.on('plotly_hover', data => {
+  if (el.on) el.on('plotly_hover', data => {
     const pt = data.points && data.points[0];
     if (!pt) return;
     const i = pt.pointIndex;

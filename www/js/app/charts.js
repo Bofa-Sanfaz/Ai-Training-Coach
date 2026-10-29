@@ -37,7 +37,15 @@ function plotReady() {
 // Draw (or redraw) a chart. Plotly.react updates the existing SVG in place, so
 // the element must never be emptied by hand between draws — that was the cause
 // of charts vanishing after a filter change or when returning to a screen.
+// A chart drawn while its screen is hidden has no width, and Plotly then falls back to
+// a fixed 700 × 450 canvas that stays wrong after the screen appears (squashed curves,
+// cut-off axis). Such draws are parked and done when the screen is shown.
 function drawChart(el, traces, layout, config = PLOT_CONFIG) {
+  if (!el.offsetParent || el.clientWidth === 0) {
+    el.__pending = { traces, layout, config };
+    return Promise.resolve(null);
+  }
+  el.__pending = null;
   const stale = el.querySelector('.chart-empty') || (el._fullLayout && !el.querySelector('.main-svg'));
   if (stale) { Plotly.purge(el); el.innerHTML = ''; }
   const p = Plotly.react(el, traces, layout, config);
@@ -45,11 +53,20 @@ function drawChart(el, traces, layout, config = PLOT_CONFIG) {
   return p;
 }
 
-// Charts drawn while their screen was hidden get a 0-width box; resize on show.
+// After a screen or panel becomes visible: draw parked charts and fix any chart whose
+// size no longer matches its box. Listeners (hover/click) are re-attached by the next
+// render of that screen, which switchTab always does.
 function resizeChartsIn(root) {
   if (!window.Plotly || !root) return;
-  root.querySelectorAll('.js-plotly-plot').forEach(el => {
-    if (el.offsetParent && el._fullLayout && el.layout && !el.layout.width) {
+  root.querySelectorAll('.chart').forEach(el => {
+    if (!el.offsetParent || el.clientWidth === 0) return;
+    if (el.__pending) {
+      const { traces, layout, config } = el.__pending;
+      drawChart(el, traces, layout, config);
+      return;
+    }
+    const fl = el._fullLayout;
+    if (fl && el.layout && !el.layout.width && Math.abs(fl.width - el.clientWidth) > 4) {
       try { Plotly.Plots.resize(el); } catch (_) { /* ignore */ }
     }
   });

@@ -141,7 +141,7 @@
       <span><i style="background:#db2777"></i>Fatigue (ATL 7d)</span>
       <span><i style="background:#16a34a"></i>Form (TSB)</span>
     </div>
-    <div class="hint" style="margin:2px 4px 0">Load = heart-rate TRIMP per ride. Set max &amp; resting HR in Profile for accurate values.</div>
+    <div class="hint" style="margin:2px 4px 0"><b id="loadRangeNote"></b> · Load = heart-rate TRIMP per session. Set max &amp; resting HR in Profile for accurate values.</div>
 
     <div class="section-title">
       <span>Training calendar</span>
@@ -398,7 +398,7 @@
 
     <div class="card">
       <div class="card-title"><svg class="ic"><use href="#i-heart"/></svg>Samsung Health</div>
-      <div class="card-sub">Sleep, resting HR, HRV, weight, steps and VO2max from your Galaxy Watch, read through Android Health Connect (rides still come from Strava). In Samsung Health: Settings → Health Connect → allow sharing.</div>
+      <div class="card-sub">Watch workouts (treadmill, gym bike, elliptical, strength…), sleep, heart rate, weight, steps and VO2max, read through Android Health Connect. In Samsung Health: Settings → Health Connect → allow sharing.</div>
       <div id="healthState" class="small mt-8"></div>
       <button id="btnHealthConnect" class="btn btn-primary mt-12" onclick="connectHealth()"><svg class="ic"><use href="#i-link"/></svg>Link Health Connect</button>
       <div id="healthOnRow" class="hidden">
@@ -407,6 +407,17 @@
           <button id="btnHealthSync" class="btn btn-secondary btn-sm" onclick="syncWellness(true)">Import now</button>
           <button class="btn btn-ghost btn-sm" onclick="disconnectHealth()">Pause import</button>
         </div>
+      </div>
+      <div class="export-box mt-12">
+        <b>Swims (and anything else missing)</b>
+        <div class="hint">Samsung Health doesn't share swims with Health Connect, so import them from Samsung Health's own export:</div>
+        <ol class="hint">
+          <li>Samsung Health → ⋮ → Settings → <b>Download personal data</b> → Download.</li>
+          <li>Tap below and open <b>Download › Samsung Health › (newest folder)</b>.</li>
+          <li>Pick <b>com.samsung.shealth.exercise….csv</b>. For heart-rate detail also select the files in <b>jsons › com.samsung.shealth.exercise</b> (long-press to select several).</li>
+        </ol>
+        <input type="file" id="shExportInput" multiple class="hidden" onchange="importSamsungExport(event)" />
+        <button class="btn btn-secondary btn-sm mt-8" onclick="$('#shExportInput').click()"><svg class="ic"><use href="#i-swim"/></svg>Import Samsung Health export</button>
       </div>
     </div>
 

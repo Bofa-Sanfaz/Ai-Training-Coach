@@ -185,7 +185,9 @@ async function syncWellness(manual = false) {
     // Workouts recorded on the watch: swims, treadmill & outdoor runs, gym bike, gym & other (Strava copies win)
     let got = 0;
     try {
-      const scanned = await getConfig('health_workouts_scanned');
+      // scan v3: rescan from January once so walks etc. reach the new inbox
+      const scanned = (await getConfig('health_scan_ver')) === '3' ? await getConfig('health_workouts_scanned') : '';
+      await setConfig('health_scan_ver', '3');
       got = await importHealthWorkouts(H, scanned ? addDays(now, -21) : addDays(now, -365), now);
       await setConfig('health_workouts_scanned', new Date().toISOString());
     } catch (err) { console.warn('workout import', err); }
@@ -225,6 +227,17 @@ async function importHealthWorkouts(H, from, to) {
   const all = await db.workouts.toArray();
   const recBefore = recordSignature(all);
   const onStrava = start => all.some(w => w.source !== 'health' && Math.abs(parseSafeDate(w.date) - start) <= 300000);
+  // Strava often files watch treadmill / gym-bike sessions as a generic "Workout": take the watch's sport
+  for (const s of sessions) {
+    const [sport, label, indoor] = HC_TYPES[s.workoutType];
+    if (sport === 'other') continue;
+    const start = new Date(s.startDate);
+    const twin = all.find(w => w.source !== 'health' && Math.abs(parseSafeDate(w.date) - start) <= 300000);
+    if (twin && !twin.sport && sportOf(twin) === 'other' && ['Workout', 'WeightTraining'].includes(twin.sport_type)) {
+      await db.workouts.update(twin.id, { sport, indoor, name: twin.name && !/workout/i.test(twin.name) ? twin.name : label });
+      Object.assign(twin, { sport, indoor });
+    }
+  }
   // Walks, hikes, football… → inbox (or straight in, if the athlete chose "always include")
   const localDate = d => `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const always = await routeToInbox(unknown.filter(s => !onStrava(new Date(s.startDate))).map(s => ({
@@ -245,6 +258,133 @@ async function importHealthWorkouts(H, from, to) {
     await announceNewRecords(recBefore, added.map(w => w.id));
   }
   return added.length;
+}
+
+// --------------------------------------------------------
+// SAMSUNG HEALTH EXPORT (Settings → Download personal data)
+// Samsung Health does not share swims with Health Connect, but its own data export
+// has every session. The athlete picks the exercise CSV
+// (com.samsung.shealth.exercise.<date>.csv) and, optionally, the matching
+// "…exercise.live_data.json" files for second-by-second heart rate.
+// Codes: Samsung Health predefined exercise types.
+// --------------------------------------------------------
+const SH_TYPES = {
+  14001: ['swim', 'Pool swim', true], 1002: ['run', 'Run', false], 15005: ['run', 'Treadmill run', true],
+  11007: ['ride', 'Ride', false], 15003: ['ride', 'Exercise bike', true],
+  15006: ['other', 'Elliptical', true], 15001: ['other', 'Step machine', true], 15004: ['other', 'Rowing machine', true],
+  14010: ['other', 'Rowing machine', true], 15002: ['other', 'Weight machine', true], 10007: ['other', 'Circuit training', true],
+  9002: ['other', 'Yoga', true], 9001: ['other', 'Pilates', true], 12001: ['other', 'Aerobics', true]
+};
+const SH_INBOX = { 1001: 'walking', 13001: 'hiking', 0: 'other' };
+
+function parseCsvLine(line) {
+  const out = [];
+  let cur = '', q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+// "2026-10-20 05:30:00.000" (UTC) → Date
+function shDate(s) {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  return m ? new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6])) : null;
+}
+
+async function importSamsungExport(event) {
+  const files = [...((event && event.target && event.target.files) || [])];
+  if (event && event.target) event.target.value = '';
+  const csv = files.find(f => /exercise/i.test(f.name) && /\.csv$/i.test(f.name)) || files.find(f => /\.csv$/i.test(f.name));
+  if (!csv) { toast('Pick the com.samsung.shealth.exercise…csv file from the Samsung Health export.', 'warn', 6000); return; }
+  const lines = (await csv.text()).split(/\r?\n/).filter(Boolean);
+  const hi = lines.findIndex(l => /exercise_type/.test(l));
+  if (hi < 0) { toast(`"${csv.name}" doesn't look like the Samsung Health exercise file.`, 'error', 6000); return; }
+  const head = parseCsvLine(lines[hi]).map(h => h.trim());
+  const col = name => head.findIndex(h => h === name || h.endsWith(`.${name}`));
+  const C = { type: col('exercise_type'), start: col('start_time'), end: col('end_time'), dur: col('duration'), dist: col('distance'), hr: col('mean_heart_rate'), max: col('max_heart_rate'), kcal: col('calorie'), uuid: col('datauuid'), pool: col('pool_length') };
+  // Heart-rate detail files, keyed by session id
+  const live = {};
+  for (const f of files.filter(x => /live_data\.json$/i.test(x.name))) {
+    const id = f.name.split('.')[0];
+    try { live[id] = JSON.parse(await f.text()); } catch (e) { /* skip unreadable file */ }
+  }
+  const all = await db.workouts.toArray();
+  const recBefore = recordSignature(all);
+  const deleted = await deletedWorkoutIds();
+  const inboxItems = [];
+  let added = 0, skipped = 0;
+  await createRestorePoint('Before importing a Samsung Health export', 'auto');
+  for (const line of lines.slice(hi + 1)) {
+    const r = parseCsvLine(line);
+    const code = parseInt(r[C.type], 10);
+    const start = shDate(r[C.start]);
+    if (!start || !Number.isFinite(code) || formatLocalDate(start) < MIN_WORKOUT_DATE) continue;
+    const dur = Math.round(num(r[C.dur]) / 1000) || Math.round((shDate(r[C.end]) - start) / 1000);
+    if (!(dur >= 180)) continue;
+    const sid = -Math.round(start.getTime() / 1000);
+    if (deleted.has(sid) || all.some(w => Number(w.strava_id) === sid || Math.abs(parseSafeDate(w.date) - start) <= 300000)) { skipped++; continue; }
+    const dist = num(r[C.dist]);
+    if (!SH_TYPES[code]) {
+      if (code in SH_INBOX || code > 0) inboxItems.push({ key: `health:${sid}`, src: 'health', type: SH_INBOX[code] || `samsung${code}`, name: prettyType(SH_INBOX[code] || 'activity'), date: `${formatLocalDate(start)} ${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`, distance_km: round(dist / 1000, 2), moving_sec: dur, raw: null, sh: { code, start: start.toISOString(), dur, dist, hr: num(r[C.hr]), max: num(r[C.max]), kcal: num(r[C.kcal]) } });
+      continue;
+    }
+    const [sport, label, indoor] = SH_TYPES[code];
+    const pts = (live[r[C.uuid]] || []).filter(p => p && num(p.heart_rate) > 30 && p.start_time);
+    const t0 = start.getTime();
+    const hr = pts.map(p => ({ t: Math.round((num(p.start_time) - t0) / 1000), v: Math.round(num(p.heart_rate)) })).filter(p => p.t >= 0 && p.t <= dur).sort((a, b) => a.t - b.t);
+    const w = {
+      strava_id: sid, ride_number: 0, exercise_code: '', source: 'health', hc_type: `samsung:${code}`,
+      name: code === 14001 && !(num(r[C.pool]) > 0) && dist > 0 && !indoor ? 'Swim' : label, sport, sport_type: `samsung${code}`, indoor,
+      date: `${formatLocalDate(start)} ${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      distance_km: round(dist / 1000, 3), moving_sec: dur, elapsed_sec: dur, duration_str: formatDuration(dur),
+      avg_speed_kmh: dist > 0 ? round((dist / 1000) / (dur / 3600), 2) : 0, max_speed_kmh: 0,
+      avg_hr: Math.round(num(r[C.hr])) || (hr.length ? Math.round(mean(hr.map(x => x.v))) : 0), max_hr: Math.round(num(r[C.max])) || (hr.length ? Math.max(...hr.map(x => x.v)) : 0),
+      elevation_gain_m: 0, kilojoules: 0, calories: Math.round(num(r[C.kcal])),
+      avg_power_w: 0, max_power_w: 0, norm_power_w: 0, device_watts: false, map_polyline: '', source_name: 'Samsung Health export',
+      debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
+    };
+    const stream = hr.length > 5 ? { time: { data: hr.map(x => x.t) }, heartrate: { data: hr.map(x => x.v) } } : null;
+    w.id = await db.workouts.add(w);
+    await db.streams.put({ strava_id: sid, stream_data: stream });
+    await ensureRideMetrics(w, stream, true);
+    all.push(w);
+    added++;
+  }
+  // Walks, hikes and custom types from the export → inbox (imported from the saved summary)
+  if (inboxItems.length) {
+    const always = await routeToInbox(inboxItems);
+    for (const it of always) if (await addSamsungSummary(it)) added++;
+  }
+  if (added) { await renumberRides(); await announceNewRecords(recBefore, (await db.workouts.toArray()).filter(w => w.source_name === 'Samsung Health export').map(w => w.id)); }
+  haptic(added ? 'success' : 'light');
+  toast(`Samsung Health export: ${added} added${skipped ? `, ${skipped} already here` : ''}${inboxItems.length ? `, ${inboxItems.length} to sort in the inbox` : ''}`, added ? 'success' : 'info', 5000);
+  await afterWorkoutsChanged(null);
+}
+
+// Inbox items that came from the export carry a summary instead of a Health Connect session
+async function addSamsungSummary(it) {
+  const s = it.sh;
+  if (!s) return false;
+  const start = new Date(s.start);
+  const sid = -Math.round(start.getTime() / 1000);
+  if (await db.workouts.where('strava_id').equals(sid).first()) return false;
+  const w = {
+    strava_id: sid, ride_number: 0, exercise_code: '', source: 'health', hc_type: `samsung:${s.code}`, name: it.name, sport: inboxSport(it.type), sport_type: it.type, indoor: false,
+    date: it.date, distance_km: round(s.dist / 1000, 3), moving_sec: s.dur, elapsed_sec: s.dur, duration_str: formatDuration(s.dur),
+    avg_speed_kmh: s.dist > 0 ? round((s.dist / 1000) / (s.dur / 3600), 2) : 0, max_speed_kmh: 0, avg_hr: Math.round(s.hr) || 0, max_hr: Math.round(s.max) || 0,
+    elevation_gain_m: 0, kilojoules: 0, calories: Math.round(s.kcal), avg_power_w: 0, max_power_w: 0, norm_power_w: 0, device_watts: false, map_polyline: '',
+    source_name: 'Samsung Health export', debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
+  };
+  w.id = await db.workouts.add(w);
+  await db.streams.put({ strava_id: sid, stream_data: null });
+  await ensureRideMetrics(w, null, true);
+  return true;
 }
 
 // One Health Connect session → workout (+ heart-rate stream). Returns the workout, or null if it

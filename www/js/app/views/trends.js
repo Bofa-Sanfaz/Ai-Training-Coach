@@ -70,6 +70,15 @@ function renderLoadChart() {
   const s = trendsCache && trendsCache.series;
   if (!plotReady()) return chartEmpty(el, 'Charts unavailable.');
   if (!s) return chartEmpty(el, 'No heart-rate based training load yet.');
+  // Ranges longer than the history would all look identical to "All": mark them as such
+  const span = s.dates.length;
+  $$('#loadRange .chip').forEach(ch => {
+    const r = +ch.dataset.range;
+    const covers = r > 0 && r >= span;
+    ch.classList.toggle('dim', covers);
+    ch.title = covers ? `Your history is ${span} days — same as All` : '';
+  });
+  $('#loadRangeNote').textContent = `History since ${formatNiceDate(s.dates[0], false)} · ${span} days`;
   const start = loadRangeDays ? Math.max(0, s.dates.length - loadRangeDays) : 0;
   const x = s.dates.slice(start);
   const tsb = s.tsb.slice(start);
@@ -259,12 +268,12 @@ function renderGlobalGraph() {
     yaxis: { range: [0, 105], showticklabels: false, dtick: 25 },
     xaxis: { type: 'category' }
   }), Object.assign({}, PLOT_CONFIG, { responsive: false }));
-  el.on('plotly_hover', data => {
+  if (el.on) el.on('plotly_hover', data => {
     const pt = data.points && data.points[0];
     const w = pt && workouts[pt.pointIndex];
     if (w) $('#global_banner_sub').textContent = `${rideTitle(w)} — ${formatFullDateWithDay(w.date)}: ${distText(w)}, ${speedText(w)}, ${w.avg_hr || '--'} bpm${sportOf(w) === 'ride' || sportOf(w) === 'run' ? `, ${Math.round(num(w.elevation_gain_m))} m` : ''}`;
   });
-  el.on('plotly_click', data => {
+  if (el.on) el.on('plotly_click', data => {
     const pt = data.points && data.points[0];
     const w = pt && workouts[pt.pointIndex];
     if (w) openRide(w.id);

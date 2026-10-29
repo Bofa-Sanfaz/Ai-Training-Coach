@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.3.4 — 2026-10-29
+- Trends: range chips longer than the load history (e.g. 6m / 1y when history starts in May) are dimmed with a tooltip, and the chart shows where the history starts — they previously looked identical to All without explanation.
+
+## 3.3.3 — 2026-10-29
+- **Swims**: Samsung Health doesn't share swim sessions with Health Connect (checked on the phone: 118 sessions since January, none of them swims). New importer for Samsung Health's own export (Profile → Samsung Health → Import Samsung Health export): exercise CSV + optional live_data JSON files for per-second heart rate; Samsung codes mapped (14001 pool swim, 15005 treadmill, 15003 exercise bike, 15006 elliptical, 15001 step machine, 15004/14010 rowing, 15002 weights, 10007 circuits, 9002 yoga, 9001 pilates; walks/hikes/custom → inbox).
+- Treadmill/gym-bike sessions that Strava files as a generic "Workout" take the watch's sport (indoor run / indoor ride).
+- One-time rescan of Health Connect from January so watch walks reach the inbox.
+
+## 3.3.2 — 2026-10-29
+- Fixed the squashed/cut-off Fitness · Fatigue · Form chart ("Trends stuck"): a chart drawn while its screen was hidden got Plotly's default 700 × 450 size and kept it. Hidden draws are now parked and drawn at the real size when the screen appears; mis-sized charts are resized on show. Found on the phone over USB (`scripts/phone-eval.js`).
+
 ## 3.3.1 — 2026-10-29
 - Activity inbox, 2026+ only, Reports sport selector, much richer PDF, Aether context at three resolutions with coach verdicts and data completeness, derived resting HR, conversation-review rules (no-bike ≠ rest, no invented facts), Trends no longer renders inside the tab transition, charts can't trap scrolling, guide PDF.
 

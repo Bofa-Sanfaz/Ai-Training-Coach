@@ -976,3 +976,12 @@ span.agent-chip { cursor: default; }
    horizontal swipes scroll the wide progression chart */
 .chart, .chart .draglayer, .chart .nsewdrag, .chart .main-svg { touch-action: pan-y !important; }
 .chart-scroll, .chart-scroll .chart, .chart-scroll .draglayer, .chart-scroll .nsewdrag, .chart-scroll .main-svg { touch-action: pan-x pan-y !important; }
+
+/* Samsung Health export import */
+.export-box { border: 1px dashed var(--border-strong); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+.export-box ol { margin: 6px 0 0; padding-left: 18px; }
+.export-box li { margin: 2px 0; }
+
+/* Range chips longer than the history (same as All) */
+.chip.dim:not(.active) { opacity: 0.45; }
+

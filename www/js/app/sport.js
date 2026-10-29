@@ -283,6 +283,8 @@ async function importInboxItems(items) {
       w.sport = sport;
       w.id = await db.workouts.add(w);
       n++;
+    } else if (it.src === 'health' && it.sh) {
+      if (await addSamsungSummary(it)) n++;
     } else if (it.src === 'health') {
       const H = healthPlugin();
       if (!H) continue;

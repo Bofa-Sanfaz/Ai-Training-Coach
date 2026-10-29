@@ -69,6 +69,7 @@ function stagger(els, { y = 14, delay = 40, max = 8 } = {}) {
 // Called after a screen renders: roll numbers and grow bars
 function animateIn(root) {
   if (!root) return;
+  resizeChartsIn(root);
   countUp(root);
 }
 
