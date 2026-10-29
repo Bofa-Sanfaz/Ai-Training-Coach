@@ -6,7 +6,7 @@ _Last updated: 2026-10-29. Read this first; it describes the app as it is now. T
 Training Partner (formerly Ride Partner) is a personal, offline-first Android app for one athlete who rides (MTB/XC), runs, swims and trains in the gym. It syncs workouts from **Strava** and from the **Galaxy Watch via Samsung Health → Health Connect**, computes training physiology locally, and provides **AI coaching** (Aether + task-specific coaches) through the athlete's own API keys.
 
 - Package: `com.ridepartner.v2` (kept so updates install in place; display name "Training Partner")
-- Installed on the athlete's phone: see `C:\dev\releases` (one APK only). 3.3.0 (30300) was installed 2026-10-29; data kept.
+- Installed on the athlete's phone: see `C:\dev\releases` (one APK only). 3.5.0 (30500) installed 2026-10-29; data kept.
 - Source: GitHub `Bofa-Sanfaz/Ai-Training-Coach`, branch **`v3-rebuild`** (not merged into `main`). Local copy: `C:\dev\Ai-Training-Coach`.
 
 ## 2. Where things are
@@ -30,7 +30,7 @@ www/js/app/util.js        formatting, dates, markdown
 www/js/app/ui.js          toasts, dialogs, sheets, panels, back button, theme, haptics, capPlugin(), liveBubble, aiStatusIn
 www/js/app/motion.js      view transitions, count-up, stagger, route draw, nav indicator, ripples, intro, confetti/records
 www/js/app/db.js          Dexie schema v1–v3 (never bump — classic.html shares the DB), backups, restore points
-www/js/app/sport.js       sports (ride/run/swim/other), units, data flags + mv(), quality sheet, delete, activity inbox
+www/js/app/sport.js       sports (ride/run/walk/swim/other), units, data flags + mv(), quality sheet, delete, activity inbox
 www/js/app/physio.js      zones, metrics, TRIMP, CTL/ATL/TSB, records per sport, weekly totals (flag-aware)
 www/js/app/athlete.js     weight log, training phases
 www/js/app/strava.js      OAuth, sync (2026+, all sports, inbox routing, watch-copy replacement), streams
@@ -40,9 +40,22 @@ www/js/app/health.js      Health Connect: wellness (+derived resting HR) and wat
 www/js/app/ai.js          per-agent context + prompts, style rules, coach memory, plan-update parsing
 www/js/app/plan.js        template, day overrides (with sport), targets, adherence, AI planner
 www/js/app/route.js       route SVG + share card
-www/js/app/views/*.js     rides(Training), detail, trends, compare, coach(Aether), reports(+PDF), profile
+www/js/app/views/*.js     rides(Training), detail(+detail-sport), trends, compare, coach(Aether), reports(+PDF), profile
+www/js/app/squad-core.js  SHARED with the squad server: event folding, relative scoring, monthly numbers
+www/js/app/views/squad.js       Squad: storage, outbox + polling sync, sharing summaries/wellness, Home/Feed/Crew, chat, sheets, screenshot import
+www/js/app/views/squad-stats.js Squad Stats + monthly Report (Plotly) + Report PDF
+www/manifest.webmanifest  web app (friends on iPhone add it to the home screen)
+squad/                    Squad server: Cloudflare Worker + D1 (see squad/README.md — deploy, limits, tests)
 scripts/                  build-apk.ps1, patch-android.js, phone-update.ps1, phone-rescue.js, phone-eval.js
 ```
+
+## 3b. Squad (3.5)
+- Tab **Squad** = its own app section: Home · Chat (panel) · Feed · Stats · Report · Crew; switcher for several challenges.
+- Server `squad/` (free Cloudflare Worker + D1, cron every 15 min). Everything is an event with a per-challenge `seq`; clients pull `/changes?since=` and push an outbox (`squad_outbox`) with client ids → idempotent. Poll 4 s (chat) / 15 s (tab) / 60 s.
+- Local config keys: `squad_challenges` (entries incl. member token, `shared`, `daily_shared`, sharing toggles), `squad_outbox`, `squad_data_<id>` (events, members, challenge), `squad_current`, `squad_server`, `squad_name`.
+- AI: owner's provider config + key stored only on the server; client calls `POST /ai/run` when a response says `ai_due`; lease on `challenges.ai_lock`; etiquette (90 s quiet, 1 per 2 h, 4/day), recaps, monthly report, screenshot → workout (`/ai/extract`).
+- Fairness: scores only against own baseline; weight only as a change (UI, PDF, AI).
+- Not yet live: needs `wrangler login` + deploy by the owner, then `SQUAD_DEFAULT_SERVER` in squad.js. Tested locally only (`squad/test/api-test.mjs`, 68 checks; browser test of the whole UI).
 
 ## 4. Data (IndexedDB "RidePartnerDB", phone only)
 `workouts` (+ `sport`, `indoor`, `data_flags`, `source:'health'` with negative `strava_id`), `streams`, `threads` (session chats; `pending`, `kind`, `ai_*`), `master_chat` (Aether; `pending`, proposals, `ai_*`), `graph_threads`, `reports`, `config`.
@@ -58,7 +71,7 @@ Update in place: `adb install -r <apk>` (same key `persistent-keystore.jks`, ali
 Diagnostics over USB: `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>` then `node scripts/phone-eval.js 9333 "<read-only expression>"` (the app must be in the foreground) or `node scripts/phone-rescue.js 9333 out.json` to copy data.
 
 ## 7. Privacy
-Public repo: commits use `Bofa-Sanfaz@users.noreply.github.com`; never commit backups, keys, `.claude/`, `android/`, `www/_tmp*`. Health Connect is read-only. WebView debugging is enabled for USB diagnostics (only an adb-authorised computer can use it).
+Public repo: commits use `Bofa-Sanfaz@users.noreply.github.com`; never commit backups, keys, `.claude/`, `android/`, `www/_tmp*`, `.wrangler/`, `.dev.vars`, the Samsung SDK AAR. Squad member tokens and the AI key never go into the repo (tokens live in the app's DB, the key in D1). Health Connect is read-only. WebView debugging is enabled for USB diagnostics (only an adb-authorised computer can use it).
 
 ## 8. Known limits / next ideas
 - Samsung Health shares neither resting HR nor HRV with Health Connect: resting HR is estimated (lowest hourly average); HRV unavailable.

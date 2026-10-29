@@ -170,7 +170,7 @@ function rideCardHtml(w, coachIds) {
     hrStat,
     stat(sw && sw.swolf ? String(sw.swolf) : '--', 'SWOLF'),
     loadStat
-  ] : sp === 'run' ? [
+  ] : onFoot(sp) ? [
     stat(`${d.v}<small>${d.unit}</small>`, 'Distance', flagged('distance')),
     stat(escapeHtml(rideDuration(w)), 'Moving'),
     stat(`${s.v}<small>${s.unit}</small>`, 'Pace', flagged('distance')),

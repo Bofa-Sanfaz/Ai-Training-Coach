@@ -9,13 +9,14 @@ const TAB_ALIASES = { feed: 'rides', graphs: 'trends', chats: 'coach', settings:
 // the new screen is rendered inside the transition so it arrives complete.
 function switchTab(tab) {
   tab = TAB_ALIASES[tab] || tab;
-  ['rideDetail', 'threadPanel'].forEach(closePanel);
+  ['rideDetail', 'threadPanel', 'squadChat'].forEach(closePanel);
   $$('.sheet.open').forEach(s => closeSheet(s.id));
   const from = Router.current;
   Router.current = tab;
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   moveNavIndicator(tab);
-  const render = { rides: renderRides, trends: renderTrends, compare: setupComparison, coach: renderCoachList, reports: renderReports, profile: renderProfile }[tab];
+  const render = { rides: renderRides, trends: renderTrends, compare: setupComparison, coach: renderCoachList, squad: renderSquad, reports: renderReports, profile: renderProfile }[tab];
+  if (tab === 'squad' || from === 'squad') setTimeout(() => squadSchedule(tab === 'squad' ? 200 : 0), 0);
   // Chart-heavy screens render after the transition so the tab never feels frozen
   const heavy = ['trends', 'compare', 'reports'].includes(tab);
   const show = async () => {
@@ -36,6 +37,16 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
+### New in 3.5 — Squad: train together
+- **Squad tab**, its own little app: **Home · Chat · Feed · Stats · Report · Crew**. Start a challenge, send the invite code — friends on iPhone use the same app from Safari (Add to Home Screen)
+- **Scored against yourself**: consistency vs your own target days, minutes vs your own usual, pace vs your own usual pace, personal bests and streaks — different bodies never decide the winner. Weekly duels and a monthly winner
+- **3-way chat with Aether**: ask with @Aether, tap any message or workout for a **review** or a **roast**; Aether also chimes in on its own (PBs, streaks, quiet days — never while you're talking) and writes a daily recap
+- **Stats**: points, minutes and pace vs own usual, sport mix, time of day, training calendar, and — if you choose to share — weight change, steps, resting HR and sleep
+- **Monthly report** with graphs, Aether's write-up and a PDF
+- Your workouts are shared automatically as **summaries** (numbers, PBs, how it felt, your coach's one-line verdict); **add from screenshot** reads Huawei/other app screens
+- **Walks are their own sport** (pace /km, steps, cadence) instead of counting as runs
+- Reports: training story graphs, a radar of your training balance and a redesigned PDF
+
 ### New in 3.4 — every sport its own numbers
 - **Swims**: pace per 100 m (swimming time), **SWOLF**, strokes per length, stroke rate, stroke mix, rest time, fastest length and **best 50/100/200/400 m**, a per-length chart (coloured by stroke, with SWOLF) and 100 m splits — straight from your Galaxy Watch
 - **Runs**: pace, **cadence**, steps, watch VO2max; treadmill runs drop GPS climbing
@@ -131,7 +142,7 @@ async function boot() {
   if (App) {
     App.addListener('appUrlOpen', data => { if (data && data.url) processIncomingUrl(data.url); });
     App.addListener('backButton', handleHardwareBack);
-    App.addListener('resume', () => { resumedIds.clear(); setTimeout(resumePendingChats, 800); });
+    App.addListener('resume', () => { resumedIds.clear(); setTimeout(resumePendingChats, 800); squadTick(true); });
   }
   window.addEventListener('online', () => setTimeout(resumePendingChats, 1500));
   if (location.search && location.search.includes('code=')) processIncomingUrl(location.href);
@@ -148,9 +159,10 @@ async function boot() {
   if (seen !== APP_VERSION) setTimeout(showWhatsNew, 600);
   setupPullToRefresh();
   await refreshStaleMetrics();
-  try { if (await dedupeWorkouts()) await renderRides(); } catch (e) { console.warn('dedupe', e); }
+  try { if ((await dedupeWorkouts()) + (await migrateWalks())) await renderRides(); } catch (e) { console.warn('dedupe/walks', e); }
   maybeAutoSync();
   setTimeout(resumePendingChats, 2000);
+  try { await squadInit(); } catch (e) { console.warn('squad', e); }
 }
 
 // Sync button / pull-to-refresh: Strava plus the watch (Samsung Health workouts & wellness)
@@ -158,6 +170,8 @@ async function syncAll() {
   const jobs = [syncStrava()];
   if ((await getConfig('health_enabled')) === '1') jobs.push(syncWellness(true));
   await Promise.all(jobs);
+  // New workouts go to the squad right away (summaries)
+  if (Squad.list.length) { Squad.lastShare = 0; squadTick(true); }
 }
 
 // Auto-sync on open: Strava connected, online, enabled, last sync > 3 h ago

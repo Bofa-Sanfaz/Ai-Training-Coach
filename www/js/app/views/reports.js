@@ -66,6 +66,96 @@ function intensitySplit(z) {
   return { low, mid, high, pi: mid > 0 ? (low + high) / mid : null };
 }
 
+// --------------------------------------------------------
+// PERIOD STORY — shared by the Reports screen and the PDF
+//   daily load per sport, weekday / time-of-day rhythm, highlights and a
+//   five-axis balance score (0–100 each):
+//   Volume      hours vs weekly target (or vs the previous period)
+//   Consistency training days per week (5+ = 100)
+//   Intensity   distance from an 80/20 easy/hard split
+//   Recovery    sleep and resting HR when the watch has them, else rest days
+//   Progress    efficiency (rides/runs) or swim pace vs the previous period
+// --------------------------------------------------------
+async function periodStory(rides, prior, startDate, endDate) {
+  const days = [];
+  for (let d = parseSafeDate(startDate); formatLocalDate(d) <= endDate; d = addDays(d, 1)) days.push(formatLocalDate(d));
+  const daily = days.map(k => {
+    const e = { date: k, bySport: {}, total: 0 };
+    for (const w of rides.filter(x => String(x.date).startsWith(k))) { const t = num(mv(w, 'trimp')) || num(w.moving_sec) / 60; e.bySport[sportOf(w)] = (e.bySport[sportOf(w)] || 0) + t; e.total += t; }
+    return e;
+  });
+  const weekday = [0, 0, 0, 0, 0, 0, 0], hourly = [0, 0, 0, 0];
+  for (const w of rides) {
+    const d = parseSafeDate(w.date);
+    weekday[(d.getDay() + 6) % 7] += num(w.moving_sec) / 3600;
+    hourly[d.getHours() < 9 ? 0 : d.getHours() < 13 ? 1 : d.getHours() < 18 ? 2 : 3]++;
+  }
+  const weeks = Math.max(1, days.length / 7);
+  const cur = aggregateRides(rides), pri = prior.length ? aggregateRides(prior) : null;
+  const target = await getWeeklyGoals();
+  const clamp = v => Math.max(0, Math.min(100, Math.round(v)));
+  const volume = target.hours ? clamp((cur.sec / 3600 / weeks / target.hours) * 100) : pri && pri.sec ? clamp(50 + ((cur.sec - pri.sec) / pri.sec) * 100) : 50;
+  const activeDays = daily.filter(d => d.total > 0).length;
+  const consistency = clamp((activeDays / weeks / 5) * 100);
+  const split = intensitySplit(sumZones(rides));
+  const intensity = sumZones(rides).some(v => v > 0) ? clamp(100 - Math.abs(split.low * 100 - 80) * 1.5) : 50;
+  const wl = await getWellness();
+  const wk = Object.keys(wl.days).filter(k => k >= startDate && k <= endDate);
+  const sleep = mean(wk.map(k => wl.days[k].sleep_min).filter(v => v > 0));
+  const restDaysPerWeek = (days.length - activeDays) / weeks;
+  const recovery = sleep ? clamp((sleep / 450) * 100) : clamp(100 - Math.abs(restDaysPerWeek - 1.5) * 30);
+  const effNow = efficiencyIndex(rides), effPrev = prior.length ? efficiencyIndex(prior) : null;
+  const swimNow = mean(rides.map(swimPace100).filter(v => v > 0)), swimPrev = mean(prior.map(swimPace100).filter(v => v > 0));
+  const progress = effNow && effPrev ? clamp(50 + ((effNow - effPrev) / effPrev) * 500) : swimNow && swimPrev ? clamp(50 + ((swimPrev - swimNow) / swimPrev) * 500) : 50;
+  const best = (fn, label, fmt) => { const ok = rides.filter(w => num(fn(w)) > 0); if (!ok.length) return null; const w = ok.reduce((p, q) => (num(fn(q)) > num(fn(p)) ? q : p)); return { label, value: fmt(w), w }; };
+  let streak = 0, run = 0;
+  for (const d of daily) { run = d.total > 0 ? run + 1 : 0; streak = Math.max(streak, run); }
+  const highlights = [
+    best(w => mv(w, 'trimp'), 'Hardest session', w => `${Math.round(w.trimp)} TRIMP`),
+    best(w => w.moving_sec, 'Longest session', w => rideDuration(w)),
+    streak > 1 ? { label: 'Longest streak', value: `${streak} days in a row` } : null,
+    (() => { const d = daily.reduce((p, q) => (q.total > p.total ? q : p), daily[0]); return d && d.total ? { label: 'Biggest day', value: formatNiceDate(d.date, false) } : null; })()
+  ].filter(Boolean);
+  return {
+    days, daily, weekday, hourly, activeDays, highlights,
+    balance: [['Volume', volume], ['Consistency', consistency], ['Intensity mix', intensity], ['Recovery', recovery], ['Progress', progress]],
+    notes: { volume: target.hours ? `${fmtNum(cur.sec / 3600 / weeks, 1)} of ${target.hours} h per week` : 'vs previous period', consistency: `${activeDays} training days`, intensity: `${Math.round(split.low * 100)}% easy`, recovery: sleep ? `${fmtSleep(sleep)} sleep` : `${fmtNum(restDaysPerWeek, 1)} rest days/week`, progress: effNow && effPrev ? `efficiency ${signed(((effNow - effPrev) / effPrev) * 100, 1, '%')}` : swimNow && swimPrev ? `swim pace ${signed(swimPrev - swimNow, 0, ' s')}/100m` : 'not enough data' }
+  };
+}
+
+// Pentagon radar as inline SVG (no chart library needed)
+function radarSvg(balance, size = 220) {
+  const c = size / 2, r = size / 2 - 34, n = balance.length;
+  const pt = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / n; return [c + Math.cos(a) * r * v / 100, c + Math.sin(a) * r * v / 100]; };
+  const ring = v => balance.map((_, i) => pt(i, v).join(',')).join(' ');
+  const shape = balance.map(([, v], i) => pt(i, v).join(',')).join(' ');
+  return `<svg viewBox="0 0 ${size} ${size}" class="radar" role="img" aria-label="Training balance">
+    ${[25, 50, 75, 100].map(v => `<polygon points="${ring(v)}" class="radar-ring"/>`).join('')}
+    ${balance.map((_, i) => `<line x1="${c}" y1="${c}" x2="${pt(i, 100)[0]}" y2="${pt(i, 100)[1]}" class="radar-axis"/>`).join('')}
+    <polygon points="${shape}" class="radar-shape"/>
+    ${balance.map(([, v], i) => `<circle cx="${pt(i, v)[0]}" cy="${pt(i, v)[1]}" r="3.5" class="radar-dot"/>`).join('')}
+    ${balance.map(([l, v], i) => { const [x, y] = pt(i, 122); return `<text x="${x}" y="${y}" text-anchor="middle" class="radar-label">${l}</text><text x="${x}" y="${y + 12}" text-anchor="middle" class="radar-val">${v}</text>`; }).join('')}
+  </svg>`;
+}
+
+async function renderPeriodStory(rides, prior, startDate, endDate) {
+  const st = await periodStory(rides, prior, startDate, endDate);
+  $('#repRadar').innerHTML = radarSvg(st.balance);
+  $('#repRadarLegend').innerHTML = st.balance.map(([l]) => `<span><b>${l}</b> ${escapeHtml(st.notes[{ 'Volume': 'volume', 'Consistency': 'consistency', 'Intensity mix': 'intensity', 'Recovery': 'recovery', 'Progress': 'progress' }[l]])}</span>`).join('');
+  $('#repHighlights').innerHTML = st.highlights.map(h => `<div class="hl-card" ${h.w ? `onclick="openRide(${h.w.id})"` : ''}><span class="hl-l">${escapeHtml(h.label)}</span><b>${escapeHtml(h.value)}</b>${h.w ? `<span class="hl-s">${escapeHtml(rideCode(h.w))} · ${escapeHtml(formatNiceDate(h.w.date, false))}</span>` : ''}</div>`).join('');
+  if (!plotReady()) return;
+  const sports = Object.keys(SPORTS).filter(s => st.daily.some(d => d.bySport[s]));
+  drawChart($('#repDailyChart'), sports.map(s => ({ x: st.days, y: st.daily.map(d => round(d.bySport[s] || 0, 0)), type: 'bar', name: SPORTS[s].plural, marker: { color: SPORTS[s].color }, hovertemplate: `${SPORTS[s].plural} %{x|%d %b}: %{y}<extra></extra>` })),
+    plotLayout({ barmode: 'stack', bargap: 0.2, hovermode: 'closest', showlegend: sports.length > 1, legend: { orientation: 'h', y: -0.25, font: { size: 10 } }, margin: { l: 30, r: 8, t: 6, b: sports.length > 1 ? 46 : 26 }, xaxis: { type: 'date', tickformat: '%d %b' }, yaxis: { title: { text: 'load', font: { size: 10 } } } }));
+  drawChart($('#repRhythmChart'), [
+    { x: WEEKDAYS, y: st.weekday.map(v => round(v, 1)), type: 'bar', name: 'hours', marker: { color: st.weekday.map(v => (v === Math.max(...st.weekday) ? '#fc5200' : 'rgba(252,82,0,0.4)')) }, hovertemplate: '%{x}: %{y} h<extra></extra>' }
+  ], plotLayout({ hovermode: 'closest', bargap: 0.35, margin: { l: 28, r: 8, t: 6, b: 26 }, yaxis: { title: { text: 'hours', font: { size: 10 } } } }));
+  const slots = ['Morning', 'Midday', 'Afternoon', 'Evening'];
+  const top = st.hourly.indexOf(Math.max(...st.hourly));
+  $('#repRhythmNote').textContent = rides.length ? `Most sessions in the ${slots[top].toLowerCase()} · ${st.activeDays} of ${st.days.length} days active` : '';
+  return st;
+}
+
 function deltaChip(a, b, d, unit, lowerBetter = false) {
   if (!hasVal(b) || !Number.isFinite(a - b) || (a === 0 && b === 0)) return '';
   const r = round(a - b, d);
@@ -142,6 +232,7 @@ async function renderReports() {
       <span class="zone-val">${formatHours(z[i])} · ${pct}%</span></div>`;
   }).join('');
   requestAnimationFrame(() => $$('#reportZoneBars .zone-fill').forEach(el => { el.style.width = `${el.dataset.w}%`; }));
+  await renderPeriodStory(rides, prior, startDate, endDate);
   if (typeof animateIn === 'function') animateIn($('#screen-reports'));
 
   if (!reportAiBusy) {
@@ -233,8 +324,25 @@ async function chartPng(traces, layout, w = 900, h = 360) {
   }
 }
 
-async function triggerOfficialPdfDownload() {
-  const status = $('#pdfStatus');
+// Barlow fonts for the PDF, loaded once from the app's bundled font files
+let _pdfFontData = null;
+async function pdfFonts(doc) {
+  try {
+    if (!_pdfFontData) {
+      const load = async f => { const b = new Uint8Array(await (await fetch(`fonts/${f}`)).arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+      _pdfFontData = { r: await load('Barlow-Regular.ttf'), b: await load('Barlow-Bold.ttf'), n: await load('BarlowSemiCondensed-Bold.ttf') };
+    }
+    doc.addFileToVFS('Barlow-Regular.ttf', _pdfFontData.r); doc.addFont('Barlow-Regular.ttf', 'Barlow', 'normal');
+    doc.addFileToVFS('Barlow-Bold.ttf', _pdfFontData.b); doc.addFont('Barlow-Bold.ttf', 'Barlow', 'bold');
+    doc.addFileToVFS('BarlowSC-Bold.ttf', _pdfFontData.n); doc.addFont('BarlowSC-Bold.ttf', 'BarlowSC', 'bold');
+    return { text: 'Barlow', num: 'BarlowSC' };
+  } catch (e) {
+    console.warn('PDF fonts', e);
+    return { text: 'helvetica', num: null };
+  }
+}
+
+async function triggerOfficialPdfDownload() {  const status = $('#pdfStatus');
   const rides = await getScopedWorkouts(0);
   if (!rides.length) { toast('No workouts in this timeframe.', 'warn'); return; }
   const cached = await getCachedReport(rides);
@@ -264,13 +372,15 @@ async function triggerOfficialPdfDownload() {
     const split = intensitySplit(z);
     const wt = await getLatestWeight();
     const txt = s => markdownToPlain(String(s));
-    const font = (style, size, color) => { doc.setFont('helvetica', style); doc.setFontSize(size); doc.setTextColor(...color); };
+    // Barlow (the app's typeface) for text, Barlow Semi Condensed for numbers; Helvetica if fonts fail to load
+    const fam = await pdfFonts(doc);
+    const font = (style, size, color, numbers = false) => { doc.setFont(numbers && fam.num ? fam.num : fam.text, numbers && fam.num ? 'bold' : style); doc.setFontSize(size); doc.setTextColor(...color); };
     let y = 0;
     const ensure = need => { if (y + need > H - 18) { doc.addPage(); y = 18; } };
     const sectionTitle = (t, kicker) => {
       ensure(16);
       font('bold', 6.5, PDF.brand); doc.text(String(kicker || '').toUpperCase(), M, y);
-      font('bold', 12, PDF.ink); doc.text(t, M, y + 5.5);
+      font('bold', 13, PDF.ink, true); doc.text(t, M, y + 5.5);
       y += 10;
     };
 
@@ -279,7 +389,7 @@ async function triggerOfficialPdfDownload() {
     for (let i = 0; i < 26; i++) { doc.setFillColor(252, 82 + i * 2, i * 3); doc.rect(W - 70 + i * 2.7, 0, 2.8, 46, 'F'); }
     doc.setFillColor(...PDF.brand); doc.rect(0, 46, W, 1.2, 'F');
     font('bold', 7, [251, 146, 60]); doc.text('TRAINING PARTNER · PERFORMANCE REPORT', M, 13);
-    font('bold', 22, [255, 255, 255]); doc.text(`${TF_LABEL[reportTimeframe]}${reportSport === 'all' ? '' : ` · ${SPORTS[reportSport].plural}`}`, M, 25);
+    font('bold', 24, [255, 255, 255], true); doc.text(`${TF_LABEL[reportTimeframe]}${reportSport === 'all' ? '' : ` · ${SPORTS[reportSport].plural}`}`, M, 25);
     font('normal', 9, [203, 213, 225]); doc.text(`${formatNiceDate(startDate, false)} – ${formatNiceDate(endDate, false)}  ·  ${rides.length} sessions  ·  ${formatHours(cur.sec)}`, M, 32);
     font('normal', 7.5, [148, 163, 184]);
     doc.text(txt(`${ATHLETE.name}${ATHLETE.height ? ` · ${ATHLETE.height} cm` : ''}${wt ? ` · ${wt} kg` : ''} · ${ATHLETE.bike} · max HR ${PHYSIO.max_hr}`), M, 39);
@@ -314,7 +424,7 @@ async function triggerOfficialPdfDownload() {
       doc.setFillColor(...PDF.soft); doc.setDrawColor(...PDF.line); doc.roundedRect(x, ty, tw, th, 2.5, 2.5, 'FD');
       doc.setFillColor(...k.c); doc.circle(x + 5, ty + 5.2, 1.3, 'F');
       font('bold', 6.3, PDF.sub); doc.text(k.l.toUpperCase(), x + 8, ty + 6);
-      font('bold', 13, PDF.ink); doc.text(txt(k.v), x + 4, ty + 13.5);
+      font('bold', 14, PDF.ink, true); doc.text(txt(k.v), x + 4, ty + 13.8);
       if (k.d !== null && k.d !== undefined && Number.isFinite(k.d)) {
         const good = k.d === 0 ? null : (k.d > 0) !== !!k.lower;
         font('bold', 6.8, good === null ? PDF.sub : good ? PDF.green : PDF.red);
@@ -346,8 +456,63 @@ async function triggerOfficialPdfDownload() {
     });
     y += 2;
 
-    // ---------- Charts ----------
-    setBusy(btn, true, 'Drawing charts…');
+    // ---------- Training story: daily load, balance radar, rhythm, highlights ----------
+    {
+      const st = await periodStory(rides, prior, startDate, endDate);
+      ensure(95);
+      sectionTitle('Your training story', 'The period in pictures');
+      const sports = Object.keys(SPORTS).filter(s => st.daily.some(d => d.bySport[s]));
+      const dailyImg = await chartPng(sports.map(s => ({ x: st.days, y: st.daily.map(d => round(d.bySport[s] || 0, 0)), type: 'bar', name: SPORTS[s].plural, marker: { color: SPORTS[s].color } })),
+        { barmode: 'stack', bargap: 0.18, xaxis: { type: 'date', tickformat: '%d %b', showgrid: false }, yaxis: { title: { text: 'load per day', font: { size: 12 } }, gridcolor: '#eef2f7' } }, 900, 300);
+      if (dailyImg) { font('bold', 8, PDF.sub); doc.text('DAILY LOAD BY SPORT', M, y); doc.addImage(dailyImg, 'JPEG', M, y + 2, CW, CW / 3); y += CW / 3 + 8; }
+      // Balance radar (vector) + legend
+      ensure(74);
+      const cx = M + 34, cy = y + 34, R = 26, n = st.balance.length;
+      const P = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / n; return [cx + Math.cos(a) * R * v / 100, cy + Math.sin(a) * R * v / 100]; };
+      const poly = (vals, style) => { const pts = vals.map((v, i) => P(i, v)); doc.lines(pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]), pts[0][0], pts[0][1], [1, 1], style, true); };
+      doc.setLineWidth(0.2); doc.setDrawColor(...PDF.line);
+      for (const v of [25, 50, 75, 100]) poly(st.balance.map(() => v), 'S');
+      for (let i = 0; i < n; i++) { const [px, py] = P(i, 100); doc.line(cx, cy, px, py); }
+      doc.setFillColor(255, 220, 200); doc.setDrawColor(...PDF.brand); doc.setLineWidth(0.6);
+      poly(st.balance.map(b => Math.max(4, b[1])), 'FD');
+      st.balance.forEach(([l, v], i) => { const [px, py] = P(i, 128); font('bold', 6.5, PDF.ink); doc.text(l, px, py, { align: 'center' }); font('bold', 7, PDF.brand, true); doc.text(String(v), px, py + 3.2, { align: 'center' }); });
+      const keyOf = { 'Volume': 'volume', 'Consistency': 'consistency', 'Intensity mix': 'intensity', 'Recovery': 'recovery', 'Progress': 'progress' };
+      let ly = y + 6;
+      font('bold', 8, PDF.sub); doc.text('TRAINING BALANCE  (0-100)', M + 76, ly); ly += 6;
+      for (const [l, v] of st.balance) {
+        font('bold', 8, PDF.ink); doc.text(l, M + 76, ly);
+        doc.setFillColor(241, 245, 249); doc.roundedRect(M + 104, ly - 2.6, 40, 3.2, 1.4, 1.4, 'F');
+        doc.setFillColor(...(v >= 70 ? PDF.green : v >= 45 ? PDF.brand : PDF.red)); doc.roundedRect(M + 104, ly - 2.6, Math.max(1.5, 40 * v / 100), 3.2, 1.4, 1.4, 'F');
+        font('normal', 7, PDF.sub); doc.text(txt(st.notes[keyOf[l]] || ''), M + 147, ly);
+        ly += 7;
+      }
+      y += 74;
+      // Weekly rhythm + time of day
+      const rhythm = await chartPng([{ x: WEEKDAYS, y: st.weekday.map(v => round(v, 1)), type: 'bar', marker: { color: st.weekday.map(v => (v === Math.max(...st.weekday) ? '#fc5200' : '#fdba74')) } }],
+        { showlegend: false, bargap: 0.35, yaxis: { title: { text: 'hours', font: { size: 12 } }, gridcolor: '#eef2f7' } }, 600, 300);
+      const slots = ['Morning', 'Midday', 'Afternoon', 'Evening'];
+      const tod = await chartPng([{ type: 'pie', hole: 0.55, values: st.hourly, labels: slots, marker: { colors: ['#facc15', '#fb923c', '#f97316', '#6366f1'] }, textinfo: 'percent', textposition: 'inside', insidetextorientation: 'horizontal', textfont: { size: 20, color: '#0f172a' }, sort: false }], { showlegend: true, legend: { orientation: 'h', y: -0.05, font: { size: 16 } }, margin: { l: 0, r: 0, t: 0, b: 30 } }, 360, 320);
+      ensure(56);
+      font('bold', 8, PDF.sub); doc.text('WHEN YOU TRAIN', M, y);
+      if (rhythm) doc.addImage(rhythm, 'JPEG', M, y + 2, CW * 0.58, CW * 0.29);
+      if (tod) doc.addImage(tod, 'JPEG', M + CW * 0.62, y + 2, CW * 0.36, CW * 0.3);
+      y += CW * 0.3 + 6;
+      // Highlight tiles
+      if (st.highlights.length) {
+        ensure(24);
+        const hw = (CW - 3 * (st.highlights.length - 1)) / st.highlights.length;
+        st.highlights.forEach((h, i) => {
+          const x = M + i * (hw + 3);
+          doc.setFillColor(255, 247, 237); doc.setDrawColor(254, 215, 170); doc.roundedRect(x, y, hw, 18, 2.5, 2.5, 'FD');
+          font('bold', 6, PDF.brand); doc.text(h.label.toUpperCase(), x + 3.5, y + 5.5);
+          font('bold', 11, PDF.ink, true); doc.text(txt(h.value).slice(0, 24), x + 3.5, y + 11.5);
+          if (h.w) { font('normal', 6.3, PDF.sub); doc.text(txt(`${rideCode(h.w)} · ${formatNiceDate(h.w.date, false)}`), x + 3.5, y + 15.5); }
+        });
+        y += 24;
+      }
+    }
+
+    // ---------- Charts ----------    setBusy(btn, true, 'Drawing charts…');
     const from = formatLocalDate(addDays(parseSafeDate(startDate), -Math.max(14, Math.round((parseSafeDate(endDate) - parseSafeDate(startDate)) / 86400000) * 0.5)));
     if (series) {
       const i0 = Math.max(0, series.dates.findIndex(d => d >= from));
@@ -357,7 +522,7 @@ async function triggerOfficialPdfDownload() {
         { x, y: series.ctl.slice(i0), type: 'scatter', mode: 'lines', name: 'Fitness', line: { color: '#2563eb', width: 3.5, shape: 'spline' } },
         { x, y: series.atl.slice(i0), type: 'scatter', mode: 'lines', name: 'Fatigue', line: { color: '#db2777', width: 2.2, shape: 'spline' } }
       ], { bargap: 0.15, xaxis: { type: 'date', tickformat: '%d %b', showgrid: false } });
-      if (img) { sectionTitle('Fitness, fatigue & form', 'Training load'); ensure(72); doc.addImage(img, 'JPEG', M, y, CW, CW * 0.4); y += CW * 0.4 + 6; }
+      if (img) { ensure(85); sectionTitle('Fitness, fatigue & form', 'Training load'); doc.addImage(img, 'JPEG', M, y, CW, CW * 0.4); y += CW * 0.4 + 6; }
     }
     // Weekly time by sport (stacked)
     const weeks = weeklyTotals(rides.length > 3 ? all.filter(w => String(w.date) >= from) : rides);
@@ -366,7 +531,7 @@ async function triggerOfficialPdfDownload() {
         x: weeks.map(wk => wk.week), y: weeks.map(wk => round(((wk.sports[s] || {}).sec || 0) / 3600, 1)), type: 'bar', name: SPORTS[s].plural, marker: { color: SPORTS[s].color }
       }));
       const img = await chartPng(traces, { barmode: 'stack', bargap: 0.3, yaxis: { title: { text: 'hours', font: { size: 12 } }, gridcolor: '#eef2f7' }, xaxis: { type: 'date', tickformat: '%d %b', showgrid: false } }, 900, 320);
-      if (img) { sectionTitle('Weekly training time by sport', 'Volume'); ensure(66); doc.addImage(img, 'JPEG', M, y, CW, CW * 0.356); y += CW * 0.356 + 6; }
+      if (img) { ensure(78); sectionTitle('Weekly training time by sport', 'Volume'); doc.addImage(img, 'JPEG', M, y, CW, CW * 0.356); y += CW * 0.356 + 6; }
     }
 
     // ---------- Intensity ----------
@@ -421,7 +586,7 @@ async function triggerOfficialPdfDownload() {
       ensure(20);
       doc.autoTable(Object.assign({
         head: [head], body, startY: y, theme: 'plain', margin: { left: M, right: M },
-        headStyles: { fillColor: PDF.ink, textColor: [255, 255, 255], fontSize: 6.8, fontStyle: 'bold', cellPadding: 1.8 },
+        styles: { font: fam.text }, headStyles: { fillColor: PDF.ink, textColor: [255, 255, 255], fontSize: 6.8, fontStyle: 'bold', cellPadding: 1.8 },
         bodyStyles: { fontSize: 6.8, cellPadding: 1.7, textColor: PDF.ink }, alternateRowStyles: { fillColor: PDF.soft }
       }, opts));
       y = doc.lastAutoTable.finalY + 8;
@@ -457,9 +622,9 @@ async function triggerOfficialPdfDownload() {
       font('normal', 8, PDF.sub);
       const line = [`${a.count} sessions`, formatHours(a.sec), s === 'swim' ? `${Math.round(a.dist * 1000)} m` : s === 'other' ? '' : `${fmtNum(a.dist, 1)} km`,
         s !== 'other' && a.speed ? `avg ${speedText(probe, a.speed)}` : '', a.hr ? `${Math.round(a.hr)} bpm` : '', `${Math.round(a.trimp)} TRIMP`,
-        s === 'ride' || s === 'run' ? `${Math.round(a.asc)} m climbing` : '',
+        s === 'ride' || onFoot(s) ? `${Math.round(a.asc)} m climbing` : '',
         s === 'swim' && list.some(w => swimOf(w) && swimOf(w).swolf) ? `SWOLF ${fmtNum(mean(list.map(w => swimOf(w) && swimOf(w).swolf).filter(Boolean)), 1)}` : '',
-        s === 'run' && list.some(w => w.avg_cadence) ? `cadence ${Math.round(mean(list.map(w => w.avg_cadence).filter(Boolean)))} spm` : '', pa && pa.count ? `previous period: ${pa.count} sessions, ${formatHours(pa.sec)}` : ''].filter(Boolean).join('  ·  ');
+        onFoot(s) && list.some(w => w.avg_cadence) ? `cadence ${Math.round(mean(list.map(w => w.avg_cadence).filter(Boolean)))} spm` : '', pa && pa.count ? `previous period: ${pa.count} sessions, ${formatHours(pa.sec)}` : ''].filter(Boolean).join('  ·  ');
       doc.text(doc.splitTextToSize(txt(line), CW), M, y); y += 8;
       // Speed / pace and HR per session → is the same effort getting cheaper?
       const pts = list.filter(w => mv(w, 'avg_hr') > 0);
@@ -580,7 +745,7 @@ async function triggerOfficialPdfDownload() {
       startY: y,
       theme: 'plain',
       margin: { left: M, right: M },
-      headStyles: { fillColor: PDF.ink, textColor: [255, 255, 255], fontSize: 6.8, fontStyle: 'bold', cellPadding: 2 },
+      styles: { font: fam.text }, headStyles: { fillColor: PDF.ink, textColor: [255, 255, 255], fontSize: 6.8, fontStyle: 'bold', cellPadding: 2 },
       bodyStyles: { fontSize: 6.8, cellPadding: 1.9, textColor: PDF.ink },
       alternateRowStyles: { fillColor: PDF.soft },
       columnStyles: { 0: { cellWidth: 2.2 }, 1: { fontStyle: 'bold' }, 8: { textColor: PDF.sub } },

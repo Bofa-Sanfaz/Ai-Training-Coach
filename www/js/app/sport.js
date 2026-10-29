@@ -8,11 +8,15 @@
 const SPORTS = {
   ride: { key: 'ride', label: 'Ride', plural: 'Rides', code: 'Ride', icon: 'bike', color: '#fc5200' },
   run: { key: 'run', label: 'Run', plural: 'Runs', code: 'Run', icon: 'run', color: '#16a34a' },
+  walk: { key: 'walk', label: 'Walk', plural: 'Walks', code: 'Walk', icon: 'walk', color: '#ca8a04' },
   swim: { key: 'swim', label: 'Swim', plural: 'Swims', code: 'Swim', icon: 'swim', color: '#0891b2' },
   other: { key: 'other', label: 'Gym & other', plural: 'Gym & other', code: 'Gym', icon: 'dumbbell', color: '#7c3aed' }
 };
 const RUN_TYPES = ['Run', 'TrailRun', 'VirtualRun'];
 const SWIM_TYPES = ['Swim'];
+const WALK_TYPES = ['Walk', 'Hike', 'walking', 'hiking', 'snowshoeing', 'Snowshoe', 'WALKING', 'HIKING'];
+// Pace sports on foot share their metrics (pace /km, cadence, steps, splits per km)
+const onFoot = sp => sp === 'run' || sp === 'walk';
 // Strava activity types that land in "Gym & other" (elliptical, stepper, rowing, strength…)
 const OTHER_TYPES = ['Elliptical', 'StairStepper', 'WeightTraining', 'Workout', 'Rowing', 'VirtualRow', 'Crossfit', 'HighIntensityIntervalTraining', 'Yoga', 'Pilates', 'Hike', 'RockClimbing'];
 
@@ -24,6 +28,7 @@ function sportOf(w) {
   const t = w.sport_type || '';
   if (RUN_TYPES.includes(t)) return 'run';
   if (SWIM_TYPES.includes(t)) return 'swim';
+  if (WALK_TYPES.includes(t)) return 'walk';
   if (OTHER_TYPES.includes(t)) return 'other';
   return 'ride';
 }
@@ -93,7 +98,7 @@ function fmtPace(sec) {
 function speedParts(w, kmh = w && w.avg_speed_kmh) {
   const s = sportOf(w);
   if (!(kmh > 0) || s === 'other') return { v: '--', unit: '' };
-  if (s === 'run') return { v: fmtPace(3600 / kmh), unit: '/km' };
+  if (onFoot(s)) return { v: fmtPace(3600 / kmh), unit: '/km' };
   if (s === 'swim') return { v: fmtPace(360 / kmh), unit: '/100m' };
   return { v: fmtNum(kmh, 1), unit: 'km/h' };
 }
@@ -248,7 +253,7 @@ const MIN_WORKOUT_DATE = '2026-01-01';
 const RUNLIKE_TYPES = ['Walk', 'Hike', 'Snowshoe', 'walking', 'hiking', 'snowshoeing'];
 // Outdoor rides always come from Strava, so watch cycling sessions are never offered
 const NEVER_ASK_TYPES = ['cycling', 'biking', 'mountainBiking', 'roadBiking', 'meditation', 'guidedBreathing', 'mindAndBody', 'preparationAndRecovery', 'cooldown', 'transition', 'fishing', 'hunting', 'stretching', 'flexibility', 'play', 'wheelchair'];
-const inboxSport = type => (RUNLIKE_TYPES.includes(type) ? 'run' : 'other');
+const inboxSport = type => (RUNLIKE_TYPES.includes(type) ? 'walk' : 'other');
 const prettyType = t => String(t || 'Activity').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
 
 // Two recordings are the same session when they start within 2 minutes of each other or
@@ -278,6 +283,8 @@ async function routeToInbox(items) {
   // Skipped / waiting items are also matched by time, so the same walk arriving from
   // another source (Strava, Health Connect, Samsung Health) isn't asked about twice
   const skippedAt = await getJsonConfig('activity_skipped_at', []);
+  // Everything up to the last reviewed item has been seen: re-scans after an update never bring it back
+  const reviewedUntil = (await getConfig('activity_reviewed_until')) || '';
   const have = new Set(inbox.map(i => i.key));
   const all = await db.workouts.toArray();
   const at = it => parseSafeDate(it.date).getTime();
@@ -285,7 +292,7 @@ async function routeToInbox(items) {
   const include = [];
   let queued = 0;
   for (const it of items) {
-    if (it.date < MIN_WORKOUT_DATE || skipped.has(it.key) || have.has(it.key)) continue;
+    if (it.date < MIN_WORKOUT_DATE || skipped.has(it.key) || have.has(it.key) || (reviewedUntil && it.date <= reviewedUntil)) continue;
     if (seen(it, inbox) || seen(it, skippedAt) || findSameWorkout(all, at(it), it.moving_sec)) continue;
     const rule = rules[`${it.src}:${it.type}`];
     if (rule === 'include') include.push(it);
@@ -310,7 +317,7 @@ async function openInbox() {
   if (!inbox.length) return;
   const types = [...new Set(inbox.map(i => `${i.src}:${i.type}`))];
   $('#inboxList').innerHTML = inbox.map((i, n) => `
-    <label class="check-row"><input type="checkbox" data-n="${n}" ${inboxSport(i.type) === 'run' ? 'checked' : ''} />
+    <label class="check-row"><input type="checkbox" data-n="${n}" ${inboxSport(i.type) === 'walk' ? 'checked' : ''} />
       <span><b>${escapeHtml(i.name || prettyType(i.type))}</b><span class="tiny muted">${escapeHtml(prettyType(i.type))} → ${SPORTS[inboxSport(i.type)].label} · ${escapeHtml(formatNiceDate(i.date))} · ${i.distance_km > 0 ? `${fmtNum(i.distance_km, 2)} km · ` : ''}${formatDuration(i.moving_sec)} · ${i.src === 'health' ? 'Galaxy Watch' : 'Strava'}</span></span></label>`).join('');
   $('#inboxRules').innerHTML = types.map(k => {
     const t = k.split(':')[1];
@@ -332,6 +339,8 @@ async function applyInbox() {
   await setJsonConfig('activity_skipped', (await getJsonConfig('activity_skipped', [])).concat(skipped).slice(-2000));
   await setJsonConfig('activity_skipped_at', (await getJsonConfig('activity_skipped_at', [])).concat(skippedItems.map(i => ({ date: i.date, moving_sec: i.moving_sec }))).slice(-2000));
   await setJsonConfig('activity_inbox', []);
+  const newest = inbox.map(i => i.date).sort().pop();
+  if (newest && newest > ((await getConfig('activity_reviewed_until')) || '')) await setConfig('activity_reviewed_until', newest);
   closeSheet('inboxSheet');
   const added = await importInboxItems(chosen);
   toast(`${added} added${skipped.length ? ` · ${skipped.length} skipped` : ''}`, 'success', 2600);
@@ -370,7 +379,7 @@ async function importInboxItems(items) {
 // the Strava copy wins, otherwise the copy with more detail. The athlete's intent,
 // rating, note, sport and flags carry over; chats move to the kept copy.
 // --------------------------------------------------------
-const DEDUPE_VER = '1';
+const DEDUPE_VER = '2';
 
 async function dedupeWorkouts() {
   if ((await getConfig('dedupe_ver')) === DEDUPE_VER) return 0;
@@ -415,9 +424,22 @@ async function dedupeWorkouts() {
   const at = it => parseSafeDate(it.date).getTime();
   const inbox = (await getInbox()).filter(it => !findSameWorkout(after, at(it), it.moving_sec) && !skippedAt.some(x => sameSession(at(x), x.moving_sec, at(it), it.moving_sec)));
   await setJsonConfig('activity_inbox', inbox);
+  // Seed the review mark from what was already skipped, so older items never return
+  const lastSkipped = skippedAt.map(x => x.date).sort().pop();
+  if (lastSkipped && !inbox.length && lastSkipped > ((await getConfig('activity_reviewed_until')) || '')) await setConfig('activity_reviewed_until', lastSkipped);
   await setConfig('dedupe_ver', DEDUPE_VER);
   if (pairs.length) toast(`Merged ${pairs.length} duplicate workout${pairs.length > 1 ? 's' : ''} (recorded by Strava and the watch)`, 'info', 4500);
   return pairs.length;
+}
+
+// Walks included before Walk became its own sport (3.5) were stored as runs: move them over once
+async function migrateWalks() {
+  if ((await getConfig('walk_ver')) === '1') return 0;
+  const walks = (await db.workouts.toArray()).filter(w => w.sport === 'run' && WALK_TYPES.includes(w.sport_type));
+  for (const w of walks) await db.workouts.update(w.id, { sport: 'walk' });
+  if (walks.length) await renumberRides();
+  await setConfig('walk_ver', '1');
+  return walks.length;
 }
 
 // Sport chips (All · Ride · Run · Swim) — shown only when more than one sport exists

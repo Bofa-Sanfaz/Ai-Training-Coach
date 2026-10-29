@@ -6,6 +6,13 @@
   <meta name="theme-color" content="#f3f5fa" />
   <title>Training Partner</title>
   <link rel="icon" type="image/svg+xml" href="img/logo.svg" />
+  <!-- Web app (iPhone: Safari → Share → Add to Home Screen) -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Training" />
   <link rel="stylesheet" href="css/app.css" />
   <script src="js/recovery.js"></script>
 </head>
@@ -63,6 +70,7 @@
     <symbol id="i-run" viewBox="0 0 24 24"><circle cx="14.5" cy="4" r="2"/><path d="m4 21 4-6 3 2 2-5"/><path d="M8 9l3-2 4 1 2 4 3 1"/><path d="m11 7 2 5 4 3v6"/></symbol>
     <symbol id="i-swim" viewBox="0 0 24 24"><circle cx="17" cy="6" r="2"/><path d="M4 12l5-3 3 2.5L15 10"/><path d="M2 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0 1.5 0 2 0"/><path d="M2 21c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/></symbol>
     <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></symbol>
+    <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="13" cy="4" r="2"/><path d="M10 21l2-6 3 3v3"/><path d="M8 11l3-3 3 1 2 3 2 1"/><path d="M11 8l1 4"/></symbol>
     <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4"/><path d="M4 4h12l-2 4 2 4H4"/></symbol>
     <symbol id="i-multi" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M8.5 7.5 10.5 16M15.5 7.5 13.5 16M9 6h6"/></symbol>
   </defs>
@@ -222,6 +230,31 @@
     <div id="threadList"></div>
   </section>
 
+  <!-- ===================== SQUAD ===================== -->
+  <section id="screen-squad" class="screen">
+    <div class="screen-head" id="squadHead">
+      <div>
+        <div class="screen-title">Squad</div>
+        <div class="screen-sub" id="squadSub">Train together, scored against yourself</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="openSquadJoin()"><svg class="ic"><use href="#i-link"/></svg><span>Join</span></button>
+    </div>
+    <div id="sqShell" class="hidden">
+      <div class="sq-appbar">
+        <span class="sq-appbar-mark" aria-hidden="true"><svg class="ic"><use href="#i-multi"/></svg></span>
+        <button class="sq-switch grow" onclick="openSquadSwitcher()" aria-label="Switch challenge">
+          <span class="sq-switch-k">SQUAD</span>
+          <span class="sq-switch-t"><span id="sqName">Squad</span><svg class="ic ic-sm"><use href="#i-chevron-down"/></svg></span>
+          <span class="sq-switch-s" id="sqDay"></span>
+        </button>
+        <button class="icon-btn" onclick="openSquadSettings()" aria-label="Challenge settings"><svg class="ic"><use href="#i-target"/></svg></button>
+      </div>
+      <nav class="sq-tabs" id="sqTabs" aria-label="Squad sections"></nav>
+    </div>
+    <div id="squadBody"></div>
+    <input type="file" id="squadImportFile" accept="image/*" class="hidden" onchange="squadImportPicked(event)" />
+  </section>
+
   <!-- ===================== REPORTS ===================== -->
   <section id="screen-reports" class="screen">
     <div class="screen-head">
@@ -239,6 +272,14 @@
 
     <div class="sport-seg mt-8" id="reportSportSeg"></div>
     <div class="sport-tiles mt-12" id="reportSports"></div>
+
+    <div class="story-head"><span class="kicker">The period in pictures</span><h3>Your training story</h3></div>
+    <div class="story-grid">
+      <div class="chart-card story-card"><div class="story-title">Daily load by sport</div><div id="repDailyChart" class="chart" style="min-height:210px"></div></div>
+      <div class="card story-card balance-card"><div class="story-title">Training balance <span class="tiny muted">0–100 on each axis</span></div><div id="repRadar"></div><div id="repRadarLegend" class="radar-legend"></div></div>
+      <div class="chart-card story-card"><div class="story-title">When you train <span class="tiny muted" id="repRhythmNote"></span></div><div id="repRhythmChart" class="chart" style="min-height:180px"></div></div>
+      <div id="repHighlights" class="highlight-grid"></div>
+    </div>
 
     <div class="lab mt-12">
       <div class="lab-title"><svg class="ic ic-sm"><use href="#i-activity"/></svg>Load, efficiency &amp; intensity</div>
@@ -491,6 +532,7 @@
   <button class="nav-btn" data-tab="trends"><span class="pill"></span><svg class="ic"><use href="#i-trend"/></svg>Trends</button>
   <button class="nav-btn" data-tab="compare"><span class="pill"></span><svg class="ic"><use href="#i-columns"/></svg>Compare</button>
   <button class="nav-btn" data-tab="coach"><span class="pill"></span><svg class="ic"><use href="#i-chat"/></svg>Coach</button>
+  <button class="nav-btn" data-tab="squad"><span class="pill"></span><svg class="ic"><use href="#i-multi"/></svg>Squad</button>
   <button class="nav-btn" data-tab="reports"><span class="pill"></span><svg class="ic"><use href="#i-report"/></svg>Reports</button>
   <button class="nav-btn" data-tab="profile"><span class="pill"></span><svg class="ic"><use href="#i-user"/></svg>Profile</button>
 </nav>
@@ -587,7 +629,165 @@
   </div>
 </div>
 
+<!-- SQUAD CHAT PANEL -->
+<div class="panel" id="squadChat">
+  <div class="panel-head">
+    <button class="icon-btn" onclick="closePanel('squadChat')" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button>
+    <div class="panel-title"><div class="t" id="squadChatTitle">Squad</div><div class="s" id="squadChatSub"></div></div>
+    <button class="icon-btn" onclick="openSquadSettings()" aria-label="Challenge settings"><svg class="ic"><use href="#i-target"/></svg></button>
+  </div>
+  <div class="panel-body" id="squadChatBody">
+    <div class="inner">
+      <div id="squadAiNote" class="sq-sys hidden">Aether is off in this challenge — the owner can switch it on in the settings.</div>
+      <div class="sq-list" id="squadChatList"></div>
+    </div>
+  </div>
+  <div class="quick-row">
+    <button class="chip" onclick="squadQuick('@Aether ')">@Aether</button>
+    <button class="chip" onclick="squadQuick('@Aether who is doing better this week, relative to himself?')">Who's winning?</button>
+    <button class="chip" onclick="squadQuick('@Aether roast whoever is slacking the most this week')">🔥 Roast the slacker</button>
+    <button class="chip" onclick="squadQuick('@Aether give us a challenge for tomorrow')">Dare us</button>
+  </div>
+  <div id="squadReplyBar" class="attach-preview hidden">
+    <svg class="ic"><use href="#i-chat"/></svg><span class="grow" id="squadReplyText"></span>
+    <button class="x-btn" onclick="Squad.replyTo = null; squadRenderChat(false)" aria-label="Cancel reply"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="composer">
+    <textarea id="squadInput" rows="1" placeholder="Message the squad… (@Aether for the AI)" oninput="autoGrow(this)" onkeydown="composerKey(event, () => sendSquadMessage())"></textarea>
+    <button class="icon-btn send-btn" onclick="sendSquadMessage()" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
+  </div>
+</div>
+
 <div id="scrim" class="scrim" onclick="scrimClicked()"></div>
+
+<!-- SQUAD SHEETS -->
+<div class="sheet" id="squadMsgSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="small" id="squadMsgPreview"></div>
+  <div class="sq-rx-picker mt-12" id="squadMsgReacts"></div>
+  <div class="sq-actions mt-12" id="squadMsgActions"></div>
+</div>
+
+<div class="sheet" id="squadActSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title" id="squadActTitle">Workout</div>
+  <div class="sheet-sub mb-12" id="squadActSub"></div>
+  <div id="squadActBody"></div>
+  <div class="row mt-12" style="gap:8px">
+    <input id="squadCommentInput" class="input" placeholder="Comment…" maxlength="2000" onkeydown="if (event.key === 'Enter') sendSquadComment()" />
+    <button class="icon-btn send-btn" onclick="sendSquadComment()" aria-label="Send comment"><svg class="ic"><use href="#i-send"/></svg></button>
+  </div>
+</div>
+
+<div class="sheet" id="squadStartSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Start a new challenge</div>
+  <div class="sheet-sub mb-12">You get an invite code to send to your friend. Everyone is scored against his own usual numbers.</div>
+  <div class="field"><label for="sqs_name">Challenge name</label><input id="sqs_name" class="input" maxlength="60" placeholder="e.g. November duel" /></div>
+  <div class="field mt-8"><label for="sqs_me">Your name in the squad</label><input id="sqs_me" class="input" maxlength="30" /></div>
+  <div class="row mt-8" style="gap:8px">
+    <div class="field grow"><label for="sqs_start">Starts</label><input id="sqs_start" type="date" class="input" /></div>
+    <div class="field grow"><label for="sqs_end">Ends</label><input id="sqs_end" type="date" class="input" /></div>
+  </div>
+  <div class="field mt-8"><label for="sqs_days">Your target: active days per week</label>
+    <select id="sqs_days" class="input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select>
+    <div class="hint" id="sqs_base"></div></div>
+  <div class="field mt-8"><label>Roast level</label>
+    <div class="segmented" id="sqs_roast"><button data-v="off" onclick="squadPickRoast('off')">Nice</button><button data-v="mild" class="active" onclick="squadPickRoast('mild')">Mild 🌶</button><button data-v="spicy" onclick="squadPickRoast('spicy')">Spicy 🌶🌶🌶</button></div></div>
+  <div class="field mt-8"><label for="sqs_ai">Aether's model (your key, kept on the server — your friend never sees it)</label><select id="sqs_ai" class="input"></select></div>
+  <details class="mt-8"><summary class="small">Server</summary>
+    <div class="field mt-8"><label for="sqs_server">Squad server address</label><input id="sqs_server" class="input" placeholder="https://training-partner-squad.…workers.dev" autocomplete="off" /></div>
+  </details>
+  <button class="btn btn-primary mt-12" id="sqsCreate" onclick="createSquadChallenge()"><svg class="ic"><use href="#i-plus"/></svg>Create challenge</button>
+</div>
+
+<div class="sheet" id="squadJoinSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Join a challenge</div>
+  <div class="sheet-sub mb-12">Enter the 8-character code your friend sent you.</div>
+  <div class="field"><label for="sqj_code">Invite code</label><input id="sqj_code" class="input sq-code-input" maxlength="9" placeholder="ABCD-EFGH" autocapitalize="characters" autocomplete="off" /></div>
+  <div class="field mt-8"><label for="sqj_me">Your name in the squad</label><input id="sqj_me" class="input" maxlength="30" /></div>
+  <details class="mt-8"><summary class="small">Server</summary>
+    <div class="field mt-8"><label for="sqj_server">Squad server address</label><input id="sqj_server" class="input" autocomplete="off" /></div>
+  </details>
+  <button class="btn btn-primary mt-12" id="sqjJoin" onclick="joinSquadChallenge()"><svg class="ic"><use href="#i-link"/></svg>Join</button>
+</div>
+
+<div class="sheet" id="squadSwitchSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Your challenges</div>
+  <div class="pick-list mt-8" id="squadSwitchList"></div>
+  <div class="btn-row mt-12"><button class="btn btn-secondary btn-sm" onclick="closeSheet('squadSwitchSheet'); openSquadJoin()"><svg class="ic"><use href="#i-link"/></svg>Join with a code</button><button class="btn btn-primary btn-sm" onclick="closeSheet('squadSwitchSheet'); openSquadStart()"><svg class="ic"><use href="#i-plus"/></svg>New challenge</button></div>
+</div>
+
+<div class="sheet" id="squadWeightSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Log weight</div>
+  <div class="sheet-sub mb-12" id="sqw_last"></div>
+  <div class="row" style="gap:8px">
+    <div class="field grow"><label for="sqw_kg">Weight (kg)</label><input id="sqw_kg" class="input" inputmode="decimal" placeholder="e.g. 78.4" /></div>
+    <div class="field grow"><label for="sqw_date">Date</label><input id="sqw_date" type="date" class="input" /></div>
+  </div>
+  <label class="check-row mt-8"><input type="checkbox" id="sqw_share" /><span>Share my body &amp; wellness trends with this squad<small class="hint">Off = the weight stays only on this phone (it still goes into your own coaching).</small></span></label>
+  <button class="btn btn-primary mt-12" onclick="saveSquadWeight()"><svg class="ic"><use href="#i-check-circle"/></svg>Save</button>
+</div>
+
+<div class="sheet" id="squadImportSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Workout from screenshot</div>
+  <div class="sheet-sub mb-12">Aether read these numbers — check them, fix anything wrong, then save. It's added to your own workouts and shared with the squad.</div>
+  <div class="row" style="gap:10px; align-items:flex-start">
+    <img id="sqi_thumb" class="sq-import-thumb" alt="" />
+    <div class="grow">
+      <div class="field"><label for="sqi_sport">Sport</label><select id="sqi_sport" class="input"><option value="walk">Walk</option><option value="swim">Swim</option><option value="run">Run</option><option value="ride">Ride</option><option value="other">Gym &amp; other</option></select></div>
+      <div class="field mt-8"><label for="sqi_title">Name</label><input id="sqi_title" class="input" maxlength="60" /></div>
+    </div>
+  </div>
+  <div class="row mt-8" style="gap:8px">
+    <div class="field grow"><label for="sqi_date">Date</label><input id="sqi_date" type="date" class="input" /></div>
+    <div class="field grow"><label for="sqi_time">Start</label><input id="sqi_time" type="time" class="input" /></div>
+  </div>
+  <div class="row mt-8" style="gap:8px">
+    <div class="field grow"><label for="sqi_dur">Duration (h:mm:ss)</label><input id="sqi_dur" class="input" placeholder="0:45:00" /></div>
+    <div class="field grow"><label for="sqi_dist">Distance (km)</label><input id="sqi_dist" class="input" inputmode="decimal" /></div>
+  </div>
+  <div class="row mt-8" style="gap:8px">
+    <div class="field grow"><label for="sqi_hr">Avg HR</label><input id="sqi_hr" class="input" inputmode="numeric" /></div>
+    <div class="field grow"><label for="sqi_steps">Steps</label><input id="sqi_steps" class="input" inputmode="numeric" /></div>
+    <div class="field grow"><label for="sqi_kcal">kcal</label><input id="sqi_kcal" class="input" inputmode="numeric" /></div>
+  </div>
+  <div class="hint mt-8" id="sqi_extra"></div>
+  <button class="btn btn-primary mt-12" onclick="saveSquadImport()"><svg class="ic"><use href="#i-check-circle"/></svg>Save workout</button>
+</div>
+
+<div class="sheet" id="squadRulesSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">How scoring works</div>
+  <div class="md mt-8" id="squadRulesBody"></div>
+</div>
+
+<div class="sheet" id="squadSettingsSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">Challenge settings</div>
+  <div id="sqx_owner">
+    <div class="field mt-8"><label for="sqx_name">Name</label><input id="sqx_name" class="input" maxlength="60" /></div>
+    <div class="row mt-8" style="gap:8px">
+      <div class="field grow"><label for="sqx_end">Ends</label><input id="sqx_end" type="date" class="input" /></div>
+      <div class="field grow"><label for="sqx_days">Default days/week</label><select id="sqx_days" class="input"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+    </div>
+    <div class="field mt-8"><label>Roast level</label>
+      <div class="segmented" id="sqx_roast"><button data-v="off" onclick="$$('#sqx_roast button').forEach(b => b.classList.toggle('active', b === this))">Nice</button><button data-v="mild" onclick="$$('#sqx_roast button').forEach(b => b.classList.toggle('active', b === this))">Mild 🌶</button><button data-v="spicy" onclick="$$('#sqx_roast button').forEach(b => b.classList.toggle('active', b === this))">Spicy 🌶🌶🌶</button></div></div>
+    <div class="field mt-8"><label for="sqx_ai">Aether (AI)</label><div class="hint" id="sqx_ai_state"></div><select id="sqx_ai" class="input mt-4"></select></div>
+    <label class="check-row mt-8"><input type="checkbox" id="sqx_interrupts" /><span>Aether may chime in on its own (PBs, streaks, quiet days — max 4 a day, never while you're talking)</span></label>
+    <label class="check-row"><input type="checkbox" id="sqx_recap_on" /><span>Daily recap at</span><select id="sqx_recap" class="input sq-hour"><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option></select></label>
+  </div>
+  <div class="section-title"><span>You</span></div>
+  <div class="field"><label for="sqx_target">My target: active days per week</label><select id="sqx_target" class="input"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+  <label class="check-row mt-8"><input type="checkbox" id="sqx_share" /><span>Share my workouts automatically (summaries only)</span></label>
+  <label class="check-row"><input type="checkbox" id="sqx_notes" /><span>Include how it felt, my note and my coach's one-line verdict</span></label>
+  <label class="check-row"><input type="checkbox" id="sqx_wellness" /><span>Share body &amp; wellness trends<small class="hint">Weight, resting HR, HRV, sleep and daily steps from the challenge start — for the Stats graphs and the monthly report. Switching it off removes them from the squad.</small></span></label>
+  <div class="btn-row mt-12"><button class="btn btn-danger btn-sm" onclick="leaveSquadChallenge()">Leave</button><button class="btn btn-primary" id="sqxSave" onclick="saveSquadSettings()">Save</button></div>
+</div>
 
 <!-- INTENT SHEET -->
 <div class="sheet" id="intentSheet" role="dialog" aria-modal="true">
@@ -736,7 +936,7 @@
   <div class="sheet-sub mb-12" id="qs_sub">Fix the sport or mark values that are wrong. Flagged values are left out of records, best efforts, trends and AI analysis — the original numbers are kept.</div>
   <div class="field"><label>Sport</label>
     <div class="segmented" id="qs_sport">
-      <button data-v="ride" onclick="qsPickSport('ride')">Ride</button><button data-v="run" onclick="qsPickSport('run')">Run</button><button data-v="swim" onclick="qsPickSport('swim')">Swim</button><button data-v="other" onclick="qsPickSport('other')">Gym</button>
+      <button data-v="ride" onclick="qsPickSport('ride')">Ride</button><button data-v="run" onclick="qsPickSport('run')">Run</button><button data-v="walk" onclick="qsPickSport('walk')">Walk</button><button data-v="swim" onclick="qsPickSport('swim')">Swim</button><button data-v="other" onclick="qsPickSport('other')">Gym</button>
     </div>
   </div>
   <label class="check-row"><input type="checkbox" id="qs_indoor" /><span><b>Indoor / stationary</b><span class="tiny muted">Gym bike, trainer or treadmill — distance, speed and climbing are ignored</span></span></label>
@@ -755,7 +955,7 @@
 <div class="sheet" id="inboxSheet" role="dialog" aria-modal="true">
   <div class="sheet-grip"></div>
   <div class="sheet-title">New activities</div>
-  <div class="sheet-sub mb-12">These types aren't imported automatically. Ticked ones are added (walks and hikes count as runs, everything else as Gym &amp; other); the rest are skipped and won't be asked again.</div>
+  <div class="sheet-sub mb-12">These types aren't imported automatically. Ticked ones are added (walks and hikes as Walks, everything else as Gym &amp; other); the rest are skipped and won't be asked again.</div>
   <div id="inboxList"></div>
   <div class="field-label mt-12">Remember for next time</div>
   <div id="inboxRules"></div>
@@ -808,6 +1008,9 @@
 <script src="js/app/views/trends.js"></script>
 <script src="js/app/views/compare.js"></script>
 <script src="js/app/views/coach.js"></script>
+<script src="js/app/squad-core.js"></script>
+<script src="js/app/views/squad.js"></script>
+<script src="js/app/views/squad-stats.js"></script>
 <script src="js/app/views/reports.js"></script>
 <script src="js/app/views/profile.js"></script>
 <script src="js/app/demo.js"></script>

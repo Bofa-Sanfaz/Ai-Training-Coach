@@ -37,7 +37,8 @@ db.version(3).stores({
 const restoreDb = new Dexie('RidePartnerRestorePoints');
 restoreDb.version(1).stores({ snapshots: '++id, created_at, reason, kind' });
 
-const SENSITIVE_KEYS = ['gemini_api_key', 'strava_client_secret', 'strava_refresh_token', 'strava_access_token', 'strava_token_expires'];
+// squad_challenges holds squad member tokens; squad_outbox may hold unsent posts — both stay with the phone
+const SENSITIVE_KEYS = ['gemini_api_key', 'strava_client_secret', 'strava_refresh_token', 'strava_access_token', 'strava_token_expires', 'squad_challenges', 'squad_outbox'];
 const DATA_TABLES = ['workouts', 'threads', 'master_chat', 'graph_threads', 'reports', 'config'];
 const MAX_AUTO_RESTORE_POINTS = 6;
 const MAX_MANUAL_RESTORE_POINTS = 6;

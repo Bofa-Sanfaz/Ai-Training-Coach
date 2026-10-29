@@ -174,8 +174,8 @@ async function renderComparison() {
       ['Fastest 100 m', w => sw(w) && sw(w).best[100], w => fmtSec(sw(w) && sw(w).best[100]), true, 0, ' s'],
       ['Stroke rate', w => sw(w) && sw(w).stroke_rate, w => (sw(w) && sw(w).stroke_rate ? `${sw(w).stroke_rate} /min` : '--'), false, 1, '/min']);
   }
-  if (sp === 'run') rows.splice(4, 0, ['Cadence', w => w.avg_cadence || null, w => (w.avg_cadence ? `${w.avg_cadence} spm` : '--'), false, 0, ' spm']);
-  if (sp === 'ride' || (sp === 'run' && !isIndoor(w1) && !isIndoor(w2))) rows.splice(4, 0, ['Ascent', w => mv(w, 'elevation_gain_m'), w => (hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged'), false, 0, ' m']);
+  if (onFoot(sp)) rows.splice(4, 0, ['Cadence', w => w.avg_cadence || null, w => (w.avg_cadence ? `${w.avg_cadence} spm` : '--'), false, 0, ' spm']);
+  if (sp === 'ride' || (onFoot(sp) && !isIndoor(w1) && !isIndoor(w2))) rows.splice(4, 0, ['Ascent', w => mv(w, 'elevation_gain_m'), w => (hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged'), false, 0, ' m']);
   if (sp === 'ride') {
     rows.push(['Climbing VAM', w => mv(w, 'climbing_vam'), w => (mv(w, 'climbing_vam') ? `${w.climbing_vam} m/h` : '--'), false, 0, ' m/h']);
     rows.push(['Max speed', w => mv(w, 'max_speed_kmh'), w => (mv(w, 'max_speed_kmh') ? `${fmtNum(w.max_speed_kmh, 1)} km/h` : '--'), false, 1, ' km/h']);
@@ -225,7 +225,7 @@ async function renderCompareChart(list) {
   const el = $('#compareChart');
   if (!plotReady()) return chartEmpty(el, 'Charts unavailable.');
   const sp = sportOf(list[1]);
-  const byDist = sp === 'ride' || sp === 'run';
+  const byDist = sp === 'ride' || onFoot(sp);
   const colors = ['#94a3b8', SPORTS[sp].color, '#8b5cf6'];
   const traces = [];
   for (let k = 0; k < list.length; k++) {

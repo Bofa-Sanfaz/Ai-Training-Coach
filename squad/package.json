@@ -1,0 +1,15 @@
+{
+  "name": "training-partner-squad",
+  "private": true,
+  "description": "Squad server for Training Partner (Cloudflare Worker + D1)",
+  "scripts": {
+    "migrate:local": "wrangler d1 migrations apply squad --local",
+    "dev": "wrangler dev --port 8787",
+    "test": "node test/api-test.mjs",
+    "migrate:remote": "wrangler d1 migrations apply squad --remote",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.155.0"
+  }
+}

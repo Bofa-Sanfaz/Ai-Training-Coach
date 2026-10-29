@@ -6,3 +6,8 @@ android/
 
 # temporary local test files (never commit)
 www/_tmp*
+
+# Squad server: local D1 database, wrangler state and secrets (never commit)
+.wrangler/
+.dev.vars*
+squad/package-lock.json

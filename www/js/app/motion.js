@@ -7,7 +7,7 @@
 // is canvas-confetti (github.com/catdad/canvas-confetti, ISC). Everything is
 // skipped when the phone asks for reduced motion.
 // --------------------------------------------------------
-const TAB_ORDER = ['rides', 'trends', 'compare', 'coach', 'reports', 'profile'];
+const TAB_ORDER = ['rides', 'trends', 'compare', 'coach', 'squad', 'reports', 'profile'];
 const SPRING = 'cubic-bezier(0.22, 1.2, 0.36, 1)';
 
 function reducedMotion() {
@@ -27,6 +27,8 @@ function viewSwap(update, dir = 'fwd') {
   root.dataset.vt = dir;
   let t;
   try { t = document.startViewTransition(run); } catch (e) { delete root.dataset.vt; return run(); }
+  // A transition interrupted by the next tap rejects `ready`; that is expected, not an error
+  t.ready.catch(() => {});
   t.finished.catch(() => {}).finally(() => { delete root.dataset.vt; });
   setTimeout(() => { if (!result) { try { t.skipTransition(); } catch (e) { /* already done */ } run(); } }, 300);
   return new Promise(res => { const wait = () => (result ? res(result) : setTimeout(wait, 25)); wait(); });

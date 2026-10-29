@@ -12,21 +12,21 @@ let graphAiBusy = false;
 // (for pace the line is speed, so higher = faster; SWOLF/strokes: higher = less efficient).
 const GLOBAL_METRICS = {
   'Speed (km/h)': { sports: ['ride'], color: '#2563eb', val: w => mv(w, 'avg_speed_kmh') || null, fmt: w => speedText(w), floor: 25 },
-  'Pace': { sports: ['run', 'swim'], color: '#16a34a', val: w => (sportOf(w) === 'swim' ? (swimPace100(w) ? 360 / swimPace100(w) : null) : mv(w, 'avg_speed_kmh') || null), fmt: w => (sportOf(w) === 'swim' ? `${fmtSec(swimPace100(w))} /100m` : speedText(w)), floor: 1 },
+  'Pace': { sports: ['run', 'walk', 'swim'], color: '#16a34a', val: w => (sportOf(w) === 'swim' ? (swimPace100(w) ? 360 / swimPace100(w) : null) : mv(w, 'avg_speed_kmh') || null), fmt: w => (sportOf(w) === 'swim' ? `${fmtSec(swimPace100(w))} /100m` : speedText(w)), floor: 1 },
   'SWOLF': { sports: ['swim'], color: '#0891b2', val: w => (swimOf(w) && swimOf(w).swolf) || null, fmt: w => `SWOLF ${(swimOf(w) && swimOf(w).swolf) || '--'}`, floor: 40 },
   'Strokes / length': { sports: ['swim'], color: '#7c3aed', val: w => (swimOf(w) && swimOf(w).spl) || null, fmt: w => `${(swimOf(w) && swimOf(w).spl) || '--'} strokes/length`, floor: 12 },
-  'Cadence (spm)': { sports: ['run'], color: '#8b5cf6', val: w => w.avg_cadence || null, fmt: w => `${w.avg_cadence || '--'} spm`, floor: 160 },
+  'Cadence (spm)': { sports: ['run', 'walk'], color: '#8b5cf6', val: w => w.avg_cadence || null, fmt: w => `${w.avg_cadence || '--'} spm`, floor: 160 },
   'Power Output (Watts)': { sports: ['ride'], color: '#fc5200', val: w => mv(w, 'avg_power_w') || null, fmt: w => `${w.avg_power_w || '--'} W${w.device_watts ? '' : ' (est)'}`, floor: 250 },
-  'Heart Rate (bpm)': { sports: ['ride', 'run', 'swim', 'other'], color: '#ef4444', val: w => mv(w, 'avg_hr') || null, fmt: w => `${w.avg_hr || '--'} bpm`, hr: true },
-  'Efficiency': { sports: ['ride', 'run'], color: '#0d9488', val: w => (mv(w, 'avg_speed_kmh') > 0 && mv(w, 'avg_hr') > 0 ? (w.avg_speed_kmh / w.avg_hr) * 100 : null), fmt: w => (w.avg_hr ? `${fmtNum((w.avg_speed_kmh / w.avg_hr) * 100, 1)} speed/100 bpm` : '--'), floor: 15 },
-  'Distance': { sports: ['ride', 'run', 'swim'], color: '#8b5cf6', val: w => mv(w, 'distance_km') || null, fmt: w => distText(w), floor: 1 },
-  'Duration': { sports: ['ride', 'run', 'swim', 'other'], color: '#64748b', val: w => (num(w.moving_sec) / 60) || null, fmt: w => rideDuration(w), floor: 30 },
-  'Elevation Ascent (m)': { sports: ['ride', 'run'], color: '#94a3b8', val: w => (isIndoor(w) ? null : mv(w, 'elevation_gain_m') || null), fmt: w => `${Math.round(num(w.elevation_gain_m))} m`, floor: 150 },
+  'Heart Rate (bpm)': { sports: ['ride', 'run', 'walk', 'swim', 'other'], color: '#ef4444', val: w => mv(w, 'avg_hr') || null, fmt: w => `${w.avg_hr || '--'} bpm`, hr: true },
+  'Efficiency': { sports: ['ride', 'run', 'walk'], color: '#0d9488', val: w => (mv(w, 'avg_speed_kmh') > 0 && mv(w, 'avg_hr') > 0 ? (w.avg_speed_kmh / w.avg_hr) * 100 : null), fmt: w => (w.avg_hr ? `${fmtNum((w.avg_speed_kmh / w.avg_hr) * 100, 1)} speed/100 bpm` : '--'), floor: 15 },
+  'Distance': { sports: ['ride', 'run', 'walk', 'swim'], color: '#8b5cf6', val: w => mv(w, 'distance_km') || null, fmt: w => distText(w), floor: 1 },
+  'Duration': { sports: ['ride', 'run', 'walk', 'swim', 'other'], color: '#64748b', val: w => (num(w.moving_sec) / 60) || null, fmt: w => rideDuration(w), floor: 30 },
+  'Elevation Ascent (m)': { sports: ['ride', 'run', 'walk'], color: '#94a3b8', val: w => (isIndoor(w) ? null : mv(w, 'elevation_gain_m') || null), fmt: w => `${Math.round(num(w.elevation_gain_m))} m`, floor: 150 },
   'Work (kJ)': { sports: ['ride'], color: '#10b981', val: w => mv(w, 'kilojoules') || null, fmt: w => `${w.kilojoules || '--'} kJ`, floor: 800 },
   'Calories': { sports: ['other', 'swim'], color: '#f59e0b', val: w => w.calories || null, fmt: w => `${w.calories || '--'} kcal`, floor: 200 },
-  'Load (TRIMP)': { sports: ['ride', 'run', 'swim', 'other'], color: '#db2777', val: w => (hasVal(mv(w, 'trimp')) ? w.trimp : null), fmt: w => `${hasVal(w.trimp) ? Math.round(w.trimp) : '--'} TRIMP`, floor: 80 }
+  'Load (TRIMP)': { sports: ['ride', 'run', 'walk', 'swim', 'other'], color: '#db2777', val: w => (hasVal(mv(w, 'trimp')) ? w.trimp : null), fmt: w => `${hasVal(w.trimp) ? Math.round(w.trimp) : '--'} TRIMP`, floor: 80 }
 };
-const DEFAULT_PROGRESSION = { ride: ['Speed (km/h)', 'Heart Rate (bpm)', 'Distance'], run: ['Pace', 'Heart Rate (bpm)', 'Distance'], swim: ['Pace', 'SWOLF', 'Heart Rate (bpm)'], other: ['Duration', 'Heart Rate (bpm)', 'Load (TRIMP)'] };
+const DEFAULT_PROGRESSION = { ride: ['Speed (km/h)', 'Heart Rate (bpm)', 'Distance'], run: ['Pace', 'Heart Rate (bpm)', 'Distance'], swim: ['Pace', 'SWOLF', 'Heart Rate (bpm)'], other: ['Duration', 'Heart Rate (bpm)', 'Load (TRIMP)'], walk: ['Pace', 'Distance', 'Heart Rate (bpm)'] };
 let progressionSport = 'ride';
 
 function setupTrendsControls() {
@@ -206,7 +206,7 @@ function renderBestEffortsTable() {
     const probe = { sport: sp };
     const name = s => (sportsPresent(trendsCache.workouts).length > 1 ? `${SPORTS[sp].label} ${s}` : s);
     if (sp === 'swim') groups.push({ pool, name: name('fastest'), field: 'swim', durs: [50, 100, 200, 400], label: d => `${d} m`, fmt: v => fmtSec(v) });
-    if (sp === 'ride' || sp === 'run') groups.push({ pool, name: name(sp === 'ride' ? 'speed' : 'pace'), field: 'best_spd', durs: [60, 300, 1200, 3600], fmt: v => speedText(probe, v) });
+    if (sp === 'ride' || onFoot(sp)) groups.push({ pool, name: name(sp === 'ride' ? 'speed' : 'pace'), field: 'best_spd', durs: [60, 300, 1200, 3600], fmt: v => speedText(probe, v) });
     groups.push({ pool, name: name('HR'), field: 'best_hr', durs: [60, 300, 1200, 3600], fmt: v => `${Math.round(v)} bpm` });
     if (sp === 'ride') groups.push({ pool, name: 'Power (meter)', field: 'mmp', durs: [5, 60, 300, 1200, 3600], fmt: v => `${Math.round(v)} W` });
   }
@@ -293,7 +293,7 @@ function renderGlobalGraph() {
   if (el.on) el.on('plotly_hover', data => {
     const pt = data.points && data.points[0];
     const w = pt && workouts[pt.pointIndex];
-    if (w) $('#global_banner_sub').textContent = `${rideTitle(w)} — ${formatFullDateWithDay(w.date)}: ${distText(w)}, ${speedText(w)}, ${w.avg_hr || '--'} bpm${sportOf(w) === 'ride' || sportOf(w) === 'run' ? `, ${Math.round(num(w.elevation_gain_m))} m` : ''}`;
+    if (w) $('#global_banner_sub').textContent = `${rideTitle(w)} — ${formatFullDateWithDay(w.date)}: ${distText(w)}, ${speedText(w)}, ${w.avg_hr || '--'} bpm${sportOf(w) === 'ride' || onFoot(sportOf(w)) ? `, ${Math.round(num(w.elevation_gain_m))} m` : ''}`;
   });
   if (el.on) el.on('plotly_click', data => {
     const pt = data.points && data.points[0];

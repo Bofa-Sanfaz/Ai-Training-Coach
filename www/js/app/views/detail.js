@@ -80,7 +80,7 @@ async function renderRideDetail() {
   await renderDeltaTable(w);
   await renderBestEfforts(w);
 
-  const hasDist = sp === 'ride' || sp === 'run';
+  const hasDist = sp === 'ride' || onFoot(sp);
   $('#banner_line1_l').textContent = `⏱ ${rideDuration(w)}`;
   $('#banner_line1_r').textContent = hasDist ? `📏 ${distText(w)}` : '';
   $('#banner_line2_l').textContent = hasDist ? `⚡ Avg ${speedText(w)}` : '';
@@ -201,12 +201,12 @@ async function renderDeltaTable(w) {
   } else if (sp !== 'other') {
     rows.push(['Distance', okD ? distText(w) : 'flagged', distText(w, p.avgDist), okD ? deltaCell(num(w.distance_km) - p.avgDist, 2, ' km') : na]);
     rows.push([`${speedName(w)} (weighted)`, okD ? speedText(w) : 'flagged', p.speed ? speedText(w, p.speed) : '--', okD && p.speed ? (sp === 'ride' ? deltaCell(num(w.avg_speed_kmh) - p.speed, 1, ' km/h') : `<span class="${w.avg_speed_kmh > p.speed ? 'pos' : 'neg'}">${w.avg_speed_kmh > p.speed ? 'faster' : 'slower'}</span>`) : na]);
-    if (sp === 'run' && w.avg_cadence) { const c = rides.map(r => r.avg_cadence).filter(Boolean); if (c.length) rows.push(['Cadence', `${w.avg_cadence} spm`, `${Math.round(mean(c))} spm`, deltaCell(w.avg_cadence - mean(c), 0, ' spm')]); }
+    if (onFoot(sp) && w.avg_cadence) { const c = rides.map(r => r.avg_cadence).filter(Boolean); if (c.length) rows.push(['Cadence', `${w.avg_cadence} spm`, `${Math.round(mean(c))} spm`, deltaCell(w.avg_cadence - mean(c), 0, ' spm')]); }
   } else {
     rows.push(['Time', rideDuration(w), formatDuration(p.sec / rides.length), deltaCell((num(w.moving_sec) - p.sec / rides.length) / 60, 0, ' min')]);
   }
   rows.push(['HR (weighted)', mv(w, 'avg_hr') ? `${w.avg_hr} bpm` : '--', p.hr ? `${Math.round(p.hr)} bpm` : '--', mv(w, 'avg_hr') && p.hr ? deltaCell(w.avg_hr - p.hr, 0, ' bpm', true) : na]);
-  if (sp === 'ride' || (sp === 'run' && !isIndoor(w))) rows.push(['Ascent', hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged', `${Math.round(p.avgAsc)} m`, hasVal(mv(w, 'elevation_gain_m')) ? deltaCell(num(w.elevation_gain_m) - p.avgAsc, 0, ' m') : na]);
+  if (sp === 'ride' || (onFoot(sp) && !isIndoor(w))) rows.push(['Ascent', hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged', `${Math.round(p.avgAsc)} m`, hasVal(mv(w, 'elevation_gain_m')) ? deltaCell(num(w.elevation_gain_m) - p.avgAsc, 0, ' m') : na]);
   if (hasVal(w.trimp) && p.trimp > 0) {
     const avgLoad = p.trimp / rides.filter(r => hasVal(r.trimp)).length;
     rows.push(['Load', `${Math.round(w.trimp)}`, `${Math.round(avgLoad)}`, deltaCell(w.trimp - avgLoad, 0, '')]);
@@ -277,11 +277,11 @@ function renderStreamPlot() {
   }
   if ((selectedMetrics.includes('Speed (km/h)') || selectedMetrics.includes('Pace')) && speeds.length) {
     const peak = Math.max(safeMax(speeds, 0), 1);
-    const isRun = sportOf(w) === 'run';
+    const isRun = onFoot(sportOf(w));
     traces.push({ x: times, y: norm(speeds, 0, peak), name: isRun ? 'Pace' : 'Speed', text: speeds.map(s => (isRun ? speedText(w, s) : `${s} km/h`)), hovertemplate: `${isRun ? '🏃' : '🚴'} %{text}<extra></extra>`, type: 'scatter', line: { color: isRun ? '#16a34a' : '#2563eb', width: 1.8 } });
   }
   if ((selectedMetrics.includes('Cadence (RPM)') || selectedMetrics.includes('Cadence (spm)')) && cad.length) {
-    const unit = sportOf(w) === 'run' ? 'spm' : 'rpm';
+    const unit = onFoot(sportOf(w)) ? 'spm' : 'rpm';
     traces.push({ x: times, y: norm(cad, 0, Math.max(safeMax(cad, 0), 1)), name: 'Cadence', text: cad.map(c => `${c} ${unit}`), hovertemplate: '🔄 %{text}<extra></extra>', type: 'scatter', line: { color: '#8b5cf6', width: 1.2 } });
   }
   if (!traces.length) return chartEmpty(el, 'No samples for the selected metrics.');

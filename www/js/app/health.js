@@ -311,7 +311,7 @@ function shdExtras(s, sport) {
     x.swim = sw;
     if (sw) { x.distance_km = round(sw.distance_m / 1000, 3); x.moving_sec = sw.active_sec; x.avg_speed_kmh = round((sw.distance_m / 1000) / (sw.active_sec / 3600), 2); x.pool_length_m = sw.pool_m; }
   }
-  if (sport === 'run') {
+  if (onFoot(sport)) {
     // Samsung reports running cadence as steps per minute
     if (s.meanCadence > 0) x.avg_cadence = Math.round(s.meanCadence);
     if (s.maxCadence > 0) x.max_cadence = Math.round(s.maxCadence);
@@ -390,9 +390,9 @@ async function importSamsungSwims(full = false) {
     };
     Object.assign(w, shdExtras(s, sport));
     // Heart rate for zones/load; speed too for treadmill/runs (pace best efforts). Swim speed per sample isn't meaningful.
-    const withSpeed = sport === 'run' && log.some(p => p.sp > 0);
+    const withSpeed = onFoot(sport) && log.some(p => p.sp > 0);
     const pts = withSpeed ? log.filter(p => p.hr > 30 || p.sp > 0) : hrPts;
-    const withCad = sport === 'run' && log.some(p => p.cad > 0);
+    const withCad = onFoot(sport) && log.some(p => p.cad > 0);
     const stream = pts.length > 5 ? Object.assign({ time: { data: pts.map(p => p.t) }, heartrate: { data: pts.map(p => Math.round(p.hr) || null) } }, withSpeed ? { velocity_smooth: { data: pts.map(p => p.sp) } } : {}, withCad ? { cadence: { data: pts.map(p => Math.round(p.cad) || null) } } : {}) : null;
     w.id = await db.workouts.add(w);
     await db.streams.put({ strava_id: sid, stream_data: stream });

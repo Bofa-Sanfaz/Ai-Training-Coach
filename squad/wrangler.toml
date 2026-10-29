@@ -1,0 +1,22 @@
+# Squad server — Cloudflare Workers free plan (serverless: nothing to pause or wake up).
+# Local test:  npx wrangler d1 migrations apply squad --local && npx wrangler dev
+# Deploy:      npx wrangler login, then see squad/README.md
+name = "training-partner-squad"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# The web app (Assad's iPhone version) is the same www/ folder, served by this Worker
+[assets]
+directory = "../www"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "squad"
+database_id = "00000000-0000-0000-0000-000000000000" # replaced by `wrangler d1 create squad` output
+migrations_dir = "migrations"
+
+# The AI's own initiatives (interruptions, daily recap) — one cron, every 15 minutes
+[triggers]
+crons = ["*/15 * * * *"]

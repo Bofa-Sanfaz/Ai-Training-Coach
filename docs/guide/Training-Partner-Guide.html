@@ -43,13 +43,13 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.4</div>
+    <div class="kick">User guide · version 3.5</div>
     <h1>Training Partner</h1>
     <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus everything that changed in 3.3.</div>
   </div>
   <div class="toc">
     <div><b>1</b>What changed in 3.3</div>
-    <div><b>2</b>The six screens</div>
+    <div><b>2</b>The seven screens</div>
     <div><b>3</b>Workout detail</div>
     <div><b>4</b>Where data comes from</div>
     <div><b>5</b>Wrong data, sports, deleting</div>
@@ -59,6 +59,7 @@
     <div><b>9</b>Plan, targets &amp; Aether's changes</div>
     <div><b>10</b>Reports &amp; the PDF</div>
     <div><b>11</b>Backups, privacy, updates</div>
+    <div><b>12</b>Squad — training together</div>
   </div>
 </div>
 
@@ -68,7 +69,7 @@
 <p>Ride Partner became <b>Training Partner</b>: one app for riding, running, swimming and gym work. Everything below was changed in this version.</p>
 
 <div class="new"><b>All your sports</b>Runs from Strava; pool swims, treadmill runs, the gym bike, elliptical, stair stepper, rowing machine and strength sessions straight from the Galaxy Watch through Samsung Health. Each sport has its own colour and icon (<span class="tag ride">Ride</span><span class="tag run">Run</span><span class="tag swim">Swim</span><span class="tag gym">Gym &amp; other</span>), its own numbering (Ride 043, Run 002, Swim 001, Gym 001) and its own units (km/h for rides, pace per km for runs, pace per 100 m for swims).</div>
-<div class="new"><b>New activity inbox</b>Types the app doesn't import by default — walks, hikes, yoga, football… — wait in an inbox on the Training screen. Include them (walks and hikes count as runs, everything else as Gym &amp; other) or skip them, and optionally remember the choice for that type.</div>
+<div class="new"><b>New activity inbox</b>Types the app doesn't import by default — walks, hikes, yoga, football… — wait in an inbox on the Training screen. Include them (walks and hikes count as runs — since 3.5 as Walks — everything else as Gym &amp; other) or skip them, and optionally remember the choice for that type.</div>
 <div class="new"><b>Only 2026 onwards</b>Strava and Samsung Health imports ignore anything before 1 January 2026.</div>
 <div class="new"><b>Mark wrong data</b>The flag on every workout (and on every record) opens a sheet: change the sport, mark it indoor, mark climbing, distance/speed, heart rate or power as a data error, exclude it, or delete it. Original numbers are kept; flagged values are simply left out of records, best efforts, trends, totals and AI context.</div>
 <div class="new"><b>Delete workouts</b>Deleting creates a restore point first and remembers the workout so sync never brings it back.</div>
@@ -87,7 +88,8 @@
 
 <!-- ============================================================ -->
 <div class="section">
-<h2><span class="k">Section 2</span>The six screens</h2>
+<h2><span class="k">Section 2</span>The seven screens</h2>
+<p class="muted">Training · Trends · Compare · Coach · <b>Squad</b> (section 12) · Reports · Profile.</p>
 
 <h3>Training</h3>
 <ul>
@@ -96,7 +98,7 @@
   <li><b>Week card</b>: sessions, ride km, time and climbing this week vs last week, progress bars against your weekly targets, streak, form, and a chip per sport (sessions · time).</li>
   <li><b>Readiness strip</b> (Samsung Health): last night's sleep, resting HR vs 30-day baseline, HRV when available.</li>
   <li><b>Today's planned session</b>, tap to open the plan.</li>
-  <li><b>Sport chips</b> (All · Rides · Runs · Swims · Gym &amp; other), shown when you have more than one sport. The choice also applies to Trends.</li>
+  <li><b>Sport chips</b> (All · Rides · Runs · Walks · Swims · Gym &amp; other), shown when you have more than one sport. The choice also applies to Trends.</li>
   <li><b>Search</b> across name, date, sport, zone and your notes; <b>filters</b> Training / Play / No intent / Needs review.</li>
   <li><b>Workout cards</b> grouped by month: distance, time, speed or pace, HR, ascent (or energy for gym), load, and the zone strip. Flagged values are struck through; excluded workouts are faded.</li>
 </ul>
@@ -189,7 +191,7 @@
 <p>Permissions are read-only: heart rate, resting HR, HRV, sleep, steps, weight, VO2max, SpO2, respiratory rate, exercise sessions, distance, active calories, and history access. The first manual import after this update asks for the new ones once.</p>
 
 <h3>The inbox</h3>
-<p>Each waiting activity shows type → sport, date, distance and duration. Ticked ones are added (walks and hikes as runs, others as Gym &amp; other), unticked ones are skipped for good. "Every walk from now on" can be set to <i>Include</i> or <i>Skip</i>; you can change it next time the inbox opens.</p>
+<p>Each waiting activity shows type → sport, date, distance and duration. Ticked ones are added (walks and hikes as Walks, others as Gym &amp; other), unticked ones are skipped for good. "Every walk from now on" can be set to <i>Include</i> or <i>Skip</i>; you can change it next time the inbox opens.</p>
 </div>
 
 <!-- ============================================================ -->
@@ -354,6 +356,52 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
   <li>Updates install over the old version (same signing key), so data stays. Classic (v2) interface remains available as a rollback.</li>
   <li>USB debugging of the app's WebView is enabled for diagnostics; it only works from a computer you've authorised for USB debugging.</li>
 </ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 12 · new in 3.5</span>Squad — training together</h2>
+<p>The <b>Squad</b> tab is a small app of its own for challenges with friends (made for training with Assad: iPhone, Huawei Watch Fit 5 Pro, mostly walking and swimming). Your personal side stays exactly as it was — the squad only receives <b>summaries</b>. Walks are now their own sport too (<span class="tag" style="background:#ca8a04">Walk</span>: pace /km, steps, cadence) instead of counting as runs.</p>
+
+<h3>The sections</h3>
+<table>
+  <tr><th style="width:24mm">Section</th><th>What it shows</th></tr>
+  <tr><td><b>Home</b></td><td>Total points (each against his own usual), who trained today, the chat preview, quick actions (add from screenshot, log weight, ask Aether), this week's score cards, Aether's latest recap, latest workouts.</td></tr>
+  <tr><td><b>Chat</b></td><td>3-way chat: you, your friend(s) and Aether. Workouts appear inline. Tap a message or workout to react, reply, or ask Aether for a <b>review</b> or a <b>roast</b>. Mention <code>@Aether</code> to ask anything.</td></tr>
+  <tr><td><b>Feed</b></td><td>Every shared workout by day, filter by person or sport; reactions and comments; open one for all its numbers (every swim length too).</td></tr>
+  <tr><td><b>Stats</b></td><td>Per-person table (last 4 weeks or whole challenge), points per week, minutes per week against each person's own usual (dashed), pace against own usual, weekly duels, sport mix, time of day, training calendar, and — for those who share it — weight change, steps, resting HR and sleep; personal bests.</td></tr>
+  <tr><td><b>Report</b></td><td>Monthly report per person (workouts, active days, time, distance, load, best streak, PBs, weight change, sleep, steps, sports), minutes per day, "on track vs own usual", points per week, Aether's written monthly report and a <b>PDF</b>.</td></tr>
+  <tr><td><b>Crew</b></td><td>Each person's profile and baseline (what he is measured against), wins, streaks, PBs; challenge rules; invite code; settings; leave.</td></tr>
+</table>
+
+<h3>Fair scoring — everyone against himself</h3>
+<p>Different bodies, sports and starting points never decide the winner. Each person's <b>baseline</b> comes from his own 4 weeks before the challenge (or his first challenge week).</p>
+<span class="formula">weekly points = consistency 40 × min(active days / own target, 1)
+              + volume 30 × min(minutes / own usual, 1.5) / 1.5
+              + improvement 30 × (0.5 + clamp(pace better than own usual / 5 %, −1, 1) / 2)
+              + bonuses: PB +5 each (max 15) · streak day of 3+ in a row +1 (max 7) · over target +3</span>
+<p>Improvement uses swim pace /100 m, walk and run pace /km and ride speed, weighted by minutes per sport. The higher relative score wins the week (<b>weekly duel</b>); the month goes to the higher average weekly points. Weight is never compared: graphs, the PDF and Aether only ever see each person's <b>change</b>.</p>
+
+<h3>What is shared</h3>
+<ul>
+  <li>Automatically after every sync, for workouts from the challenge start: sport, date and time, duration, distance, pace/speed, heart rate, load, SWOLF and every swim length, cadence, steps, climbing, personal bests (vs your own earlier workouts of that sport, after 3 of them).</li>
+  <li>Unless switched off: how it felt (RPE), your note and the first sentence of your coach's debrief.</li>
+  <li>Only if switched on (opt-in): weight, resting HR, HRV, sleep and daily steps. Switching it off removes them from the squad.</li>
+  <li>Editing or deleting a workout updates or removes it in the squad too.</li>
+</ul>
+
+<h3>Aether in the squad</h3>
+<p>One strong model with the challenge owner's key, kept on the squad server (friends never see the key; the monthly spend cap applies). It answers <code>@Aether</code>, Review, Roast and the monthly report, and it can <b>chime in on its own</b> — personal bests, streaks, a first workout, someone quiet for 3 days, or a long chat without it — but never within 90 seconds of someone writing, at most once per 2 hours and 4 times a day, and it may stay silent. A daily recap arrives at the chosen hour (the last day of each week also announces the duel), and a final recap when the challenge ends. Only one AI reply is written at a time; replies are attached to the message they answer. Roasts are about the workout, never about bodies, weight, health or anything personal.</p>
+
+<h3>Sync — never stops working</h3>
+<p>The squad server is a Cloudflare Worker with a D1 database on the free plan: serverless, nothing pauses after hours or days without use. Your posts go into an outbox first, so closing the app or losing signal never loses them, and a retry can never post twice. The app checks for news every 4 s while the chat is open, every 15 s on the Squad tab, every minute elsewhere and immediately when the app opens.</p>
+
+<h3>Your friend on iPhone</h3>
+<ol>
+  <li>Open the invite link in Safari → Share → <b>Add to Home Screen</b>; join with the code.</li>
+  <li>Huawei Health → Me → Data sharing → <b>Strava</b>; in the web app Profile → Strava with his own free Strava API app.</li>
+  <li>Anything Strava doesn't get (e.g. pool lengths): Squad → <b>Add from screenshot</b> — Aether reads the Huawei screen, he checks the numbers and saves.</li>
+</ol>
 </div>
 
 </body>

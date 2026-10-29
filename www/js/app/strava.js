@@ -91,6 +91,8 @@ async function processIncomingUrl(urlStr) {
     toast('Network error during Strava sign-in.', 'error');
   } finally {
     isOauthExchanging = false;
+    // Web app: drop ?code=… from the address so a reload never re-uses the one-time code
+    if (!isNative() && /[?&]code=/.test(location.search)) history.replaceState(null, '', location.pathname);
   }
 }
 
@@ -100,6 +102,18 @@ async function startAutomaticOAuth() {
   if (secret) {
     await setConfig('strava_client_id', clientId);
     await setConfig('strava_client_secret', secret);
+  }
+  // Web app (e.g. iPhone home-screen app): Strava sends the browser back to this page with ?code=…
+  // (the Strava API app's "Authorization Callback Domain" must be this site's host)
+  if (!isNative()) {
+    // New Strava API apps only work for their owner, so every person needs his own Client ID
+    if (!($('#cfg_client_id').value || '').trim() || !secret) {
+      toast(`Create your own free Strava API app (strava.com/settings/api, callback domain ${location.host}) and enter its Client ID and Secret first.`, 'warn', 7000);
+      return;
+    }
+    const back = encodeURIComponent(`${location.origin}${location.pathname}`);
+    location.href = `https://www.strava.com/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${back}&response_type=code&approval_prompt=auto&scope=read,activity:read_all,profile:read_all`;
+    return;
   }
   const redirectUri = encodeURIComponent('aicoachv2://aicoach.app');
   const authUrl = `https://www.strava.com/oauth/mobile/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${redirectUri}&response_type=code&approval_prompt=force&scope=read,activity:read_all,profile:read_all`;

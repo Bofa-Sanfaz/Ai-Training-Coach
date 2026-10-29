@@ -323,9 +323,38 @@ function sportDetailLines(w) {
 `;
   }
   if (sp === 'swim') return `- Swim: no per-length data (pace ${fmtSec(swimPace100(w))}/100m from totals)\n`;
-  if (sp === 'run') return `${w.avg_cadence ? `- Cadence ${w.avg_cadence} spm${w.max_cadence ? ` (max ${w.max_cadence})` : ''}${w.steps ? ` | ${w.steps} steps` : ''}` : '- Cadence: not recorded'}${w.vo2max_watch ? ` | watch VO2max ${w.vo2max_watch}` : ''}${isIndoor(w) ? ' | treadmill (no GPS climbing)' : ''}\n`;
+  if (onFoot(sp)) return `${w.avg_cadence ? `- Cadence ${w.avg_cadence} spm${w.max_cadence ? ` (max ${w.max_cadence})` : ''}${w.steps ? ` | ${w.steps} steps` : ''}` : '- Cadence: not recorded'}${w.vo2max_watch ? ` | watch VO2max ${w.vo2max_watch}` : ''}${isIndoor(w) ? ' | treadmill (no GPS climbing)' : ''}\n`;
   if (sp === 'other') return `- Gym session: ${w.name || 'workout'}${w.reps ? ` | ${w.reps} reps` : ''}${w.calories ? ` | ${w.calories} kcal` : ''}${w.hr_min ? ` | HR min ${w.hr_min}` : ''}\n`;
   return '';
+}
+// Exact splits for the AI: every swim length; per-km (runs) or per-5-km (rides) splits from the streams
+const STROKE_CODE = { FREESTYLE: 'fr', BREASTSTROKE: 'br', BACKSTROKE: 'bk', BUTTERFLY: 'fly', KICK_BOARD: 'kick', MIXED: 'mix', UNDEFINED: '?' };
+async function splitLines(w) {
+  const sp = sportOf(w);
+  const sw = swimOf(w);
+  if (sp === 'swim' && sw) return `- Every length (s/strokes/stroke): ${sw.laps.map((l, i) => `${i + 1}) ${l.sec}/${l.strokes || 0}${STROKE_CODE[l.style]}`).join(' ')}\n`;
+  if ((!onFoot(sp) && sp !== 'ride') || isFlagged(w, 'distance')) return '';
+  const row = await db.streams.get(Number(w.strava_id));
+  const s = row && row.stream_data;
+  if (!s || !s.time) return '';
+  const T = s.time.data, D = s.distance ? s.distance.data : null, V = s.velocity_smooth ? s.velocity_smooth.data : null;
+  const HR = s.heartrate ? s.heartrate.data : [], ALT = s.altitude ? s.altitude.data : [];
+  if (!D && !V) return '';
+  const step = onFoot(sp) ? 1000 : 5000;
+  const out = [];
+  let dist = 0, segStart = 0, hrSum = 0, hrN = 0, nextMark = step, altStart = num(ALT[0]);
+  for (let i = 1; i < T.length; i++) {
+    dist = D ? num(D[i]) : dist + num(V[i]) * Math.min(10, Math.max(0, T[i] - T[i - 1]));
+    if (HR[i] > 0) { hrSum += HR[i]; hrN++; }
+    if (dist >= nextMark) {
+      const sec = T[i] - T[segStart];
+      const climb = ALT.length && !isIndoor(w) ? Math.round(num(ALT[i]) - altStart) : null;
+      out.push(`${nextMark / 1000}km ${onFoot(sp) ? fmtPace(sec / (step / 1000)) : `${fmtNum((step / 1000) / (sec / 3600), 1)}km/h`}${hrN ? ` HR${Math.round(hrSum / hrN)}` : ''}${climb !== null ? ` ${climb >= 0 ? '+' : ''}${climb}m` : ''}`);
+      segStart = i; hrSum = 0; hrN = 0; altStart = num(ALT[i]); nextMark += step;
+      if (out.length >= 60) break;
+    }
+  }
+  return out.length ? `- ${onFoot(sp) ? 'Km' : '5-km'} splits (${onFoot(sp) ? 'pace' : 'speed'}, avg HR, climb): ${out.join(' | ')}\n` : '';
 }
 async function rideBlock(w, all) {
   const sp = sportOf(w);
@@ -348,11 +377,11 @@ async function rideBlock(w, all) {
   const hrLine = hasVal(mv(w, 'avg_hr')) ? `HR avg ${w.avg_hr || '--'} / max ${w.max_hr || '--'} bpm` : `HR ${FLAGGED}`;
   return `- Session: ${sp.toUpperCase()} ${w.exercise_code}${w.name ? ` "${w.name}"` : ''} — ${formatFullDateWithDay(w.date)}${w.source === 'health' ? ' (recorded by Galaxy Watch, via Samsung Health)' : ''}
 ${flags.length ? `- DATA QUALITY: ${flags.join('; ')}\n` : ''}${distLine} | Moving ${rideDuration(w)} | Elapsed ${w.elapsed_sec ? formatDuration(w.elapsed_sec) : 'n/a'}
-- ${hrLine}${w.avg_cadence ? ` | Cadence ${w.avg_cadence} ${sp === 'run' ? 'spm' : 'rpm'}` : ''}${w.calories ? ` | ${w.calories} kcal` : ''}
-${sportDetailLines(w)}${sp === 'ride' ? `- Power: ${pm} | Work ${isFlagged(w, 'power') ? FLAGGED : `${w.kilojoules || '--'} kJ`}\n` : ''}${sp === 'ride' || (sp === 'run' && !isIndoor(w)) ? `- Ascent ${isFlagged(w, 'elevation') ? FLAGGED : `${Math.round(num(w.elevation_gain_m))} m | VAM ${vamText(w, true)}`}\n` : ''}- Load ${hasVal(mv(w, 'trimp')) ? `${Math.round(w.trimp)} TRIMP${w.trimp_source === 'avg' ? ' (from average HR)' : ''}` : 'n/a'}${w.rpe ? ` | Session-RPE load ${Math.round(w.rpe * num(w.moving_sec) / 60)}` : ''}
+- ${hrLine}${w.avg_cadence ? ` | Cadence ${w.avg_cadence} ${onFoot(sp) ? 'spm' : 'rpm'}` : ''}${w.calories ? ` | ${w.calories} kcal` : ''}
+${sportDetailLines(w)}${await splitLines(w)}${sp === 'ride' ? `- Power: ${pm} | Work ${isFlagged(w, 'power') ? FLAGGED : `${w.kilojoules || '--'} kJ`}\n` : ''}${sp === 'ride' || (onFoot(sp) && !isIndoor(w)) ? `- Ascent ${isFlagged(w, 'elevation') ? FLAGGED : `${Math.round(num(w.elevation_gain_m))} m | VAM ${vamText(w, true)}`}\n` : ''}- Load ${hasVal(mv(w, 'trimp')) ? `${Math.round(w.trimp)} TRIMP${w.trimp_source === 'avg' ? ' (from average HR)' : ''}` : 'n/a'}${w.rpe ? ` | Session-RPE load ${Math.round(w.rpe * num(w.moving_sec) / 60)}` : ''}
 - Intent set by athlete: ${getCleanIntentLabel(w)}
 - Zone minutes (moving): ${formatFullZoneSummary(w.zone_seconds)}
-${sp === 'ride' || sp === 'run' ? `- Halves: ${w.halves_profile || 'n/a'} | Drift: ${driftPromptText(w)}` : '- Drift: not applicable to this sport'}
+${sp === 'ride' || onFoot(sp) ? `- Halves: ${w.halves_profile || 'n/a'} | Drift: ${driftPromptText(w)}` : '- Drift: not applicable to this sport'}
 - Best efforts: ${best.join(' | ') || 'n/a'}
 - Athlete rating: ${w.rpe ? `RPE ${w.rpe}/10` : 'no RPE'}${w.feel ? `, felt ${w.feel}` : ''}${w.note ? `, note: "${String(w.note).slice(0, 300)}"` : ''}`;
 }
@@ -401,11 +430,13 @@ async function rideCoachContext(w) {
   const day = String(w.date).slice(0, 10);
   const series = computeLoadSeries(all);
   const cont = await buildCompactPriorContinuum(w, B.priorRides);
-  const timeline = await build1MinuteTelemetryTimeline(w.strava_id, B.timelineStep);
+  // Swims and gym: heart rate is the only stream, so a coarser timeline is enough (lengths/splits carry the detail)
+  const step = sportOf(w) === 'swim' || sportOf(w) === 'other' ? Math.max(3, B.timelineStep) : B.timelineStep;
+  const timeline = await build1MinuteTelemetryTimeline(w.strava_id, step);
   const ws = startOfWeek(parseSafeDate(day));
   const weekRides = ridesBetween(all, ws, addDays(ws, 7));
   const t = await getWeeklyGoals(formatLocalDate(ws));
-  return { all, series, cont, timeline, day, text: `${await ctxAthlete(day, all)}
+  return { all, series, cont, timeline, day, step, text: `${await ctxAthlete(day, all)}
 ${await plannedForRide(w)}
 ${loadLine(loadAt(series, formatLocalDate(addDays(parseSafeDate(day), -1))), `Load going into this session (${day})`)}
 ${await wellnessContextText(day)}
@@ -416,14 +447,14 @@ ${dataNotes()}
 THIS SESSION:
 ${await rideBlock(w, all)}
 
-TIMELINE (moving time; each line = ${B.timelineStep} min; avg and peak values):
+TIMELINE (moving time; each line = ${step} min; avg and peak values):
 ${timeline}
 
 PREVIOUS WORKOUTS (all sports, with recovery gaps):
 ${cont.continuumText || 'none'}` };
 }
 
-const coachRole = w => ({ ride: 'cycling', run: 'running', swim: 'swimming', other: 'strength & conditioning' })[sportOf(w)];
+const coachRole = w => ({ ride: 'cycling', run: 'running', walk: 'walking', swim: 'swimming', other: 'strength & conditioning' })[sportOf(w)];
 
 async function buildRideDebriefPrompt(w) {
   const c = await rideCoachContext(w);

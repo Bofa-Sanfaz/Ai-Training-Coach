@@ -102,5 +102,6 @@ function strideIndices(n, maxPoints = 1500) {
 function rerenderCharts() {
   if (Router.current === 'trends') renderTrends();
   if (Router.current === 'reports') renderReports();
+  if (Router.current === 'squad') renderSquad();
   if ($('#rideDetail').classList.contains('open')) renderStreamPlot();
 }

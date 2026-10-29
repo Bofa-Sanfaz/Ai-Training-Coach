@@ -27,7 +27,7 @@ function detailHeroBoxes(w, ctx) {
       sw ? box(String(sw.lengths), `Lengths × ${sw.pool_m} m`, '', sw.lengths) : box(w.calories ? String(w.calories) : '--', 'kcal')
     ];
   }
-  if (sp === 'run') {
+  if (onFoot(sp)) {
     return [
       box(d.v, d.unit, fl('distance'), num(d.v)),
       box(escapeHtml(rideDuration(w)), 'Moving'),
@@ -82,7 +82,7 @@ function detailStatsHtml(w, ctx) {
       peak, minHr, load, kcal, rpe
     ].join('');
   }
-  if (sp === 'run') {
+  if (onFoot(sp)) {
     return [
       ctx.userW ? kv('Body weight', `${ctx.userW} kg`) : '',
       kv('Fastest pace', w.max_speed_kmh > 0 ? speedText(w, w.max_speed_kmh) : '--'),
@@ -117,7 +117,7 @@ function applyDetailLabels(w) {
   const plural = SPORTS[sp].plural.toLowerCase();
   $('#det_delta_title').textContent = `Vs prior comparable ${sp === 'other' ? 'gym sessions' : plural}`;
   $('#det_best_title').textContent = sp === 'swim' ? 'Best efforts in this swim' : `Best efforts in this ${SPORTS[sp].label.toLowerCase()}`;
-  $('#det_stream_title').textContent = { ride: 'Ride stream studio', run: 'Run stream', swim: 'Heart rate through the swim', other: 'Heart rate through the session' }[sp];
+  $('#det_stream_title').textContent = { ride: 'Ride stream studio', run: 'Run stream', walk: 'Walk stream', swim: 'Heart rate through the swim', other: 'Heart rate through the session' }[sp];
 }
 
 // ---------- Swim: per-length chart, 100 m splits, length table ----------
@@ -161,7 +161,7 @@ function bestEffortRows(w) {
     const cells = [50, 100, 200, 400].filter(m => sw.best[m]).map(m => [`${m} m`, fmtSec(sw.best[m])]);
     if (cells.length) rows.push(['Fastest', cells]);
   }
-  if (mv(w, 'best_spd') && (sp === 'ride' || sp === 'run')) rows.push([speedName(w), Object.entries(w.best_spd).map(([d, v]) => [dur(d), speedText(w, v)])]);
+  if (mv(w, 'best_spd') && (sp === 'ride' || onFoot(sp))) rows.push([speedName(w), Object.entries(w.best_spd).map(([d, v]) => [dur(d), speedText(w, v)])]);
   if (mv(w, 'best_hr')) rows.push(['Heart rate', Object.entries(w.best_hr).map(([d, v]) => [dur(d), `${Math.round(v)} bpm`])]);
   if (sp === 'ride' && w.power_source === 'meter' && w.mmp) rows.push(['Power', Object.entries(w.mmp).filter(([d]) => [5, 60, 300, 1200, 3600].includes(+d)).map(([d, v]) => [dur(d), `${Math.round(v)} W`])]);
   return rows;
@@ -171,7 +171,7 @@ function bestEffortRows(w) {
 function streamMetricsFor(w, stream) {
   const sp = sportOf(w);
   if (sp === 'swim' || sp === 'other') return ['Heart Rate (bpm)'];
-  if (sp === 'run') {
+  if (onFoot(sp)) {
     const m = ['Pace', 'Heart Rate (bpm)'];
     if (stream && stream.altitude) m.push('Elevation (m)');
     if (stream && stream.cadence) m.push('Cadence (spm)');

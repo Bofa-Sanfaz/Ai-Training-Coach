@@ -75,8 +75,9 @@ async function loadPhysioConfig() {
   PHYSIO.ftp_user = num(await getConfig('ftp_w'), 0);
   rebuildZones();
 
-  ATHLETE.name = (await getConfig('athlete_name')) || 'Mustafa';
-  ATHLETE.bike = (await getConfig('bike_name')) || 'Kron XC150 Mountain Bike';
+  // The defaults are the phone owner's; the web app (a friend's copy) starts neutral
+  ATHLETE.name = (await getConfig('athlete_name')) || (isNative() ? 'Mustafa' : 'Athlete');
+  ATHLETE.bike = (await getConfig('bike_name')) || (isNative() ? 'Kron XC150 Mountain Bike' : 'bike');
   ATHLETE.height = (await getConfig('athlete_height')) || '';
 }
 
@@ -619,14 +620,14 @@ function computeRecords(workouts, sport = 'ride') {
   if (longest) add({ label: `Longest ${label}`, icon: 'route', value: distText(longest), field: 'distance' }, longest);
   const longTime = best(w => w.moving_sec);
   if (longTime) add({ label: 'Longest time', icon: 'clock', value: formatHours(longTime.moving_sec) }, longTime);
-  if (sport === 'ride' || sport === 'run') {
+  if (sport === 'ride' || onFoot(sport)) {
     const climb = best(w => mv(w, 'elevation_gain_m'));
     if (climb) add({ label: 'Most climbing', icon: 'mountain', value: `${Math.round(num(climb.elevation_gain_m))} m`, field: 'elevation' }, climb);
   }
-  const minDist = { ride: 10, run: 3, swim: 0.4 }[sport];
+  const minDist = { ride: 10, run: 3, walk: 2, swim: 0.4 }[sport];
   const fast = minDist ? best(w => mv(w, 'avg_speed_kmh'), pool.filter(w => num(mv(w, 'distance_km')) >= minDist)) : null;
   if (fast) add({ label: `${sport === 'ride' ? 'Fastest avg' : 'Best avg pace'} (≥${sport === 'swim' ? `${minDist * 1000} m` : `${minDist} km`})`, icon: 'gauge', value: speedText(fast), field: 'distance' }, fast);
-  if (sport === 'ride' || sport === 'run') {
+  if (sport === 'ride' || onFoot(sport)) {
     const v = best(w => mv(w, 'climbing_vam'));
     if (v) add({ label: 'Best climbing VAM', icon: 'trend', value: `${v.climbing_vam} m/h`, field: 'elevation' }, v);
   }
@@ -641,7 +642,7 @@ function computeRecords(workouts, sport = 'ride') {
     const sw = lowest(w => (swimOf(w) && swimOf(w).swolf) || 0);
     if (sw) add({ label: 'Best average SWOLF', icon: 'gauge', value: String(swimOf(sw).swolf) }, sw);
   }
-  if (sport === 'run') {
+  if (onFoot(sport)) {
     const cad = best(w => w.avg_cadence || 0);
     if (cad) add({ label: 'Highest cadence', icon: 'activity', value: `${cad.avg_cadence} spm` }, cad);
   }

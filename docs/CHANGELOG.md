@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.5.0 — 2026-10-29 · Squad
+- **Squad** (`views/squad.js`, `views/squad-stats.js`, shared `squad-core.js`; server `squad/`): shared challenges with friends as its own section with sub-tabs Home · Chat · Feed · Stats · Report · Crew and a challenge switcher.
+- Server: Cloudflare Worker + D1 (free, serverless, cron every 15 min). Invite codes, hashed member tokens, per-challenge event log with `seq`; idempotent client ids; `/changes?since=` sync; owner-only settings and AI setup; leave/rejoin; max 6 members; CORS for the Android app; serves `www/` as the web app.
+- Client sync: persistent outbox, polling 4 s / 15 s / 60 s + on resume/online; pending posts shown; offline-safe (tested: queued while offline, survives reload, delivered once).
+- Sharing: workout summaries from the challenge start (stats, swim lengths, PBs vs own history, RPE/feel/note and the coach's first sentence — optional), edits re-share, deletes remove; opt-in body & wellness (weight, resting HR, HRV, sleep, steps) as `daily` events, cleared when switched off.
+- Scoring against oneself: consistency 40 + volume 30 + improvement 30 + bonuses; baselines from the 4 weeks before the challenge (or the first week); weekly duels; monthly numbers (`SquadCore.month`) shared by app, PDF and AI. Weight only ever as a change.
+- Aether in the squad (server side, owner's key, spend cap): @Aether / review / roast / monthly report; unprompted messages for PBs, streaks, first workout, quiet members and lively chats with etiquette (90 s quiet, ≤1 per 2 h, ≤4/day, PASS allowed, one reply at a time via a lease, replies attached with `reply_to`); daily recap, weekly duel, final recap; screenshot → workout (`/ai/extract`).
+- Stats (Plotly): per-person table, points/minutes/pace vs own usual per week, duels, sport mix, time of day, training calendar, weight change, steps, resting HR, sleep, PB list. Report: month chips, per-person tiles, minutes per day, on track vs own usual, points per week, AI report, PDF (light charts on paper).
+- Web app for friends: `manifest.webmanifest`, home-screen icons, Strava sign-in on the web (own Strava API app), neutral name defaults, join link `#join=CODE`.
+- Walk is its own sport (`walk`, pace /km, steps, cadence; one-time migration of existing walks).
+- Reports: training-story graphs, balance radar, Barlow fonts in the PDF; AI context gets every swim length and km/5-km splits; the activity inbox no longer brings back reviewed items.
+- Exported backups leave out squad tokens and the outbox; restores keep current squad memberships.
+- Fix: view transitions interrupted by a quick tap no longer log an error.
+
 ## 3.4.0 — 2026-10-29 · every sport its own metrics
 - Swim metrics from the per-length log (`buildSwimDetail` in sport.js): pool length, lengths, swim vs rest time, pace /100 m on swim time, SWOLF avg/best, strokes per length, stroke rate, stroke mix, fastest length, best 50/100/200/400 m, 100 m splits. Native reader returns intervals (time, strokes, style), cadence, steps, VO2max, reps, min HR; existing watch sessions back-filled (`shd_ver` 2).
 - Per-sport workout detail (`views/detail-sport.js`): hero numbers, stats, best efforts, stream metrics; swim per-length chart + splits + length table; irrelevant fields removed (e.g. no speed/elevation/VAM/power for swims and gym, no weight for swims/gym, no climbing on treadmill).
