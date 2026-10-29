@@ -39,5 +39,5 @@ It's in `www/js/recovery.js` and has no dependencies, so it works even if the ma
 Android refuses to install an older version over a newer one. To go back to an older APK completely:
 1. In the current app: **Profile → Export JSON** (save it to Files/Drive).
 2. Uninstall Ride Partner.
-3. Install the older APK (old builds are kept in `C:\dev\releases`; the original v2 source is in `C:\dev\backups\Ai-Training-Coach-v2-original`).
+3. Install the older APK (old builds are kept in `C:\dev\backups\old-apks`; the original v2 source is in `C:\dev\backups\Ai-Training-Coach-v2-original`).
 4. In the older app: **Restore JSON** and pick the exported file. Re-enter API keys and sign in to Strava again.

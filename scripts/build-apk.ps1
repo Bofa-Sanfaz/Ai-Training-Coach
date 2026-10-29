@@ -64,6 +64,11 @@ $apk = Get-ChildItem 'android\app\build\outputs\apk\release\*.apk' | Select-Obje
 if (-not $apk) { throw 'No APK produced.' }
 New-Item -ItemType Directory -Force $Releases | Out-Null
 $dest = Join-Path $Releases "RidePartner-v$version-$VersionCode.apk"
+# Keep exactly one APK in releases: older builds move to backups\old-apks (rollback copies)
+$archive = Join-Path (Split-Path $Releases -Parent) 'backups\old-apks'
+Get-ChildItem $Releases -Filter '*.apk' | Where-Object { $_.FullName -ne $dest } | ForEach-Object {
+  New-Item -ItemType Directory -Force $archive | Out-Null
+  if ($_.Name -like '*latest*') { Remove-Item $_.FullName } else { Move-Item $_.FullName $archive -Force }
+}
 Copy-Item $apk.FullName $dest -Force
-Copy-Item $apk.FullName (Join-Path $Releases 'RidePartner-latest.apk') -Force
 Write-Host "`nAPK ready: $dest ($([math]::Round((Get-Item $dest).Length / 1MB, 1)) MB)" -ForegroundColor Green

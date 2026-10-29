@@ -4,7 +4,7 @@
 ```
 powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1
 ```
-Output: `C:\dev\releases\RidePartner-v<version>-<versionCode>.apk` and `C:\dev\releases\RidePartner-latest.apk`.
+Output: `C:\dev\releases\RidePartner-v<version>-<versionCode>.apk` — the only APK kept in `releases`. Previous builds are moved to `C:\dev\backups\old-apks` automatically.
 
 For the next local build, raise the version code so Android accepts it as an update:
 ```
