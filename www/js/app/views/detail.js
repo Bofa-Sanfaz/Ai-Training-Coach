@@ -28,7 +28,7 @@ async function renderRideDetail() {
   const w = currentWorkout;
   if (!w) return;
   $('#det_title').textContent = rideTitle(w);
-  $('#det_sub').textContent = `${w.exercise_code || ''} · ${formatNiceDate(w.date)}`;
+  $('#det_sub').textContent = rideSubtitle(w);
 
   const badges = [intentBadge(w, true)];
   if (w.trainer) badges.push('<span class="badge badge-play">Indoor</span>');

@@ -97,6 +97,21 @@ async function boot() {
   window.__rpBootOk();
 
   if (seen !== APP_VERSION) setTimeout(showWhatsNew, 600);
+  refreshStaleMetrics();
+}
+
+// After an update or a zone change, rides carry metrics from older formulas.
+// Recompute them in the background (only derived fields change; rides, intents and chats are untouched).
+async function refreshStaleMetrics() {
+  try {
+    const stale = (await db.workouts.toArray()).filter(needsMetrics);
+    if (!stale.length) return;
+    for (const w of stale) await ensureRideMetrics(w, undefined, true);
+    if (Router.current === 'rides' && !$$('.panel.open').length) await renderRides();
+    if (stale.length > 2) toast(`Updated metrics for ${stale.length} rides`, 'success', 2200);
+  } catch (e) {
+    console.warn('Background metric refresh failed', e);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

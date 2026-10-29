@@ -33,8 +33,18 @@ function zoneStripHtml(z) {
   return `<div class="zone-strip">${z.map((s, i) => `<span style="width:${(num(s) / tot) * 100}%;background:${PHYSIO.zones[i].color}"></span>`).join('')}</div>`;
 }
 
+function rideCode(w) {
+  return w.exercise_code ? w.exercise_code.split(' - ')[0] : `Ride ${String(w.ride_number || '').padStart(3, '0')}`;
+}
+
+// Strava activity name when known (filled on the next sync for rides imported by v2), else "Ride 012"
 function rideTitle(w) {
-  return w.name && w.name.trim() ? w.name : (w.exercise_code || `Ride ${w.ride_number}`);
+  return w.name && w.name.trim() ? w.name : rideCode(w);
+}
+
+function rideSubtitle(w) {
+  const date = formatNiceDate(w.date);
+  return w.name && w.name.trim() ? `${rideCode(w)} · ${date}` : date;
 }
 
 function deltaTxt(prevText) {
@@ -132,7 +142,7 @@ function rideCardHtml(w, coachIds) {
       <div class="ride-top">
         <div class="grow">
           <div class="ride-name">${escapeHtml(rideTitle(w))}</div>
-          <div class="ride-date">${escapeHtml(w.exercise_code ? w.exercise_code.split(' - ')[0] : '')} · ${escapeHtml(formatNiceDate(w.date))}${w.demo ? ' · demo' : ''}</div>
+          <div class="ride-date">${escapeHtml(rideSubtitle(w))}${w.demo ? ' · demo' : ''}</div>
         </div>
         <div class="ride-badges">${intentBadge(w)}${status}</div>
       </div>
