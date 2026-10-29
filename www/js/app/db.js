@@ -141,6 +141,10 @@ async function restoreDump(data, { preserveSecrets = true } = {}) {
     if (Array.isArray(data.config) && data.config.length) await db.config.bulkPut(data.config);
     if (keep.length) await db.config.bulkPut(keep);
   });
+  // Rescue / full backups may also carry telemetry streams (saves re-downloading from Strava)
+  if (Array.isArray(data.streams) && data.streams.length) {
+    for (let i = 0; i < data.streams.length; i += 25) await db.streams.bulkPut(data.streams.slice(i, i + 25).filter(s => s && s.strava_id));
+  }
 }
 
 // --------------------------------------------------------

@@ -35,6 +35,12 @@ If the app fails to start twice in a row, or hangs on start, a recovery screen a
 
 It's in `www/js/recovery.js` and has no dependencies, so it works even if the main app is broken.
 
+## "App not installed" when updating (keep your data)
+Android refuses an update when the installed app was signed with a different key (builds made before the shared keystore existed). Nothing is deleted when it refuses.
+1. Phone: Developer options → USB debugging on; connect by USB; allow the PC.
+2. `powershell -ExecutionPolicy Bypass -File scripts\phone-update.ps1` — tries an in-place update first; if the key differs, copies all data (rides, streams, chats, notes, settings — not API keys) to `C:\dev\backups\phone-rescue.json` and the phone's Download folder. Nothing is uninstalled.
+3. `... scripts\phone-update.ps1 -Finish` — uninstalls the old app, installs the new one; then Profile → Restore JSON → `RidePartner_Rescue.json`. Re-enter Strava secret / sign in and AI keys.
+
 ## 4. Reinstall an older APK
 Android refuses to install an older version over a newer one. To go back to an older APK completely:
 1. In the current app: **Profile → Export JSON** (save it to Files/Drive).

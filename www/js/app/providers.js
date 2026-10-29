@@ -10,7 +10,11 @@
 // --------------------------------------------------------
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const ANTHROPIC_VERSION = '2026-10-21';
-const AI_TIMEOUT_MS = 120000;
+// Timeouts: wait up to 75 s for the first byte, then only fail if the stream goes silent
+// for 45 s (long answers keep streaming as long as text arrives). Non-streaming: 150 s.
+const AI_TIMEOUT_MS = 150000;
+const AI_FIRST_BYTE_MS = 75000;
+const AI_IDLE_MS = 45000;
 
 // Verified against ai.google.dev/gemini-api/docs/models (Oct 2026)
 const GEMINI_MODELS = [
@@ -313,12 +317,16 @@ async function requestProvider(p, prompt, imageB64, opts) {
   const wantStream = !!opts.onDelta && typeof TextDecoder !== 'undefined' && typeof ReadableStream !== 'undefined';
   const r = buildRequest(p, prompt, imageB64, opts, wantStream);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  let timer = null;
+  let timedOutAfter = 0;
+  const arm = ms => { clearTimeout(timer); timer = setTimeout(() => { timedOutAfter = ms; controller.abort(); }, ms); };
+  arm(wantStream ? AI_FIRST_BYTE_MS : AI_TIMEOUT_MS);
   const acc = { text: '', in: 0, out: 0, finish: null, block: null, error: null };
   try {
     let res = await httpRequest(r.url, { method: 'POST', headers: r.headers, body: r.body, signal: controller.signal });
     if (res.ok && wantStream && !res.native && res.body && res.body.getReader) {
-      await readSse(res, evt => { r.onEvent(evt, acc); if (acc.text) opts.onDelta(acc.text); });
+      arm(AI_IDLE_MS);
+      await readSse(res, evt => { arm(AI_IDLE_MS); r.onEvent(evt, acc); if (acc.text) opts.onDelta(acc.text); });
     } else if (res.ok && res.native && wantStream) {
       // Native HTTP (CORS fallback) can't stream: repeat the request in non-streaming form
       const r2 = buildRequest(p, prompt, imageB64, opts, false);
@@ -336,7 +344,7 @@ async function requestProvider(p, prompt, imageB64, opts) {
     }
   } catch (e) {
     if (e && e.status !== undefined) throw e;
-    if (e && e.name === 'AbortError') throw { status: 'timeout', msg: `timed out after ${AI_TIMEOUT_MS / 1000}s` };
+    if (e && e.name === 'AbortError') throw { status: 'timeout', msg: timedOutAfter === AI_IDLE_MS ? `stopped responding for ${AI_IDLE_MS / 1000}s` : `no response within ${Math.round((timedOutAfter || AI_TIMEOUT_MS) / 1000)}s` };
     throw { status: 'network', msg: (e && e.message) || 'network error' };
   } finally {
     clearTimeout(timer);

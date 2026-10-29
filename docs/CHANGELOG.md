@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.2.1 — 2026-10-29
+- AI timeouts: wait up to 75 s for the first word, then only give up if a reply stops streaming for 45 s (long answers no longer cut off at a fixed limit); a timeout moves straight to the next provider.
+- Restore JSON also restores telemetry streams when the backup contains them.
+- `scripts/phone-update.ps1` + `scripts/phone-rescue.js`: update over USB without losing data; if the installed app was signed with an older key, copy all its data out first (see docs/ROLLBACK.md).
+
 ## 3.2.0 — 2026-10-29
 ### Your plan, made dynamic
 - **Weekly template**: enter your own preset plan once (Mon–Sun); it repeats every week.
