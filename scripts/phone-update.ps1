@@ -22,7 +22,13 @@ $backupDir = 'C:\dev\backups'
 $backup = Join-Path $backupDir 'phone-rescue.json'
 
 function Step($m) { Write-Host "`n== $m" -ForegroundColor Cyan }
-function Adb { $out = & $adb @args 2>&1 | ForEach-Object { "$_" }; return ($out -join "`n") }
+# adb writes errors to stderr; capture them as text instead of letting PowerShell stop the script
+function Adb {
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $out = & $adb @args 2>&1 | ForEach-Object { "$_" } } finally { $ErrorActionPreference = $prev }
+  return ($out -join "`n")
+}
 
 Step 'Phone connection'
 & $adb start-server | Out-Null

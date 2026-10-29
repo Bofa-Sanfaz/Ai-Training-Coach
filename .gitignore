@@ -3,3 +3,6 @@ node_modules/
 android/
 .claude/
 *.log
+
+# temporary local test files (never commit)
+www/_tmp*
