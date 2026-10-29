@@ -408,8 +408,14 @@
           <button class="btn btn-ghost btn-sm" onclick="disconnectHealth()">Pause import</button>
         </div>
       </div>
+      <div class="export-box mt-12 hidden" id="swimSdkBox">
+        <b>Swims, treadmill &amp; gym — automatic</b>
+        <div class="small mt-4" id="swimSdkState"></div>
+        <div class="hint mt-4">Reads pool swims (with heart rate), treadmill runs, the gym bike, elliptical, rowing, stairs and strength sets straight from Samsung Health on every sync — more than Health Connect shares. One-time setup in Samsung Health: ⋮ → Settings → About Samsung Health → tap the version 10 times → <b>Developer mode</b> → turn on <b>Developer Mode for Data Read</b>. Then tap Connect and allow access.</div>
+        <button class="btn btn-primary btn-sm mt-8" id="btnSwimSdk" onclick="swimSdkButton()"><svg class="ic"><use href="#i-swim"/></svg>Connect swims</button>
+      </div>
       <div class="export-box mt-12">
-        <b>Swims (and anything else missing)</b>
+        <b>Swims from an export (fallback)</b>
         <div class="hint">Samsung Health doesn't share swims with Health Connect, so import them from Samsung Health's own export:</div>
         <ol class="hint">
           <li>Samsung Health → ⋮ → Settings → <b>Download personal data</b> → Download.</li>

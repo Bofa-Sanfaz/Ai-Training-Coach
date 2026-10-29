@@ -189,6 +189,7 @@ async function syncWellness(manual = false) {
       const scanned = (await getConfig('health_scan_ver')) === '3' ? await getConfig('health_workouts_scanned') : '';
       await setConfig('health_scan_ver', '3');
       got = await importHealthWorkouts(H, scanned ? addDays(now, -21) : addDays(now, -365), now);
+      got += await importSamsungSwims();
       await setConfig('health_workouts_scanned', new Date().toISOString());
     } catch (err) { console.warn('workout import', err); }
     if (manual) toast(`Wellness data imported${got ? ` · ${got} new workout${got > 1 ? 's' : ''}` : ''}`, 'success', 2600);
@@ -258,6 +259,125 @@ async function importHealthWorkouts(H, from, to) {
     await announceNewRecords(recBefore, added.map(w => w.id));
   }
   return added.length;
+}
+
+// --------------------------------------------------------
+// SWIMS STRAIGHT FROM SAMSUNG HEALTH (native SamsungSwims plugin, Samsung Health Data SDK)
+// Runs with every wellness import. Uses the same negative id as Health Connect and the
+// export importer (−start in seconds), so a swim is never added twice.
+// --------------------------------------------------------
+// Samsung Health exercise type → [sport, name, indoor]. Outdoor rides come from Strava (skipped);
+// rest periods between sets ("BREAK") are skipped; walks, squash, "OTHER"… go to the inbox.
+const SHD_TYPES = {
+  POOL_SWIMMING: ['swim', 'Pool swim', true], OPEN_WATER_SWIMMING: ['swim', 'Open water swim', false],
+  TREADMILL: ['run', 'Treadmill run', true], RUNNING: ['run', 'Run', false], TRACK_RUNNING: ['run', 'Track run', false],
+  STATIONARY_BIKING: ['ride', 'Stationary bike', true],
+  ELLIPTICAL: ['other', 'Elliptical', true], ROWING_MACHINE: ['other', 'Rowing machine', true], STAIR_CLIMBING: ['other', 'Stair climbing', true],
+  STEP_MACHINE: ['other', 'Step machine', true], WEIGHT_MACHINE: ['other', 'Weight machine', true], BENCH_PRESS: ['other', 'Bench press', true],
+  SQUATS: ['other', 'Squats', true], DEADLIFTS: ['other', 'Deadlifts', true], LEG_PRESSES: ['other', 'Leg press', true], LAT_PULLDOWNS: ['other', 'Lat pulldown', true],
+  PUSH_UPS: ['other', 'Push-ups', true], PLANK: ['other', 'Plank', true], ARM_EXTENSIONS: ['other', 'Arm extensions', true], AEROBICS: ['other', 'Aerobics', true],
+  CIRCUIT_TRAINING: ['other', 'Circuit training', true], YOGA: ['other', 'Yoga', true], PILATES: ['other', 'Pilates', true]
+};
+const SHD_SKIP = ['BIKING', 'MOUNTAIN_BIKING', 'BREAK'];
+const swimPlugin = () => capPlugin('SamsungSwims');
+
+async function samsungSwimStatus() {
+  const P = swimPlugin();
+  if (!P) return { present: false };
+  try { return Object.assign({ present: true }, await P.status()); } catch (e) { return { present: true, available: false, error: String(e.message || e) }; }
+}
+
+async function connectSamsungSwims() {
+  const P = swimPlugin();
+  if (!P) return;
+  const r = await P.requestAccess().catch(e => ({ granted: false, error: String(e.message || e) }));
+  if (r.granted) {
+    await setConfig('swims_sdk', '1');
+    toast('Samsung Health connected — importing swims and gym sessions…', 'success');
+    const n = await importSamsungSwims(true);
+    toast(n ? `${n} workout${n > 1 ? 's' : ''} imported (swims, treadmill, gym)` : 'Connected · nothing new since January', 'success', 3500);
+  } else {
+    toast(`Samsung Health didn't allow access${r.error ? ` (${r.error.slice(0, 90)})` : ''}. Turn on Developer mode for data read (see the steps in this card), then try again.`, 'warn', 9000);
+  }
+  renderHealthCard();
+}
+
+async function importSamsungSwims(full = false) {
+  const P = swimPlugin();
+  if (!P || (await getConfig('swims_sdk')) !== '1') return 0;
+  const last = await getConfig('swims_sdk_scanned');
+  const from = full || !last ? parseSafeDate(MIN_WORKOUT_DATE) : addDays(new Date(), -21);
+  let res;
+  try { res = await P.readSessions({ startDate: from.toISOString(), endDate: new Date().toISOString(), withLog: true }); } catch (e) { console.warn('swim read', e); return 0; }
+  const all = await db.workouts.toArray();
+  const recBefore = recordSignature(all);
+  const deleted = await deletedWorkoutIds();
+  const localDate = d => `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const inboxItems = [];
+  let added = 0;
+  for (const s of (res && res.sessions) || []) {
+    const start = new Date(s.start);
+    const sid = -Math.round(start.getTime() / 1000);
+    if (formatLocalDate(start) < MIN_WORKOUT_DATE || deleted.has(sid) || !(num(s.durationSec) >= 180) || SHD_SKIP.includes(s.type)) continue;
+    const known = SHD_TYPES[s.type];
+    if (!known) {
+      if (!all.some(w => Math.abs(parseSafeDate(w.date) - start) <= 300000) && num(s.durationSec) >= 600) {
+        const t = s.type.toLowerCase().replace(/_(\w)/g, (_, c) => c.toUpperCase());
+        inboxItems.push({ key: `health:${sid}`, src: 'health', type: t, name: s.title || prettyType(t), date: localDate(start), distance_km: round(num(s.distance) / 1000, 2), moving_sec: Math.round(s.durationSec), raw: null,
+          sh: { code: s.type, start: s.start, dur: Math.round(s.durationSec), dist: num(s.distance), hr: num(s.meanHr), max: num(s.maxHr), kcal: num(s.calories) } });
+      }
+      continue;
+    }
+    const kind = [known[1], known[2]];
+    const sport = known[0];
+    const twin = all.find(w => Number(w.strava_id) === sid || Math.abs(parseSafeDate(w.date) - start) <= 300000);
+    if (twin) {
+      // Strava filed a watch treadmill / gym-bike session as a generic "Workout": take the watch's sport
+      if (twin.source !== 'health' && !twin.sport && sportOf(twin) === 'other' && sport !== 'other' && ['Workout', 'WeightTraining'].includes(twin.sport_type)) {
+        await db.workouts.update(twin.id, { sport, indoor: kind[1] });
+      }
+      // A swim already here (e.g. from the export) gains the watch's distance / log if it lacked them
+      if (twin.source === 'health' && !(twin.distance_km > 0) && (s.swimDistance || s.distance)) {
+        const m = s.poolUnit === 'yard' ? num(s.swimDistance || s.distance) * 0.9144 : num(s.swimDistance || s.distance);
+        await db.workouts.update(twin.id, { distance_km: round(m / 1000, 3), avg_speed_kmh: round((m / 1000) / (num(twin.moving_sec) / 3600), 2) });
+      }
+      continue;
+    }
+    const dur = Math.max(1, Math.round(num(s.swimDurationSec) || num(s.durationSec)));
+    const meters = s.poolUnit === 'yard' ? num(s.swimDistance || s.distance) * 0.9144 : num(s.swimDistance || s.distance);
+    const log = (s.log || []).map(p => ({ t: Math.round((p.t - start.getTime()) / 1000), hr: num(p.hr), sp: num(p.sp) })).filter(p => p.t >= 0 && p.t <= dur + 60);
+    const hrPts = log.filter(p => p.hr > 30);
+    const w = {
+      strava_id: sid, ride_number: 0, exercise_code: '', source: 'health', hc_type: `shd:${s.type}`,
+      name: s.title || kind[0], sport, sport_type: s.type, indoor: kind[1],
+      date: `${formatLocalDate(start)} ${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      distance_km: round(meters / 1000, 3), moving_sec: dur, elapsed_sec: Math.round(num(s.durationSec)) || dur, duration_str: formatDuration(dur),
+      avg_speed_kmh: meters > 0 ? round((meters / 1000) / (dur / 3600), 2) : 0, max_speed_kmh: s.maxSpeed ? round(s.maxSpeed * 3.6, 2) : 0,
+      avg_hr: Math.round(num(s.meanHr)) || (hrPts.length ? Math.round(mean(hrPts.map(p => p.hr))) : 0),
+      max_hr: Math.round(num(s.maxHr)) || (hrPts.length ? Math.max(...hrPts.map(p => p.hr)) : 0),
+      elevation_gain_m: 0, kilojoules: 0, calories: Math.round(num(s.calories)),
+      avg_power_w: 0, max_power_w: 0, norm_power_w: 0, device_watts: false, map_polyline: '',
+      pool_length_m: s.poolLength ? round(s.poolUnit === 'yard' ? s.poolLength * 0.9144 : s.poolLength, 1) : null,
+      source_name: 'Samsung Health (watch)', debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
+    };
+    // Heart rate for zones/load; speed too for treadmill/runs (pace best efforts). Swim speed per sample isn't meaningful.
+    const withSpeed = sport === 'run' && log.some(p => p.sp > 0);
+    const pts = withSpeed ? log.filter(p => p.hr > 30 || p.sp > 0) : hrPts;
+    const stream = pts.length > 5 ? Object.assign({ time: { data: pts.map(p => p.t) }, heartrate: { data: pts.map(p => Math.round(p.hr) || null) } }, withSpeed ? { velocity_smooth: { data: pts.map(p => p.sp) } } : {}) : null;
+    w.id = await db.workouts.add(w);
+    await db.streams.put({ strava_id: sid, stream_data: stream });
+    await ensureRideMetrics(w, stream, true);
+    all.push(w);
+    added++;
+  }
+  // Walks, squash, "other"… → inbox (or straight in when the athlete chose "always include")
+  if (inboxItems.length) for (const it of await routeToInbox(inboxItems)) if (await addSamsungSummary(it)) added++;
+  await setConfig('swims_sdk_scanned', new Date().toISOString());
+  if (added) {
+    await renumberRides();
+    await announceNewRecords(recBefore, all.slice(-added).map(w => w.id));
+  }
+  return added;
 }
 
 // --------------------------------------------------------
@@ -515,4 +635,33 @@ async function renderHealthCard() {
     : s
       ? `<span class="pos">● Linked</span> · updated ${escapeHtml(relativeTime(s.updated_at))}<br>Sleep ${fmtSleep(s.sleep)} · RHR ${s.rhr || '--'} · HRV ${s.hrv || '--'} ms${s.vo2max ? ` · VO2max ${s.vo2max.value}` : ''}`
       : '<span class="pos">● Linked</span> · no data yet — tap Import now';
+  await renderSwimSdkCard();
+}
+
+// Automatic swims: shown only in builds that include the Samsung Health swim reader
+async function renderSwimSdkCard() {
+  const box = $('#swimSdkBox');
+  if (!box) return;
+  const st = await samsungSwimStatus();
+  box.classList.toggle('hidden', !st.present);
+  if (!st.present) return;
+  const on = (await getConfig('swims_sdk')) === '1' && st.granted;
+  const last = await getConfig('swims_sdk_scanned');
+  const mine = (await db.workouts.toArray()).filter(w => String(w.hc_type || '').startsWith('shd:'));
+  const n = mine.filter(w => sportOf(w) === 'swim').length, g = mine.length - n;
+  $('#swimSdkState').innerHTML = on
+    ? `<span class="pos">● Automatic</span> · ${n} swim${n === 1 ? '' : 's'} + ${g} other watch session${g === 1 ? '' : 's'}${last ? ` · checked ${escapeHtml(relativeTime(last))}` : ''}`
+    : st.available === false
+      ? `<span class="neg">Samsung Health not reachable</span>${st.error ? `<br><span class="tiny">${escapeHtml(st.error.slice(0, 140))}</span>` : ''}`
+      : '<span class="neu">Not connected</span>';
+  $('#btnSwimSdk').textContent = on ? 'Import swims now' : 'Connect swims';
+}
+
+async function swimSdkButton() {
+  if ((await getConfig('swims_sdk')) === '1' && (await samsungSwimStatus()).granted) {
+    const n = await importSamsungSwims(true);
+    toast(n ? `${n} new swim${n > 1 ? 's' : ''}` : 'No new swims', 'success', 2500);
+    await afterWorkoutsChanged(null);
+    renderSwimSdkCard();
+  } else await connectSamsungSwims();
 }

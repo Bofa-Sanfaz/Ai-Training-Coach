@@ -1,0 +1,52 @@
+// Optional native module: reads swim sessions straight from Samsung Health through the
+// Samsung Health Data SDK. Added to the Android project by scripts/patch-android.js only
+// when the SDK file (samsung-health-data-api*.aar) is present on the build machine —
+// the SDK is not redistributable, so it never goes into the repository.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.21'
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace = "app.trainingpartner.swims"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 36
+    }
+    lint {
+        abortOnError = false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_21.toString()
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly fileTree(dir: 'libs', include: ['*.aar'])
+    implementation project(':capacitor-android')
+    implementation 'androidx.appcompat:appcompat:1.8.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.4.21"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    implementation 'com.google.code.gson:gson:2.13.1'
+    implementation 'org.jetbrains.kotlin:kotlin-parcelize-runtime:2.4.21'
+}

@@ -129,4 +129,51 @@ if (!styles.includes('windowSplashScreenBackground')) {
 write(stylesPath, styles);
 log('Splash theme colours');
 
+// 7) Optional: Samsung Health swim reader (native/samsung-swims) — only when the Samsung
+//    Health Data SDK is on this machine. Looked up in SHD_SDK_DIR, then C:\dev\tools\samsung-health-data-sdk.
+//    The SDK can't be redistributed, so CI and other machines simply build without it.
+const sdkDirs = [process.env.SHD_SDK_DIR, 'C:\\dev\\tools\\samsung-health-data-sdk'].filter(Boolean);
+const findAar = dir => {
+  if (!fs.existsSync(dir)) return null;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) { const f = findAar(p); if (f) return f; }
+    else if (/^samsung-health-data-api.*\.aar$/i.test(entry.name)) return p;
+  }
+  return null;
+};
+const aar = sdkDirs.map(findAar).find(Boolean);
+const modDst = path.join(root, 'android', 'samsung-swims');
+const settingsPath = path.join(root, 'android', 'settings.gradle');
+const pluginsJson = path.join(main, 'assets', 'capacitor.plugins.json');
+if (aar) {
+  fs.rmSync(modDst, { recursive: true, force: true });
+  copyDir(path.join(root, 'native', 'samsung-swims'), modDst);
+  fs.mkdirSync(path.join(modDst, 'libs'), { recursive: true });
+  const aarName = path.basename(aar);
+  fs.copyFileSync(aar, path.join(modDst, 'libs', aarName));
+  let settings = read(settingsPath);
+  if (!settings.includes("':samsung-swims'")) settings += `\ninclude ':samsung-swims'\nproject(':samsung-swims').projectDir = new File('./samsung-swims/')\n`;
+  write(settingsPath, settings);
+  let g = read(gradlePath);
+  if (!g.includes("project(':samsung-swims')")) {
+    g = g.replace(/dependencies\s*\{/, `dependencies {\n    implementation project(':samsung-swims')\n    implementation files('../samsung-swims/libs/${aarName}')\n    implementation 'com.google.code.gson:gson:2.13.1'\n    implementation 'org.jetbrains.kotlin:kotlin-parcelize-runtime:2.4.21'\n    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'`);
+  }
+  write(gradlePath, g);
+  // Register the plugin with Capacitor (cap sync only lists npm plugins)
+  const list = JSON.parse(read(pluginsJson));
+  if (!list.some(p => p.classpath === 'app.trainingpartner.swims.SamsungSwimsPlugin')) list.push({ pkg: 'samsung-swims', classpath: 'app.trainingpartner.swims.SamsungSwimsPlugin' });
+  write(pluginsJson, JSON.stringify(list, null, '\t'));
+  // The SDK targets Android 10+; the app keeps minSdk 26 and only calls it on capable phones
+  manifest = read(manifestPath);
+  if (!manifest.includes('tools:overrideLibrary')) manifest = manifest.replace(/<uses-sdk[^>]*\/>/, '').replace('<application', '<uses-sdk tools:overrideLibrary="com.samsung.android.sdk.health.data" />\n\n    <application');
+  write(manifestPath, manifest);
+  log(`Samsung Health swim reader: included (${aarName})`);
+} else {
+  if (fs.existsSync(modDst)) fs.rmSync(modDst, { recursive: true, force: true });
+  write(settingsPath, read(settingsPath).replace(/\ninclude ':samsung-swims'\nproject\(':samsung-swims'\)[^\n]*\n/, '\n'));
+  write(gradlePath, read(gradlePath).replace(/\n\s*implementation project\(':samsung-swims'\)\n\s*implementation files\('\.\.\/samsung-swims[^\n]*\n\s*implementation 'com\.google\.code\.gson[^\n]*\n\s*implementation 'org\.jetbrains\.kotlin:kotlin-parcelize[^\n]*\n\s*implementation 'org\.jetbrains\.kotlinx[^\n]*/, ''));
+  log('Samsung Health swim reader: SDK not found — built without it');
+}
+
 console.log('Android project patched.');

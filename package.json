@@ -1,6 +1,6 @@
 {
   "name": "ai-training-coach",
-  "version": "3.3.4",
+  "version": "3.3.6",
   "description": "Offline-first AI training coach for rides, runs, swims and gym (Training Partner)",
   "private": true,
   "scripts": {

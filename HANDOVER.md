@@ -62,5 +62,6 @@ Public repo: commits use `Bofa-Sanfaz@users.noreply.github.com`; never commit ba
 
 ## 8. Known limits / next ideas
 - Samsung Health shares neither resting HR nor HRV with Health Connect: resting HR is estimated (lowest hourly average); HRV unavailable.
+- Swims/treadmill/gym come from the Samsung Health Data SDK (native/samsung-swims, built in only when the AAR is at C:\dev\tools\samsung-health-data-sdk — not in the repo; CI builds without it). Needs Samsung Health developer mode for data read on the phone.
 - Sleep is only present on nights the watch is worn.
 - True background retries need the app process alive (Android may freeze it); unanswered messages resume when the app is opened again.

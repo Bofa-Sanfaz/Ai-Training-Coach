@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.6 — 2026-10-29
+- **Automatic swims, treadmill and gym from Samsung Health** via the Samsung Health Data SDK (native module `native/samsung-swims`, added by `patch-android.js` only when the SDK AAR is in `C:\dev\tools\samsung-health-data-sdk`; never committed). Read-only, Samsung Health developer mode for data read. Imports pool/open-water swims (distance, pool length, active swim time, per-second HR → zones/load), treadmill and outdoor runs (HR + speed), stationary bike, elliptical, rowing, stairs, strength sets; walks/squash/other → inbox; outdoor rides and rest breaks skipped. Runs on every wellness sync; Profile → Samsung Health shows status. First import on the phone: 38 sessions (9 swims, 14 treadmill runs…).
+- Strava "Workout" twins of watch treadmill / gym-bike sessions take the watch's sport.
+
 ## 3.3.4 — 2026-10-29
 - Trends: range chips longer than the load history (e.g. 6m / 1y when history starts in May) are dimmed with a tooltip, and the chart shows where the history starts — they previously looked identical to All without explanation.
 
