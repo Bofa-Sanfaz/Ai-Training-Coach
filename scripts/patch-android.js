@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // --------------------------------------------------------
-// Applies Ride Partner's native customisations to the generated
+// Applies Training Partner's native customisations to the generated
 // Capacitor project in ./android. Safe to run repeatedly.
 // Used by scripts/build-apk.ps1 (local) and the GitHub workflow (CI).
 //
@@ -15,7 +15,7 @@ const app = path.join(root, 'android', 'app');
 const main = path.join(app, 'src', 'main');
 const res = path.join(main, 'res');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const APP_NAME = 'Ride Partner';
+const APP_NAME = 'Training Partner';
 const versionCode = parseInt(process.env.VERSION_CODE || '30000', 10);
 const versionName = pkg.version;
 
@@ -49,8 +49,8 @@ if (!manifest.includes('windowSoftInputMode')) {
   manifest = manifest.replace('android:name=".MainActivity"', 'android:name=".MainActivity"\n            android:windowSoftInputMode="adjustResize"');
 }
 // Health Connect: least privilege. The plugin declares read+write for ~24 data types;
-// keep only the reads Ride Partner uses, remove every write and unused read.
-const HEALTH_KEEP = ['STEPS', 'HEART_RATE', 'WEIGHT', 'SLEEP', 'RESPIRATORY_RATE', 'OXYGEN_SATURATION', 'RESTING_HEART_RATE', 'HEART_RATE_VARIABILITY', 'VO2_MAX'];
+// keep only the reads Training Partner uses, remove every write and unused read.
+const HEALTH_KEEP = ['STEPS', 'HEART_RATE', 'WEIGHT', 'SLEEP', 'RESPIRATORY_RATE', 'OXYGEN_SATURATION', 'RESTING_HEART_RATE', 'HEART_RATE_VARIABILITY', 'VO2_MAX', 'EXERCISE', 'DISTANCE', 'ACTIVE_CALORIES_BURNED'];
 const pluginManifest = path.join(root, 'node_modules', '@capgo', 'capacitor-health', 'android', 'src', 'main', 'AndroidManifest.xml');
 if (fs.existsSync(pluginManifest)) {
   const perms = [...read(pluginManifest).matchAll(/android\.permission\.health\.([A-Z0-9_]+)/g)].map(m => m[1]);

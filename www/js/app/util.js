@@ -2,7 +2,7 @@
 // --------------------------------------------------------
 // GENERAL UTILITIES: numbers, dates, formatting, markdown
 // --------------------------------------------------------
-const APP_VERSION = '3.2.2';
+const APP_VERSION = '3.3.1';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -266,5 +266,5 @@ function markdownToPlain(raw) {
     .replace(/^\s*#{1,6}\s+/gm, '')
     .replace(/^\s*[*]\s+/gm, '- ')
     .replace(/[*#$`]/g, '')
-    .replace(/[^\x09\x0A\x0D\x20-\x7E×÷°]/g, '');
+    .replace(/[^\x09\x0A\x0D\x20-\x7E×÷°·]/g, '');
 }

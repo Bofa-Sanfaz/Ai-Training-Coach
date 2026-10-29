@@ -218,7 +218,15 @@ function setBusy(btn, busy, busyText) {
 }
 
 function typingHtml(text = 'Coach is thinking') {
-  return `<div class="typing"><span class="dots"><i></i><i></i><i></i></span>${escapeHtml(text)}…</div>`;
+  return `<div class="typing"><span class="dots"><i></i><i></i><i></i></span><span class="grow">${escapeHtml(text)}…<span class="typing-status"></span></span></div>`;
+}
+
+// Retry / waiting status under the typing indicator inside `host` (e.g. "Gemini busy — retrying in 30 s")
+function aiStatusIn(host) {
+  return s => {
+    const el = host && host.querySelector('.typing .typing-status');
+    if (el) el.textContent = s ? ` ${s}` : '';
+  };
 }
 
 // ---------- Theme ----------

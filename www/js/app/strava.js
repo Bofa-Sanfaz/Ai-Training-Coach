@@ -4,6 +4,7 @@
 // --------------------------------------------------------
 const DEFAULT_STRAVA_CLIENT_ID = '277202';
 const RIDE_TYPES = ['Ride', 'VirtualRide', 'EBikeRide', 'MountainBikeRide', 'GravelRide', 'EMountainBikeRide', 'Velomobile', 'Handcycle'];
+const SYNC_TYPES = RIDE_TYPES.concat(RUN_TYPES, SWIM_TYPES, OTHER_TYPES);
 const STREAM_KEYS = 'time,distance,latlng,altitude,heartrate,velocity_smooth,watts,cadence,grade_smooth,moving,temp';
 
 let isSyncInProgress = false;
@@ -170,13 +171,16 @@ function buildWorkoutFromActivity(a) {
   };
 }
 
+// Numbered per sport: "Ride 042", "Run 003", "Swim 001"
 async function renumberRides() {
   const all = await db.workouts.toArray();
   all.sort((a, b) => parseSafeDate(a.date) - parseSafeDate(b.date));
+  const counters = {};
   for (let i = 0; i < all.length; i++) {
     const w = all[i];
-    const seq = i + 1;
-    const code = `Ride ${String(seq).padStart(3, '0')} - ${String(w.date).split(' ')[0]}`;
+    const sp = sportOf(w);
+    const seq = counters[sp] = (counters[sp] || 0) + 1;
+    const code = `${SPORTS[sp].code} ${String(seq).padStart(3, '0')} - ${String(w.date).split(' ')[0]}`;
     if (w.ride_number !== seq || w.exercise_code !== code) {
       w.ride_number = seq;
       w.exercise_code = code;
@@ -227,7 +231,8 @@ async function syncStrava(opts = {}) {
     let reauthed = false;
     for (let page = 1; page <= 20; page++) {
       setSyncStatus(`Reading activity list (page ${page})…`, 5 + page * 2);
-      const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=200`, { headers: { Authorization: `Bearer ${token}` } });
+      const after = Math.floor(parseSafeDate(MIN_WORKOUT_DATE).getTime() / 1000);
+      const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=200&after=${after}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.status === 429) { toast('Strava rate limit reached. Try again in 15 minutes.', 'warn', 5000); break; }
       if (res.status === 401) {
         if (reauthed) throw new Error('Strava rejected the token (401). Sign in again in Profile.');
@@ -242,13 +247,34 @@ async function syncStrava(opts = {}) {
       if (pageActs.length < 200) break;
     }
 
-    // 2) Insert new rides
-    const rideActs = acts.filter(a => RIDE_TYPES.includes(a.sport_type) || RIDE_TYPES.includes(a.type || 'Ride'));
-    const known = new Set((await db.workouts.toArray()).map(w => Number(w.strava_id)));
+    // 2) Insert new rides, runs, swims and gym sessions (2026 onwards; deleted workouts are never re-imported).
+    //    Other types (walks, hikes, yoga…) go to the inbox unless the athlete set a rule for that type.
+    const recent = acts.filter(a => String(a.start_date_local || '') >= MIN_WORKOUT_DATE);
+    const isSyncType = a => SYNC_TYPES.includes(a.sport_type) || SYNC_TYPES.includes(a.type || 'Ride');
+    const alwaysInclude = await routeToInbox(recent.filter(a => !isSyncType(a)).map(a => ({
+      key: `strava:${a.id}`, src: 'strava', type: a.sport_type || a.type, name: a.name || '', date: String(a.start_date_local || '').replace('T', ' ').slice(0, 16),
+      distance_km: round(num(a.distance) / 1000, 2), moving_sec: num(a.moving_time), raw: a
+    })));
+    const rideActs = recent.filter(isSyncType);
+    for (const it of alwaysInclude) { it.raw.__sport = inboxSport(it.type); rideActs.push(it.raw); }
+    const existing = await db.workouts.toArray();
+    const recordsBefore = recordSignature(existing);
+    const known = new Set(existing.map(w => Number(w.strava_id)));
+    const deleted = await deletedWorkoutIds();
     const added = [];
     for (const a of rideActs) {
-      if (known.has(Number(a.id))) continue;
+      if (known.has(Number(a.id)) || deleted.has(Number(a.id))) continue;
       const w = buildWorkoutFromActivity(a);
+      if (a.__sport) w.sport = a.__sport;
+      // A workout imported earlier from Samsung Health is replaced by the Strava copy (same start ±5 min);
+      // the athlete's corrections and flags carry over
+      const twin = existing.find(x => x.source === 'health' && Math.abs(parseSafeDate(x.date) - parseSafeDate(w.date)) <= 300000);
+      if (twin) {
+        for (const k of ['intent_type', 'intent_target', 'rpe', 'feel', 'note', 'data_flags', 'sport']) if (twin[k] !== undefined && twin[k] !== null) w[k] = twin[k];
+        await db.workouts.delete(twin.id);
+        await db.streams.delete(Number(twin.strava_id));
+        await db.threads.where('strava_id').equals(Number(twin.strava_id)).modify({ strava_id: Number(a.id) });
+      }
       w.id = await db.workouts.add(w);
       added.push(w);
     }
@@ -261,6 +287,7 @@ async function syncStrava(opts = {}) {
       if (w.device_watts === undefined) w.device_watts = !!a.device_watts;
       if (!w.name) w.name = a.name || '';
       if (!w.sport_type) w.sport_type = a.sport_type || a.type || 'Ride';
+      if (w.trainer === undefined) w.trainer = !!a.trainer;
       if (!w.map_polyline && a.map && a.map.summary_polyline) w.map_polyline = a.map.summary_polyline;
     });
 
@@ -278,6 +305,8 @@ async function syncStrava(opts = {}) {
       const row = await db.streams.get(Number(w.strava_id));
       if (row) {
         stream = row.stream_data;
+      } else if (Number(w.strava_id) < 0) {
+        stream = null; // imported from Samsung Health, not on Strava
       } else if (!rateLimited) {
         try {
           const res = await fetch(`https://www.strava.com/api/v3/activities/${w.strava_id}/streams?keys=${STREAM_KEYS}&key_by_type=true`, { headers: { Authorization: `Bearer ${token}` } });
@@ -310,12 +339,14 @@ async function syncStrava(opts = {}) {
     await renderRides();
 
     const parts = [];
-    parts.push(added.length ? `${added.length} new ride${added.length > 1 ? 's' : ''}` : 'No new rides');
+    const kinds = Object.keys(SPORTS).map(s => [s, added.filter(w => sportOf(w) === s).length]).filter(x => x[1]);
+    parts.push(added.length ? kinds.map(([s, n]) => `${n} new ${n > 1 ? SPORTS[s].plural.toLowerCase() : SPORTS[s].label.toLowerCase()}`).join(', ') : 'No new workouts');
     if (fetched) parts.push(`${fetched} stream${fetched > 1 ? 's' : ''} downloaded`);
     if (rateLimited) parts.push(`${missing} still pending (Strava limit — sync again in ~15 min)`);
     if (!auto || added.length || rateLimited) toast(parts.join(' · '), rateLimited ? 'warn' : 'success', rateLimited ? 6500 : 3800);
     if (added.length) haptic('success');
     await setConfig('last_sync_at', new Date().toISOString());
+    await announceNewRecords(recordsBefore, added.map(w => w.id));
 
     if (added.length) {
       intentModalQueue = (await Promise.all(added.map(w => db.workouts.get(w.id)))).sort((a, b) => (a.date < b.date ? -1 : 1));

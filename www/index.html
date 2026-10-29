@@ -4,12 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#f3f5fa" />
-  <title>Ride Partner</title>
+  <title>Training Partner</title>
   <link rel="icon" type="image/svg+xml" href="img/logo.svg" />
   <link rel="stylesheet" href="css/app.css" />
   <script src="js/recovery.js"></script>
 </head>
 <body>
+<div id="intro" aria-hidden="true"><div class="intro-mark"><img src="img/logo.svg" alt="" /></div><div class="intro-word"><span>Training</span> <span>Partner</span></div><div class="intro-line"></div></div>
 
 <!-- ICON SPRITE -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -58,6 +59,12 @@
     <symbol id="i-scale" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 10a5 5 0 0 1 8 0M12 10l1.5-2.5"/></symbol>
     <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-run" viewBox="0 0 24 24"><circle cx="14.5" cy="4" r="2"/><path d="m4 21 4-6 3 2 2-5"/><path d="M8 9l3-2 4 1 2 4 3 1"/><path d="m11 7 2 5 4 3v6"/></symbol>
+    <symbol id="i-swim" viewBox="0 0 24 24"><circle cx="17" cy="6" r="2"/><path d="M4 12l5-3 3 2.5L15 10"/><path d="M2 17c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0 1.5 0 2 0"/><path d="M2 21c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/></symbol>
+    <symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4"/><path d="M4 4h12l-2 4 2 4H4"/></symbol>
+    <symbol id="i-multi" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="12" cy="18" r="3"/><path d="M8.5 7.5 10.5 16M15.5 7.5 13.5 16M9 6h6"/></symbol>
   </defs>
 </svg>
 
@@ -66,8 +73,8 @@
   <div class="brand">
     <img class="brand-mark" src="img/logo.svg" alt="" />
     <div class="brand-text">
-      <div class="brand-title">Ride Partner</div>
-      <div class="brand-sub" id="brandSub">AI cycling coach</div>
+      <div class="brand-title">Training Partner</div>
+      <div class="brand-sub" id="brandSub">AI training coach</div>
     </div>
   </div>
   <div class="appbar-actions">
@@ -83,19 +90,21 @@
     <div id="ptr" class="ptr" aria-hidden="true"><svg class="ic"><use href="#i-refresh"/></svg></div>
     <div class="screen-head">
       <div>
-        <div class="screen-title">Rides</div>
+        <div class="screen-title">Training</div>
         <div class="screen-sub" id="ridesSub">Loading…</div>
       </div>
-      <button id="btnSync" class="btn btn-primary btn-sm" onclick="syncStrava()"><svg class="ic"><use href="#i-refresh"/></svg><span>Sync Strava</span></button>
+      <button id="btnSync" class="btn btn-primary btn-sm" onclick="syncAll()"><svg class="ic"><use href="#i-refresh"/></svg><span>Sync</span></button>
     </div>
     <div id="syncStatus" class="sync-status hidden">
       <span id="syncStatusText"></span>
       <div class="progress"><i id="syncProgress"></i></div>
     </div>
+    <div id="inboxCard"></div>
     <div id="weekCard" class="mt-8"></div>
+    <div id="sportSegRides" class="mt-12"></div>
     <div class="search mt-12">
       <svg class="ic ic-sm"><use href="#i-search"/></svg>
-      <input id="rideSearch" type="search" placeholder="Search name, date, zone, notes…" autocomplete="off" />
+      <input id="rideSearch" type="search" placeholder="Search name, date, sport, zone, notes…" autocomplete="off" />
     </div>
     <div class="chip-rack mt-8" id="rideFilters">
       <button class="chip active" data-filter="all">All</button>
@@ -115,6 +124,7 @@
         <div class="screen-sub">Fitness, fatigue, form and season progression</div>
       </div>
     </div>
+    <div id="sportSegTrends" class="mb-8"></div>
     <div class="kpi-grid" id="loadKpis"></div>
     <div class="section-title">
       <span>Fitness · Fatigue · Form</span>
@@ -152,7 +162,7 @@
     </div>
     <div class="chart-card mt-8"><div id="weeklyChart" class="chart" style="min-height:230px"></div></div>
 
-    <div class="section-title"><span>Ride-by-ride progression</span></div>
+    <div class="section-title"><span>Session-by-session progression</span><span class="tiny muted" id="globalSportNote"></span></div>
     <div class="chip-rack" id="globalMetricPills"></div>
     <div class="chart-card chart-scroll"><div id="globalChart" class="chart"></div></div>
     <div class="readout">
@@ -164,7 +174,7 @@
     <div id="bestEfforts"></div>
 
     <div class="section-title"><span>AI season progression audit</span></div>
-    <div class="model-bar"><span class="label tiny"><svg class="ic ic-sm"><use href="#i-sparkle"/></svg>AI engine</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
+    <button class="model-chip" data-agent="trends" onclick="openModelPicker('trends')"></button>
     <button id="btnGraphAI" class="btn btn-primary" onclick="generateGraphDebrief()"><svg class="ic"><use href="#i-sparkle"/></svg>Analyze macro trends</button>
     <div class="chat" id="graphChatThread"></div>
     <div class="row hidden" id="graphReplyBox">
@@ -178,22 +188,26 @@
     <div class="screen-head">
       <div>
         <div class="screen-title">Compare</div>
-        <div class="screen-sub">Put two or three rides side by side</div>
+        <div class="screen-sub" id="compareSub">Two sessions of the same sport, side by side</div>
       </div>
     </div>
-    <div class="card">
-      <div class="field"><label>Ride A (baseline)</label><select id="comp_s1" class="input" onchange="renderComparison()"></select></div>
-      <div class="row" style="justify-content:center; margin:-4px 0 6px;">
-        <button class="btn btn-ghost btn-xs" onclick="swapComparison()"><svg class="ic ic-sm"><use href="#i-swap"/></svg>Swap A / B</button>
-      </div>
-      <div class="field"><label>Ride B</label><select id="comp_s2" class="input" onchange="renderComparison()"></select></div>
-      <div class="field" style="margin-bottom:0"><label>Ride C (optional)</label><select id="comp_s3" class="input" onchange="renderComparison()"></select></div>
+    <div class="chip-rack mb-8" id="compareSports"></div>
+    <div class="chip-rack mb-8" id="comparePresets"></div>
+    <div class="card compare-pick">
+      <div class="cp-row"><span class="cp-tag a">A</span><select id="comp_s1" class="input" onchange="renderComparison()"></select></div>
+      <button class="cp-swap" onclick="swapComparison()" aria-label="Swap A and B"><svg class="ic ic-sm"><use href="#i-swap"/></svg></button>
+      <div class="cp-row"><span class="cp-tag b">B</span><select id="comp_s2" class="input" onchange="renderComparison()"></select></div>
+      <details class="cp-more"><summary>Add a third session</summary>
+        <div class="cp-row mt-8"><span class="cp-tag c">C</span><select id="comp_s3" class="input" onchange="renderComparison()"></select></div>
+      </details>
     </div>
-    <div class="section-title">Side by side</div>
+    <div id="compareVerdict"></div>
     <div id="compareTableContainer"></div>
+    <div class="section-title"><span>Overlay</span><span class="tiny muted" id="compareOverlayNote"></span></div>
+    <div class="chart-card"><div id="compareChart" class="chart"></div></div>
     <div class="section-title">AI comparison</div>
-    <div class="model-bar"><span class="label tiny"><svg class="ic ic-sm"><use href="#i-sparkle"/></svg>AI engine</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
-    <button id="btnCompareAI" class="btn btn-primary" onclick="generateAIComparison()"><svg class="ic"><use href="#i-sparkle"/></svg>Generate comparative breakdown</button>
+    <button class="model-chip" data-agent="compare" onclick="openModelPicker('compare')"></button>
+    <button id="btnCompareAI" class="btn btn-primary" onclick="generateAIComparison()"><svg class="ic"><use href="#i-sparkle"/></svg>Explain the difference</button>
     <div class="chat" id="compareAIBox"></div>
   </section>
 
@@ -223,28 +237,33 @@
       <button data-tf="all">All time</button>
     </div>
 
+    <div class="sport-seg mt-8" id="reportSportSeg"></div>
+    <div class="sport-tiles mt-12" id="reportSports"></div>
+
     <div class="lab mt-12">
-      <div class="lab-title"><svg class="ic ic-sm"><use href="#i-activity"/></svg>Physiological stress &amp; biomarkers</div>
+      <div class="lab-title"><svg class="ic ic-sm"><use href="#i-activity"/></svg>Load, efficiency &amp; intensity</div>
       <div class="lab-grid" id="labDiagnosticGrid"></div>
-      <div class="small lab-muted" style="margin:14px 0 8px; font-weight:600;">Moving time in zone</div>
+      <div class="small lab-muted" style="margin:14px 0 8px; font-weight:600;">Moving time in zone · all sports</div>
       <div id="reportZoneBars"></div>
     </div>
 
-    <div class="section-title">All-time records</div>
+    <div class="section-title"><span>All-time records</span></div>
+    <div class="chip-rack mb-8" id="recordSportSeg"></div>
     <div class="record-grid" id="recordGrid"></div>
 
     <div class="card mt-16">
-      <div class="card-title"><svg class="ic"><use href="#i-sparkle"/></svg>Longitudinal review</div>
-      <div class="card-sub">Period-over-period adaptation, cardiac drift, zone strain, climbing VAM and training load.</div>
-      <div class="model-bar"><span class="label tiny">Synthesis engine</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
-      <button id="btnReport" class="btn btn-primary" onclick="generateExecutiveReport()"><svg class="ic"><use href="#i-sparkle"/></svg>Synthesize review</button>
+      <div class="card-title"><svg class="ic"><use href="#i-sparkle"/></svg>Period review</div>
+      <div class="card-sub">Every sport together and on its own: intensity, drift, recovery, progress vs the previous period and next steps.</div>
+      <button class="model-chip" data-agent="report" onclick="openModelPicker('report')"></button>
+      <button id="btnReport" class="btn btn-primary" onclick="generateExecutiveReport()"><svg class="ic"><use href="#i-sparkle"/></svg>Write review</button>
       <div class="chat" id="reportSummaryBox"></div>
     </div>
 
-    <div class="card">
-      <div class="card-title"><svg class="ic"><use href="#i-report"/></svg>Official PDF report</div>
-      <div class="card-sub mb-12">A4 report with KPIs, zones, the AI review and a session ledger. Opens the Android share sheet so you can save it to Files, Drive or send it.</div>
-      <button id="btnPdf" class="btn btn-dark" onclick="triggerOfficialPdfDownload()"><svg class="ic"><use href="#i-download"/></svg>Export A4 PDF</button>
+    <div class="card pdf-card">
+      <div class="pdf-preview" aria-hidden="true"><i></i><i></i><i></i><b></b><b></b><b></b></div>
+      <div class="card-title"><svg class="ic"><use href="#i-report"/></svg>Designed PDF report</div>
+      <div class="card-sub mb-12">Coach verdict, KPI tiles vs the previous period, each sport, fitness/fatigue and weekly-volume charts, intensity donut, recovery, best efforts, the full review and every session. Opens the share sheet.</div>
+      <button id="btnPdf" class="btn btn-dark" onclick="triggerOfficialPdfDownload()"><svg class="ic"><use href="#i-download"/></svg>Export PDF</button>
       <div id="pdfStatus" class="small center mt-8" style="color:var(--brand); font-weight:700;"></div>
     </div>
   </section>
@@ -353,6 +372,18 @@
       <div class="card-sub">The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.</div>
       <div id="providerList" class="list mt-8"></div>
       <label class="switch-row mt-8"><span><b>Automatic fallback</b><br><span class="hint">If the active provider fails or hits a limit, try the others (free ones first).</span></span><input type="checkbox" id="cfg_ai_fallback" onchange="setAiFallback(this.checked)" /></label>
+      <div class="field-label mt-12">Model per coach</div>
+      <div id="agentModelList" class="list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><svg class="ic"><use href="#i-history"/></svg>Coach memory</div>
+      <div class="card-sub">Facts every coach keeps in mind — corrections you gave (e.g. "Ride 34 was a stationary gym bike"), equipment, injuries, goals. Coaches add to it when you correct them; you can add or delete here.</div>
+      <div id="memoryList" class="list mt-8"></div>
+      <div class="row mt-12">
+        <input id="memory_new" class="input grow" placeholder="e.g. I train for an Ironman in 2027" autocomplete="off" onkeydown="if(event.key==='Enter')addMemoryFact()" />
+        <button class="btn btn-secondary btn-sm" style="flex:0 0 auto" onclick="addMemoryFact()">Add</button>
+      </div>
     </div>
 
     <div class="card">
@@ -439,7 +470,7 @@
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav" id="bottomNav">
-  <button class="nav-btn active" data-tab="rides"><span class="pill"></span><svg class="ic"><use href="#i-bike"/></svg>Rides</button>
+  <button class="nav-btn active" data-tab="rides"><span class="pill"></span><svg class="ic"><use href="#i-activity"/></svg>Training</button>
   <button class="nav-btn" data-tab="trends"><span class="pill"></span><svg class="ic"><use href="#i-trend"/></svg>Trends</button>
   <button class="nav-btn" data-tab="compare"><span class="pill"></span><svg class="ic"><use href="#i-columns"/></svg>Compare</button>
   <button class="nav-btn" data-tab="coach"><span class="pill"></span><svg class="ic"><use href="#i-chat"/></svg>Coach</button>
@@ -454,7 +485,7 @@
     <div class="panel-title"><div class="t" id="det_title"></div><div class="s" id="det_sub"></div></div>
     <button class="icon-btn" onclick="shareRideCard()" aria-label="Share ride card"><svg class="ic"><use href="#i-share"/></svg></button>
     <button class="icon-btn" onclick="editCurrentRideIntent()" aria-label="Edit intent"><svg class="ic"><use href="#i-target"/></svg></button>
-    <button class="icon-btn" onclick="resetActiveRideThread()" aria-label="Reset coach thread"><svg class="ic"><use href="#i-trash"/></svg></button>
+    <button class="icon-btn" onclick="currentWorkout && openQualitySheet(currentWorkout.id)" aria-label="Sport, data errors, delete"><svg class="ic"><use href="#i-flag"/></svg></button>
   </div>
   <div class="panel-body" id="detBody">
     <div class="inner">
@@ -485,8 +516,8 @@
         <div class="row between"><span id="banner_line1_l">⏱ --</span><span id="banner_line1_r">📏 --</span></div>
         <div class="row between sub"><span id="banner_line2_l">⚡ --</span><span id="banner_line2_r">❤️ --</span></div>
       </div>
-      <div class="section-title" id="coachSection"><span>AI coach debrief</span><span id="det_status_badge"></span></div>
-      <div class="model-bar"><span class="label tiny"><svg class="ic ic-sm"><use href="#i-sparkle"/></svg>AI engine</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
+      <div class="section-title" id="coachSection"><span>AI coach</span><span class="row" style="gap:6px"><span id="det_status_badge"></span><button class="btn btn-ghost btn-xs" onclick="resetActiveRideThread()" aria-label="Reset coach thread"><svg class="ic ic-sm"><use href="#i-trash"/></svg></button></span></div>
+      <button class="model-chip" data-agent="ride" onclick="openModelPicker('ride')"></button>
       <div id="sessionActionBox"></div>
       <div class="chat" id="chatThread"></div>
     </div>
@@ -510,9 +541,9 @@
     <div class="panel-title"><div class="t">Aether</div><div class="s" id="masterSub">Season coach</div></div>
     <button class="icon-btn" onclick="resetMasterThread()" aria-label="Reset conversation"><svg class="ic"><use href="#i-trash"/></svg></button>
   </div>
+  <div class="panel-subbar"><button class="model-chip" data-agent="aether" onclick="openModelPicker('aether')"></button></div>
   <div class="panel-body" id="masterBody">
     <div class="inner">
-      <div class="model-bar"><span class="label tiny"><svg class="ic ic-sm"><use href="#i-sparkle"/></svg>Coach model</span><select class="model-select" onchange="syncModelSelection(this.value)"></select></div>
       <div class="chat" id="hubChatContainer"></div>
     </div>
   </div>
@@ -658,10 +689,61 @@
 </div>
 
 <!-- WHAT'S NEW SHEET -->
+<div class="sheet" id="modelPickSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title" id="modelPickTitle">Model</div>
+  <div class="sheet-sub mb-12">Each coach can use its own model. Every reply shows which model wrote it.</div>
+  <div class="pick-list" id="modelPickList"></div>
+  <div class="pick-foot hidden" id="modelPickFoot">
+    <div class="field-label">If this model is busy or fails</div>
+    <div class="segmented" id="pickMode">
+      <button data-v="fallback" onclick="setPickMode('fallback')">Use another provider</button>
+      <button data-v="strict" onclick="setPickMode('strict')">Keep retrying this one</button>
+    </div>
+    <div class="hint mt-8" id="pickModeHint"></div>
+    <div class="btn-row mt-12">
+      <button class="btn btn-secondary" onclick="applyPick(true)">Use for all coaches</button>
+      <button class="btn btn-primary" onclick="applyPick(false)">Use for this coach</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="qualitySheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title" id="qs_title">Workout data</div>
+  <div class="sheet-sub mb-12" id="qs_sub">Fix the sport or mark values that are wrong. Flagged values are left out of records, best efforts, trends and AI analysis — the original numbers are kept.</div>
+  <div class="field"><label>Sport</label>
+    <div class="segmented" id="qs_sport">
+      <button data-v="ride" onclick="qsPickSport('ride')">Ride</button><button data-v="run" onclick="qsPickSport('run')">Run</button><button data-v="swim" onclick="qsPickSport('swim')">Swim</button><button data-v="other" onclick="qsPickSport('other')">Gym</button>
+    </div>
+  </div>
+  <label class="check-row"><input type="checkbox" id="qs_indoor" /><span><b>Indoor / stationary</b><span class="tiny muted">Gym bike, trainer or treadmill — distance, speed and climbing are ignored</span></span></label>
+  <div class="field-label mt-12">Wrong values</div>
+  <label class="check-row"><input type="checkbox" id="qs_f_elevation" /><span><b>Elevation &amp; climbing</b><span class="tiny muted" id="qs_v_elevation"></span></span></label>
+  <label class="check-row"><input type="checkbox" id="qs_f_distance" /><span><b>Distance &amp; speed (GPS)</b><span class="tiny muted" id="qs_v_distance"></span></span></label>
+  <label class="check-row"><input type="checkbox" id="qs_f_hr" /><span><b>Heart rate</b><span class="tiny muted" id="qs_v_hr"></span></span></label>
+  <label class="check-row"><input type="checkbox" id="qs_f_power" /><span><b>Power</b><span class="tiny muted" id="qs_v_power"></span></span></label>
+  <label class="check-row"><input type="checkbox" id="qs_f_exclude" /><span><b>Exclude the whole workout</b><span class="tiny muted">Accidental recording or test — kept, but ignored by every statistic</span></span></label>
+  <div class="btn-row mt-16">
+    <button class="btn btn-danger" onclick="deleteWorkoutFromSheet()"><svg class="ic"><use href="#i-trash"/></svg>Delete</button>
+    <button class="btn btn-primary" onclick="saveQualitySheet()"><svg class="ic"><use href="#i-check-circle"/></svg>Save</button>
+  </div>
+</div>
+
+<div class="sheet" id="inboxSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">New activities</div>
+  <div class="sheet-sub mb-12">These types aren't imported automatically. Ticked ones are added (walks and hikes count as runs, everything else as Gym &amp; other); the rest are skipped and won't be asked again.</div>
+  <div id="inboxList"></div>
+  <div class="field-label mt-12">Remember for next time</div>
+  <div id="inboxRules"></div>
+  <button class="btn btn-primary mt-16" onclick="applyInbox()"><svg class="ic"><use href="#i-check-circle"/></svg>Save</button>
+</div>
+
 <div class="sheet" id="whatsNewSheet" role="dialog" aria-modal="true">
   <div class="sheet-grip"></div>
   <div class="sheet-title">What's new in v3</div>
-  <div class="sheet-sub mb-12">Ride Partner has been rebuilt.</div>
+  <div class="sheet-sub mb-12">Training Partner has been rebuilt.</div>
   <div class="md small" id="whatsNewBody"></div>
   <button class="btn btn-primary mt-16" onclick="closeSheet('whatsNewSheet')">Let's ride</button>
 </div>
@@ -680,11 +762,14 @@
 
 <script src="js/vendor/dexie.min.js"></script>
 <script src="js/vendor/plotly-basic.min.js"></script>
+<script src="js/vendor/confetti.browser.js"></script>
 <script src="js/vendor/jspdf.umd.min.js"></script>
 <script src="js/vendor/jspdf.plugin.autotable.min.js"></script>
 <script src="js/app/util.js"></script>
 <script src="js/app/ui.js"></script>
+<script src="js/app/motion.js"></script>
 <script src="js/app/db.js"></script>
+<script src="js/app/sport.js"></script>
 <script src="js/app/physio.js"></script>
 <script src="js/app/athlete.js"></script>
 <script src="js/app/strava.js"></script>

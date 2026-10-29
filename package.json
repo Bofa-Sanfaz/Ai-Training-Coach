@@ -1,7 +1,7 @@
 {
   "name": "ai-training-coach",
-  "version": "3.2.2",
-  "description": "Offline-First AI Cycling Coach (Ride Partner)",
+  "version": "3.3.1",
+  "description": "Offline-first AI training coach for rides, runs, swims and gym (Training Partner)",
   "private": true,
   "scripts": {
     "build": "echo 'Web assets live in www/ (no bundling step)'",

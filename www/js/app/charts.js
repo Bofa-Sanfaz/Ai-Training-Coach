@@ -34,6 +34,27 @@ function plotReady() {
   return !!window.Plotly;
 }
 
+// Draw (or redraw) a chart. Plotly.react updates the existing SVG in place, so
+// the element must never be emptied by hand between draws — that was the cause
+// of charts vanishing after a filter change or when returning to a screen.
+function drawChart(el, traces, layout, config = PLOT_CONFIG) {
+  const stale = el.querySelector('.chart-empty') || (el._fullLayout && !el.querySelector('.main-svg'));
+  if (stale) { Plotly.purge(el); el.innerHTML = ''; }
+  const p = Plotly.react(el, traces, layout, config);
+  ['plotly_hover', 'plotly_click', 'plotly_unhover'].forEach(ev => el.removeAllListeners && el.removeAllListeners(ev));
+  return p;
+}
+
+// Charts drawn while their screen was hidden get a 0-width box; resize on show.
+function resizeChartsIn(root) {
+  if (!window.Plotly || !root) return;
+  root.querySelectorAll('.js-plotly-plot').forEach(el => {
+    if (el.offsetParent && el._fullLayout && el.layout && !el.layout.width) {
+      try { Plotly.Plots.resize(el); } catch (_) { /* ignore */ }
+    }
+  });
+}
+
 function smoothStreamArray(arr, windowSize = 5) {
   if (!arr || arr.length < windowSize) return arr || [];
   const half = Math.floor(windowSize / 2);

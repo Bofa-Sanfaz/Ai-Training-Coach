@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.3.1 — 2026-10-29
+- Activity inbox, 2026+ only, Reports sport selector, much richer PDF, Aether context at three resolutions with coach verdicts and data completeness, derived resting HR, conversation-review rules (no-bike ≠ rest, no invented facts), Trends no longer renders inside the tab transition, charts can't trap scrolling, guide PDF.
+
+## 3.3.0 — 2026-10-29 · Training Partner
+Full explanation for the athlete: `docs/Training-Partner-Guide.pdf` (source `docs/guide/Training-Partner-Guide.html`).
+### Multi-sport
+- Renamed to **Training Partner**; sports: ride, run, swim, gym & other (`www/js/app/sport.js`). Per-sport numbering, units (pace for runs/swims), colours, icons and filters (Training, Trends, Compare, Reports).
+- Strava imports runs, swims and gym types; Samsung Health (Health Connect) imports pool/open-water swims, treadmill/outdoor runs, stationary bike and gym sessions with a heart-rate stream (`addHealthSession`). Strava copies replace watch copies (±5 min) keeping intent/rating/note/flags.
+- Only workouts from 2026-01-01 (`MIN_WORKOUT_DATE`; Strava `after=`).
+- **Activity inbox** for other types (walk/hike → run, others → gym & other) with per-type rules (`activity_rules`, `activity_inbox`, `activity_skipped`).
+- Health permissions now include exercise, distance and active calories; resting HR derived from the lowest hourly HR when Samsung shares none; sleep coverage reported to the coaches.
+### Data quality
+- Flag sheet per workout: sport, indoor, data errors (elevation, distance/speed, HR, power), exclude, delete. `mv()` hides flagged values everywhere (records, best efforts, totals, load, compare, AI).
+- Delete with restore point and a permanent "deleted" list (`deleted_workouts`).
+### AI
+- Model per coach with a two-level picker (provider → models), strict "keep retrying this one" mode (10 s → 5 min backoff, up to 2 h, waits for connection), per-agent concurrency instead of one global lock.
+- Every reply stores and shows provider · model · seconds (`ai_provider`, `ai_model`, `ai_secs`).
+- Chat messages saved immediately (`pending`), replies finish in the background, unanswered messages resumed on app resume / back online.
+- Coach memory (`coach_memory`, `<remember>` tags) shared by all coaches; Profile card to add/delete.
+- Style rules from a review of real conversations (concise, no hype, no repeated questions, weight only when relevant, no invented numbers/sessions, honest readiness). plan-actions: "no bike" ≠ rest, sessions carry a sport, never claim "applied".
+- Context: whole history at three resolutions (6 weeks per session incl. athlete note + coach verdict, weekly, monthly), mass only on change, compact zones, data-completeness line, per-minute peaks in the timeline. Fixed: every Gemini model was treated as a "small" model ("gemini" matched "mini").
+### Screens
+- Charts no longer disappear on redraw (`drawChart`), can't trap touch scrolling, and heavy screens render after the transition.
+- Compare rebuilt: same sport, smart defaults, verdict, efficiency, paired bars, zones, speed/HR overlay, saved AI answer.
+- Reports: sport selector, sport tiles with deltas, efficiency and intensity split, records per sport with "mark as data error".
+- PDF rebuilt: cover, verdict, KPI tiles vs previous period, per-sport breakdown, load/volume/intensity charts (JPEG), week-by-week table, a page per sport, highlights & records, plan adherence, recovery log, data quality & memory, styled review, colour-coded ledger.
+- Motion (`motion.js`): view-transition tab pushes, card→detail morph, count-ups, route drawing, sliding tab indicator, ripples, intro, confetti for records (canvas-confetti 1.9.3, ISC, vendored). Respects reduced motion.
+### Developer
+- `webContentsDebuggingEnabled` on (USB diagnostics); `scripts/phone-eval.js` evaluates read-only expressions in the app over USB.
+
 ## 3.2.1 — 2026-10-29
 - AI timeouts: wait up to 75 s for the first word, then only give up if a reply stops streaming for 45 s (long answers no longer cut off at a fixed limit); a timeout moves straight to the next provider.
 - Restore JSON also restores telemetry streams when the backup contains them.

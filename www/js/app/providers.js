@@ -49,8 +49,8 @@ const PROVIDER_PRESETS = {
   custom: { name: 'Custom (OpenAI-compatible)', type: 'openai', baseUrl: '', model: '', paid: false, keyUrl: '', note: 'Any OpenAI-compatible endpoint, e.g. a local Ollama / LM Studio server (http://<pc-ip>:11434/v1).' }
 };
 
-let isRequestInProgress = false;
-let AI = null; // { active, fallback, capUsd, providers: [...] }
+let AI = null; // { active, fallback, capUsd, providers: [...], agentModels: { agent: { pid, model } } }
+const aiRunning = new Set(); // agents with a request in flight (one per agent; different agents may run together)
 
 // --------------------------------------------------------
 // SETTINGS
@@ -80,6 +80,7 @@ async function loadAiSettings() {
   for (const p of s.providers) if (p.type === 'gemini' && RETIRED_MODELS.includes(p.model)) p.model = PROVIDER_PRESETS.gemini.model;
   if (!s.providers.some(p => p.id === s.active)) s.active = s.providers[0] ? s.providers[0].id : '';
   if (!(s.capUsd >= 0)) s.capUsd = 5;
+  if (!s.agentModels || typeof s.agentModels !== 'object') s.agentModels = {};
   AI = s;
   return s;
 }
@@ -110,23 +111,164 @@ function providerLabel(p) {
   return `${p.name} · ${p.model || 'no model'}${p.paid ? ' · paid' : ' · free'}`;
 }
 
-// The compact selectors shown next to every AI button switch the active provider
-async function refreshModelSelectors() {
-  if (!AI) await loadAiSettings();
-  const ready = AI.providers.filter(p => p.enabled);
-  const html = ready.length
-    ? ready.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(`${p.name.replace(/ \(.*\)$/, '')} · ${p.model || '—'}`)}</option>`).join('')
-    : '<option value="">No AI provider — add one in Profile</option>';
-  $$('.model-select').forEach(sel => { sel.innerHTML = html; sel.value = AI.active; });
+const shortProviderName = p => String(p.name || '').replace(/ \(.*\)$/, '').replace(/^Google /, '').replace(/^Anthropic /, '');
+
+// Short, readable model name: "mistral-medium-latest" → "mistral-medium", "openai/gpt-oss-120b" → "gpt-oss-120b"
+function shortModelName(id) {
+  return String(id || '').replace(/^models\//, '').replace(/^[^/]+\//, '').replace(/-latest$/, '').replace(/:free$/, ' (free)');
 }
 
-async function syncModelSelection(providerId) {
-  if (!providerId || !providerById(providerId)) return;
-  AI.active = providerId;
-  await saveAiSettings();
-  $$('.model-select').forEach(sel => { sel.value = providerId; });
+// --------------------------------------------------------
+// PER-AGENT MODEL CHOICE
+// Each coach can use its own provider + model; "Automatic" = the default provider,
+// then the fallback chain (free providers first).
+// --------------------------------------------------------
+// strict = "only this model": no fallback; retries with growing pauses until it answers
+function agentChoice(agent) {
+  const c = agent && AI && AI.agentModels[agent];
+  const p = c && providerById(c.pid);
+  return p && providerReady(p) ? { p, model: c.model || p.model, strict: !!c.strict } : null;
+}
+
+// Provider object used for a request (model override applied, prices from the model list when known)
+function withModel(p, model) {
+  if (!model || model === p.model) return p;
+  const q = Object.assign({}, p, { model });
+  const m = (p.models || []).find(x => x.id === model);
+  if (p.type === 'anthropic' && CLAUDE_PRICES[model]) [q.priceIn, q.priceOut] = CLAUDE_PRICES[model];
+  else if (m && m.price) { [q.priceIn, q.priceOut] = m.price; q.paid = m.price[0] > 0 || m.price[1] > 0; }
+  return q;
+}
+
+function agentModelLabel(agent) {
+  const c = agentChoice(agent);
+  if (c) return `${shortProviderName(c.p)} · ${shortModelName(c.model)}${c.strict ? ' · only' : ''}`;
   const p = activeProvider();
-  if (p && !providerReady(p)) toast(`${p.name} needs an API key and model — open Profile → AI providers.`, 'warn', 4500);
+  return p && providerReady(p) ? `Auto · ${shortProviderName(p)} · ${shortModelName(p.model)}` : 'No AI provider set up';
+}
+
+// Chips with data-agent="…" show the model each coach uses; tapping opens the picker
+async function refreshModelSelectors() {
+  if (!AI) await loadAiSettings();
+  $$('.model-chip').forEach(ch => {
+    const agent = ch.dataset.agent;
+    const c = agentChoice(agent);
+    ch.innerHTML = `<span class="mc-dot ${c ? (c.strict ? 'strict' : 'pinned') : ''}"></span><span class="grow">${escapeHtml(agentModelLabel(agent))}</span>${icon('chevron-down', 'ic-sm')}`;
+    ch.classList.toggle('pinned', !!c);
+  });
+}
+
+// ---------- Picker: level 1 = providers, level 2 = that provider's models ----------
+let pick = null; // { agent, pid, model, strict, all, q }
+
+const PROVIDER_COLORS = { gemini: '#1a73e8', groq: '#f55036', openrouter: '#6566f1', mistral: '#fa520f', anthropic: '#d97757', openai: '#10a37f', deepseek: '#4d6bfe', custom: '#64748b' };
+const providerBadge = p => `<span class="prov-badge" style="--pc:${PROVIDER_COLORS[p.preset] || '#64748b'}">${escapeHtml(shortProviderName(p).slice(0, 2))}</span>`;
+
+function openModelPicker(agent) {
+  const cur = AI.agentModels[agent] || null;
+  pick = { agent, pid: cur ? cur.pid : null, model: cur ? cur.model : null, strict: !!(cur && cur.strict), all: false, q: '' };
+  $('#modelPickTitle').textContent = `Model · ${AI_AGENTS[agent] || agent}`;
+  renderPickProviders();
+  openSheet('modelPickSheet', () => { pick = null; });
+}
+
+function renderPickProviders() {
+  const auto = !pick.pid;
+  const def = activeProvider();
+  let html = `<button class="prov-card ${auto ? 'active' : ''}" onclick="pickAutomatic()">
+      <span class="prov-badge auto">${icon('repeat', 'ic-sm')}</span>
+      <span class="grow"><b>Automatic</b><span class="tiny muted">${def ? `${escapeHtml(shortProviderName(def))} · ${escapeHtml(shortModelName(def.model))} first, then the others (free first)` : 'Add a provider first'}</span></span>
+      ${auto ? icon('check-circle', 'ic-sm') : ''}</button>
+    <div class="pick-group">Providers</div>`;
+  for (const p of AI.providers) {
+    const ready = providerReady(p);
+    const sel = pick.pid === p.id;
+    const count = (p.models || []).length;
+    html += `<button class="prov-card ${sel ? 'active' : ''} ${ready ? '' : 'disabled'}" onclick="${ready ? `pickProvider('${escapeHtml(p.id)}')` : "closeSheet('modelPickSheet'); switchTab('profile')"}">
+      ${providerBadge(p)}
+      <span class="grow"><b>${escapeHtml(p.name)}</b><span class="tiny muted">${ready ? `${escapeHtml(sel ? shortModelName(pick.model || p.model) : shortModelName(p.model))}${count ? ` · ${count} models` : ''} · ${p.paid ? 'paid' : 'free'}` : 'needs an API key — set up in Profile'}</span></span>
+      ${icon('chevron', 'ic-sm muted')}</button>`;
+  }
+  $('#modelPickList').innerHTML = html;
+  $('#modelPickFoot').classList.add('hidden');
+}
+
+async function pickAutomatic() {
+  pick.pid = null; pick.model = null; pick.strict = false;
+  await applyPick(false);
+}
+
+function pickProvider(pid) {
+  const p = providerById(pid);
+  if (pick.pid !== pid) { pick.pid = pid; pick.model = p.model; }
+  pick.q = '';
+  renderPickModels();
+}
+
+function renderPickModels() {
+  const p = providerById(pick.pid);
+  const list = [{ id: p.model, label: 'Provider default' }].concat((p.models || []).filter(m => m.id !== p.model));
+  const q = pick.q.toLowerCase();
+  const shown = list.filter(m => !q || `${m.id} ${m.label || ''}`.toLowerCase().includes(q)).slice(0, 60);
+  const priceTag = m => m.free ? '<span class="tag free">free</span>' : m.price ? `<span class="tag">$${fmtNum(m.price[0], 2)}/$${fmtNum(m.price[1], 2)}</span>` : (p.type === 'anthropic' && CLAUDE_PRICES[m.id] ? `<span class="tag">$${CLAUDE_PRICES[m.id][0]}/$${CLAUDE_PRICES[m.id][1]}</span>` : '');
+  $('#modelPickList').innerHTML = `
+    <button class="pick-back" onclick="renderPickProviders()">${icon('back', 'ic-sm')}All providers</button>
+    <div class="prov-head">${providerBadge(p)}<div class="grow"><b>${escapeHtml(p.name)}</b><div class="tiny muted">${p.paid ? 'Paid — counts toward your spend cap' : 'Free tier'}</div></div>
+      <button class="btn btn-secondary btn-xs" onclick="refreshPickModels()">${icon('refresh', 'ic-sm')}Refresh</button></div>
+    ${list.length > 8 ? `<input class="input pick-search" placeholder="Search ${list.length} models…" value="${escapeHtml(pick.q)}" oninput="pick.q=this.value; renderPickModelsKeepFocus()" />` : ''}
+    <div class="pick-models">${shown.map(m => `
+      <button class="pick-row ${pick.model === m.id ? 'active' : ''}" onclick="pick.model='${escapeHtml(m.id)}'; renderPickModels()">
+        <span class="grow"><b>${escapeHtml(shortModelName(m.id))}</b><span class="tiny muted">${escapeHtml(m.label && m.label !== m.id ? m.label : m.id)}</span></span>${priceTag(m)}${pick.model === m.id ? icon('check-circle', 'ic-sm') : ''}</button>`).join('') || '<div class="small muted">No models match.</div>'}</div>`;
+  $('#modelPickFoot').classList.remove('hidden');
+  $$('#pickMode button').forEach(b => b.classList.toggle('active', (b.dataset.v === 'strict') === pick.strict));
+  $('#pickModeHint').textContent = pick.strict
+    ? `Only ${shortModelName(pick.model)} answers. If it is busy or rate-limited, Training Partner waits and retries (10 s, 20 s, 40 s… up to 5 min apart) until it replies — your message is kept even if you leave the app.`
+    : `${shortModelName(pick.model)} answers first; if it fails, your other providers answer instead (free first).`;
+}
+
+function renderPickModelsKeepFocus() {
+  const pos = $('.pick-search') ? $('.pick-search').selectionStart : 0;
+  renderPickModels();
+  const s = $('.pick-search');
+  if (s) { s.focus(); s.setSelectionRange(pos, pos); }
+}
+
+function setPickMode(v) {
+  pick.strict = v === 'strict';
+  renderPickModels();
+}
+
+async function refreshPickModels() {
+  const p = providerById(pick.pid);
+  try {
+    toast(`Loading ${p.name} models…`, 'info', 1500);
+    await testProvider(p);
+    await saveAiSettings();
+    renderPickModels();
+  } catch (e) {
+    toast(`Could not load models: ${e.message}`, 'error', 4000);
+  }
+}
+
+async function applyPick(all) {
+  const agents = all ? Object.keys(AI_AGENTS) : [pick.agent];
+  for (const a of agents) {
+    if (pick.pid) AI.agentModels[a] = { pid: pick.pid, model: pick.model, strict: pick.strict };
+    else delete AI.agentModels[a];
+  }
+  await saveAiSettings();
+  const label = agentModelLabel(pick.agent);
+  closeSheet('modelPickSheet');
+  await refreshModelSelectors();
+  if (Router.current === 'profile' && typeof renderAgentModels === 'function') renderAgentModels();
+  haptic('light');
+  toast(`${all ? 'All coaches' : AI_AGENTS[agents[0]] || agents[0]}: ${label}`, 'success', 2400);
+}
+
+// Who wrote a reply, for the small label under each AI message
+function aiMetaLabel(m) {
+  if (!m || !m.ai_model) return '';
+  return `${m.ai_provider ? `${m.ai_provider} · ` : ''}${shortModelName(m.ai_model)}${m.ai_secs ? ` · ${m.ai_secs}s` : ''}`;
 }
 
 // --------------------------------------------------------
@@ -290,7 +432,7 @@ function buildRequest(p, prompt, imageB64, opts, stream) {
   }
   const headers = { 'Content-Type': 'application/json' };
   if (p.apiKey) headers.Authorization = `Bearer ${p.apiKey}`;
-  if (/openrouter\.ai/.test(p.baseUrl)) { headers['HTTP-Referer'] = 'https://ridepartner.app'; headers['X-Title'] = 'Ride Partner'; }
+  if (/openrouter\.ai/.test(p.baseUrl)) { headers['HTTP-Referer'] = 'https://ridepartner.app'; headers['X-Title'] = 'Training Partner'; }
   return {
     url: `${p.baseUrl.replace(/\/$/, '')}/chat/completions`,
     headers,
@@ -358,25 +500,31 @@ async function requestProvider(p, prompt, imageB64, opts) {
 }
 
 // --------------------------------------------------------
-// PUBLIC: callAI(prompt, imageB64, { onDelta, json, maxTokens })
+// PUBLIC: callAI(prompt, imageB64, { onDelta, json, maxTokens, agent, meta })
+// agent: which coach is asking (uses its own model choice); meta: an object that
+// receives { provider, model, secs } of the model that actually answered.
 // Returns the reply text, or null after showing a clear error toast.
 // --------------------------------------------------------
 async function callAI(prompt, imageB64 = null, opts = {}) {
-  if (isRequestInProgress) { toast('An AI request is already running — please wait.', 'warn'); return null; }
   if (!navigator.onLine) { toast('Connect to the internet to use the AI coach.', 'warn'); return null; }
   if (!AI) await loadAiSettings();
+  const lane = opts.agent || 'default';
+  if (aiRunning.has(lane)) { toast('This coach is still answering — please wait.', 'warn'); return null; }
 
-  const primary = activeProvider();
-  const others = AI.fallback ? AI.providers.filter(p => p !== primary && providerReady(p)).sort((a, b) => Number(a.paid) - Number(b.paid)) : [];
+  const pinned = agentChoice(opts.agent);
+  const primary = pinned ? withModel(pinned.p, pinned.model) : activeProvider();
+  const others = AI.fallback ? AI.providers.filter(p => p.id !== (primary && primary.id) && providerReady(p)).sort((a, b) => Number(a.paid) - Number(b.paid)) : [];
+  if (pinned && AI.fallback && providerReady(activeProvider()) && activeProvider().id !== pinned.p.id) others.unshift(...others.splice(others.indexOf(activeProvider()), 1));
   const chain = (providerReady(primary) ? [primary] : []).concat(others);
   if (!chain.length) {
     toast('Set up an AI provider first: Profile → AI providers (Gemini, Groq and OpenRouter have free tiers).', 'warn', 6000);
     return null;
   }
 
-  isRequestInProgress = true;
+  aiRunning.add(lane);
   const failures = [];
   try {
+    if (pinned && pinned.strict) return await callStrict(primary, prompt, imageB64, opts);
     const capHit = await capReached();
     for (const p of chain) {
       if (p.paid && capHit) { failures.push(`${p.name}: monthly spend cap reached`); continue; }
@@ -384,9 +532,11 @@ async function callAI(prompt, imageB64 = null, opts = {}) {
         failures.push(`${p.name}: set its prices in Profile so spending can be tracked`);
         continue;
       }
+      const t0 = Date.now();
       try {
         const text = await requestProvider(p, prompt, imageB64, opts);
-        if (p !== primary) toast(`${primary ? primary.name : 'Primary provider'} unavailable — answered by ${p.name}.`, 'info', 3500);
+        if (opts.meta) Object.assign(opts.meta, { provider: shortProviderName(p), model: p.model, secs: Math.round((Date.now() - t0) / 1000) });
+        if (p !== primary) toast(`${primary ? primary.name : 'Primary provider'} unavailable — answered by ${p.name} (${shortModelName(p.model)}).`, 'info', 3500);
         return text;
       } catch (err) {
         failures.push(`${p.name}: ${describeAiError(err)}`);
@@ -398,8 +548,51 @@ async function callAI(prompt, imageB64 = null, opts = {}) {
     toast(`AI request failed.\n${failures.slice(0, 3).join('\n')}`, 'error', 8000);
     return null;
   } finally {
-    isRequestInProgress = false;
+    aiRunning.delete(lane);
   }
+}
+
+// "Keep retrying this one": a single model, retried with growing pauses (10 s → 5 min)
+// for up to ~2 hours. Waits for the network to come back instead of failing. Errors that
+// retrying can't fix (bad key, unknown model, bad request) stop at once.
+const STRICT_DELAYS = [10, 20, 40, 60, 120, 180, 300];
+const STRICT_MAX_MS = 2 * 3600 * 1000;
+
+async function callStrict(p, prompt, imageB64, opts) {
+  const status = opts.onStatus || (() => {});
+  const t0 = Date.now();
+  for (let attempt = 1; ; attempt++) {
+    if (!navigator.onLine) {
+      status('waiting for a connection…');
+      await new Promise(r => { const on = () => { window.removeEventListener('online', on); r(); }; window.addEventListener('online', on); setTimeout(on, 60000); });
+      continue;
+    }
+    if (p.paid && await capReached()) { toast(`${p.name}: monthly spend cap reached.`, 'error', 6000); return null; }
+    const ta = Date.now();
+    try {
+      status(attempt > 1 ? `attempt ${attempt}…` : '');
+      const text = await requestProvider(p, prompt, imageB64, opts);
+      if (opts.meta) Object.assign(opts.meta, { provider: shortProviderName(p), model: p.model, secs: Math.round((Date.now() - ta) / 1000) });
+      status('');
+      return text;
+    } catch (err) {
+      const fatal = [400, 401, 403, 404].includes(err.status);
+      if (fatal || Date.now() - t0 > STRICT_MAX_MS) {
+        toast(`${p.name} (${shortModelName(p.model)}): ${describeAiError(err)}${fatal ? '' : ' — gave up after 2 hours'}`, 'error', 8000);
+        return null;
+      }
+      const wait = STRICT_DELAYS[Math.min(attempt - 1, STRICT_DELAYS.length - 1)];
+      for (let s = wait; s > 0; s--) {
+        status(`${shortModelName(p.model)}: ${describeAiError(err).slice(0, 60)} — retrying in ${s} s (attempt ${attempt + 1})`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+  }
+}
+
+// Fields stored with every AI message so the app can show who wrote it
+function aiMetaFields(meta) {
+  return meta && meta.model ? { ai_provider: meta.provider, ai_model: meta.model, ai_secs: meta.secs } : {};
 }
 
 function describeAiError(err) {

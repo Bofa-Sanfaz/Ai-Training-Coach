@@ -72,6 +72,7 @@ function renderRouteCard(w, stream) {
   host.innerHTML = `${routeSvg(data)}
     <div class="route-legend">${data.hr ? PHYSIO.zones.map(z => `<span><i style="background:${z.color}"></i>${z.key}</span>`).join('') : '<span>Route</span>'}
     <span class="grow"></span><span><i style="background:#16a34a"></i>Start</span><span><i style="background:#0f172a"></i>Finish</span></div>`;
+  drawRoute($('svg', host));
 }
 
 // --------------------------------------------------------
@@ -107,7 +108,7 @@ async function shareRideCard() {
     try { g.drawImage(await loadImage('img/logo.svg'), 72, 72, 96, 96); } catch (e) {}
     g.fillStyle = '#ffffff';
     g.font = '700 46px "Barlow Semi Condensed", sans-serif';
-    g.fillText('Ride Partner', 190, 118);
+    g.fillText('Training Partner', 190, 118);
     g.fillStyle = '#9fb0cf';
     g.font = '500 30px "Barlow", sans-serif';
     g.fillText(formatNiceDate(w.date), 190, 158);

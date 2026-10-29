@@ -33,7 +33,8 @@ function cleanSession(s) {
     type,
     duration_min: type === 'rest' ? 0 : Math.max(0, Math.min(600, Math.round(num(s.duration_min)))),
     zone: String(s.zone || '').slice(0, 20),
-    details: String(s.details || '').slice(0, 400)
+    details: String(s.details || '').slice(0, 400),
+    sport: type === 'rest' ? '' : (SPORTS[s.sport] ? s.sport : (s.sport === 'gym' ? 'other' : ''))
   };
 }
 
@@ -179,7 +180,7 @@ async function applyPlanChanges(change, source) {
 
 function describePlanChange(change) {
   const lines = [];
-  for (const d of change.days || []) lines.push(`${d.date ? formatNiceDate(d.date, false) : '?'} → ${d.title || d.type}${d.duration_min ? ` · ${d.duration_min} min` : ''}${d.zone ? ` · ${d.zone}` : ''}`);
+  for (const d of change.days || []) lines.push(`${d.date ? formatNiceDate(d.date, false) : '?'} → ${d.sport && SPORTS[d.sport === 'gym' ? 'other' : d.sport] ? SPORTS[d.sport === 'gym' ? 'other' : d.sport].label + ': ' : ''}${d.title || d.type}${d.duration_min ? ` · ${d.duration_min} min` : ''}${d.zone ? ` · ${d.zone}` : ''}`);
   for (const d of change.template || []) lines.push(`Every ${d.weekday} → ${d.title || d.type}${d.duration_min ? ` · ${d.duration_min} min` : ''}${d.zone ? ` · ${d.zone}` : ''}`);
   if (change.targets) {
     const t = change.targets;
@@ -206,7 +207,7 @@ async function generateWeekPlan() {
   const btn = $('#btnPlan');
   setBusy(btn, true, 'Planning…');
   try {
-    const text = await callAI(await buildPlannerPrompt(), null, { json: true, maxTokens: 4000 });
+    const text = await callAI(await buildPlannerPrompt(), null, { json: true, maxTokens: 4000, agent: 'planner' });
     if (!text) return;
     const plan = parsePlanJson(text);
     await applyPlanChanges({ days: plan.days }, 'ai');
@@ -243,7 +244,7 @@ async function planCardHtml() {
       <button class="plan-check" onclick="togglePlanDone('${d}')" aria-label="Mark done" ${!s || s.type === 'rest' ? 'disabled' : ''}>${icon(missed ? 'x' : 'check-circle')}</button>
       <div class="plan-date"><b>${dt.toLocaleDateString('en-GB', { weekday: 'short' })}</b><span>${dt.getDate()}</span></div>
       <div class="grow plan-body" onclick="openPlanDayEditor('date','${d}')">
-        ${s ? `<div class="plan-title"><span class="plan-dot" style="background:${t.color}"></span>${escapeHtml(s.title)}${src}</div>
+        ${s ? `<div class="plan-title"><span class="plan-dot" style="background:${t.color}"></span>${s.sport && SPORTS[s.sport] ? `<span class="plan-sport" style="color:${SPORTS[s.sport].color}">${icon(SPORTS[s.sport].icon, 'ic-xs')}</span>` : ''}${escapeHtml(s.title)}${src}</div>
           <div class="tiny muted">${s.type === 'rest' ? 'Rest day' : `${s.duration_min} min${s.zone ? ` · ${escapeHtml(s.zone)}` : ''}`}</div>
           ${s.details ? `<div class="plan-details">${escapeHtml(s.details)}</div>` : ''}`
           : '<div class="plan-title muted">Nothing planned <span class="tiny">— tap to add</span></div>'}

@@ -151,7 +151,7 @@
       '<div style="max-width:460px;margin:0 auto;">' +
       '<div style="font-size:40px;">🛟</div>' +
       '<h2 style="margin:8px 0 6px;font-size:22px;">Recovery mode</h2>' +
-      '<p style="color:#9fb0cf;font-size:14px;line-height:1.5;margin:0 0 6px;">' + (reason || 'Ride Partner had trouble starting.') + ' Your data is stored on this phone and has not been deleted. Choose an option:</p>' +
+      '<p style="color:#9fb0cf;font-size:14px;line-height:1.5;margin:0 0 6px;">' + (reason || 'Training Partner had trouble starting.') + ' Your data is stored on this phone and has not been deleted. Choose an option:</p>' +
       (errs ? '<pre style="white-space:pre-wrap;background:#111a2c;color:#f87171;padding:10px;border-radius:10px;font-size:11px;">' + errs.replace(/</g, '&lt;') + '</pre>' : '') +
       '<button id="rpRetry" style="' + btn + 'background:#fc5200;color:#fff;">Try again</button>' +
       '<button id="rpClassic" style="' + btn + 'background:#1b2842;color:#fff;">Open Classic version (v2)</button>' +

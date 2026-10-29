@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training Partner Guide</title>
+<style>
+  :root { --ink:#0f172a; --sub:#475569; --mute:#64748b; --line:#e2e8f0; --soft:#f8fafc; --brand:#fc5200; --ride:#fc5200; --run:#16a34a; --swim:#0891b2; --gym:#7c3aed; }
+  @page { size: A4; margin: 16mm 15mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif; color: var(--ink); font-size: 10.2pt; line-height: 1.5; margin: 0; background: #fff; }
+  h1, h2, h3 { line-height: 1.2; margin: 0; }
+  h2 { font-size: 17pt; margin: 0 0 4mm; padding-top: 2mm; }
+  h2 .k { display: block; font-size: 7.5pt; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); margin-bottom: 1.5mm; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 1.5mm; }
+  p { margin: 0 0 2.5mm; }
+  ul { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin: .6mm 0; }
+  code, .f { font-family: Consolas, "Cascadia Mono", monospace; font-size: 9pt; background: var(--soft); border: 1px solid var(--line); border-radius: 3px; padding: 0 1.2mm; }
+  .formula { display: block; font-family: Consolas, monospace; font-size: 9.4pt; background: #fff7ed; border-left: 3px solid var(--brand); padding: 2mm 3mm; margin: 1.5mm 0 3mm; border-radius: 0 4px 4px 0; white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; margin: 1.5mm 0 4mm; font-size: 9pt; }
+  th { text-align: left; background: var(--ink); color: #fff; padding: 1.6mm 2mm; font-weight: 600; }
+  td { padding: 1.5mm 2mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:nth-child(even) td { background: var(--soft); }
+  .section { break-before: page; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: 3mm 4mm; margin: 2mm 0 3mm; background: var(--soft); break-inside: avoid; }
+  .tag { display: inline-block; font-size: 7.5pt; font-weight: 700; padding: .3mm 2mm; border-radius: 10px; color: #fff; margin-right: 1mm; }
+  .ride { background: var(--ride); } .run { background: var(--run); } .swim { background: var(--swim); } .gym { background: var(--gym); }
+  .muted { color: var(--mute); }
+  .cover { height: 260mm; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(160deg, #0f172a 0%, #1e293b 62%, #fc5200 62.2%, #ff8a3d 100%); color: #fff; padding: 22mm 16mm 16mm; margin: -16mm -15mm 0; }
+  .cover .kick { font-size: 9pt; letter-spacing: .2em; text-transform: uppercase; color: #fdba74; font-weight: 700; }
+  .cover h1 { font-size: 40pt; font-weight: 800; letter-spacing: -.5px; margin-top: 6mm; }
+  .cover .lead { font-size: 13pt; color: #cbd5e1; max-width: 140mm; margin-top: 5mm; }
+  .cover .toc { background: rgba(15, 23, 42, .78); border-radius: 8px; padding: 6mm 8mm; font-size: 10pt; columns: 2; column-gap: 8mm; }
+  .cover .toc div { margin: 1mm 0; break-inside: avoid; }
+  .cover .toc b { color: #fdba74; margin-right: 2mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .new { border-left: 3px solid var(--brand); padding-left: 3mm; margin: 2mm 0 3mm; break-inside: avoid; }
+  .new > b:first-child { display: block; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div>
+    <div class="kick">User guide · version 3.3</div>
+    <h1>Training Partner</h1>
+    <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus everything that changed in 3.3.</div>
+  </div>
+  <div class="toc">
+    <div><b>1</b>What changed in 3.3</div>
+    <div><b>2</b>The six screens</div>
+    <div><b>3</b>Workout detail</div>
+    <div><b>4</b>Where data comes from</div>
+    <div><b>5</b>Wrong data, sports, deleting</div>
+    <div><b>6</b>Calculations</div>
+    <div><b>7</b>The AI coaches &amp; their context</div>
+    <div><b>8</b>Models, retries &amp; costs</div>
+    <div><b>9</b>Plan, targets &amp; Aether's changes</div>
+    <div><b>10</b>Reports &amp; the PDF</div>
+    <div><b>11</b>Backups, privacy, updates</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 1</span>What changed in 3.3</h2>
+<p>Ride Partner became <b>Training Partner</b>: one app for riding, running, swimming and gym work. Everything below was changed in this version.</p>
+
+<div class="new"><b>All your sports</b>Runs from Strava; pool swims, treadmill runs, the gym bike, elliptical, stair stepper, rowing machine and strength sessions straight from the Galaxy Watch through Samsung Health. Each sport has its own colour and icon (<span class="tag ride">Ride</span><span class="tag run">Run</span><span class="tag swim">Swim</span><span class="tag gym">Gym &amp; other</span>), its own numbering (Ride 043, Run 002, Swim 001, Gym 001) and its own units (km/h for rides, pace per km for runs, pace per 100 m for swims).</div>
+<div class="new"><b>New activity inbox</b>Types the app doesn't import by default — walks, hikes, yoga, football… — wait in an inbox on the Training screen. Include them (walks and hikes count as runs, everything else as Gym &amp; other) or skip them, and optionally remember the choice for that type.</div>
+<div class="new"><b>Only 2026 onwards</b>Strava and Samsung Health imports ignore anything before 1 January 2026.</div>
+<div class="new"><b>Mark wrong data</b>The flag on every workout (and on every record) opens a sheet: change the sport, mark it indoor, mark climbing, distance/speed, heart rate or power as a data error, exclude it, or delete it. Original numbers are kept; flagged values are simply left out of records, best efforts, trends, totals and AI context.</div>
+<div class="new"><b>Delete workouts</b>Deleting creates a restore point first and remembers the workout so sync never brings it back.</div>
+<div class="new"><b>Charts fixed</b>Charts no longer disappear after changing a filter, a metric pill, or coming back to a screen. Charts can't trap your scroll any more, and chart-heavy screens draw after the screen transition so the tab never feels frozen.</div>
+<div class="new"><b>Compare really compares</b>Same-sport sessions, "latest vs most similar" by default (accidental recordings skipped), a one-line verdict, efficiency (speed per heartbeat), paired bars, heart-rate zones side by side and a speed/HR overlay chart.</div>
+<div class="new"><b>Model per coach, two-level picker</b>Tap the model line in any coach → a provider (e.g. Google Gemini) → its models. Choose "Use another provider" (automatic fallback) or "Keep retrying this one" (only that model, retried with growing pauses until it answers). Every reply shows the model that wrote it and how long it took.</div>
+<div class="new"><b>Messages are never lost</b>Your message is saved the instant you send it. Leaving the chat or the app doesn't stop the reply; unanswered messages are retried automatically when the app comes back or the connection returns.</div>
+<div class="new"><b>Coach memory</b>Facts and corrections ("that ride was a stationary gym bike") are saved and given to every coach. Coaches add facts themselves when you correct them; you can add or delete them in Profile → Coach memory.</div>
+<div class="new"><b>Better AI answers</b>Reply rules from a review of your real conversations: answer first, ~150 words for chat, no hype, no repeated closing questions, weight only when relevant, no invented numbers or sessions, honest about missing data. "No bike this week" now means other sports, not rest. Timelines show each minute's peak values, not only averages.</div>
+<div class="new"><b>More complete, more compact context</b>Aether sees every workout: the last six weeks one by one (with your note and the coach's verdict from that session's chat), older ones as weekly/monthly totals, plus a "data completeness" line. A bug that gave every Gemini model the reduced "small model" context ("ge<b>mini</b>") is fixed.</div>
+<div class="new"><b>Samsung Health improvements</b>Resting heart rate is estimated from the watch's heart rate (Samsung doesn't share a resting value), the coaches are told when sleep wasn't recorded instead of treating it as bad sleep, and HRV is reported as unavailable.</div>
+<div class="new"><b>Reports &amp; PDF</b>Choose All / Rides / Runs / Swims / Gym. The PDF now has a cover band, coach verdict, KPI tiles vs the previous period, each sport, fitness/fatigue and weekly-volume charts, an intensity donut, a week-by-week table, a page per sport (trend chart, zones, top sessions), highlights &amp; records, plan adherence, a recovery log, data-quality notes, coach memory, the review and every session.</div>
+<div class="new"><b>Motion</b>Screens slide in the direction you move, a tapped workout grows into its detail page, numbers roll up, routes draw themselves, a light sweep crosses the week card, the tab indicator slides, buttons ripple, and new records get confetti. All of it is switched off if the phone asks for reduced motion.</div>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 2</span>The six screens</h2>
+
+<h3>Training</h3>
+<ul>
+  <li><b>Sync</b> (or pull down): Strava plus the watch (Samsung Health workouts and wellness).</li>
+  <li><b>Inbox card</b> appears when new activity types are waiting (see section 4).</li>
+  <li><b>Week card</b>: sessions, ride km, time and climbing this week vs last week, progress bars against your weekly targets, streak, form, and a chip per sport (sessions · time).</li>
+  <li><b>Readiness strip</b> (Samsung Health): last night's sleep, resting HR vs 30-day baseline, HRV when available.</li>
+  <li><b>Today's planned session</b>, tap to open the plan.</li>
+  <li><b>Sport chips</b> (All · Rides · Runs · Swims · Gym &amp; other), shown when you have more than one sport. The choice also applies to Trends.</li>
+  <li><b>Search</b> across name, date, sport, zone and your notes; <b>filters</b> Training / Play / No intent / Needs review.</li>
+  <li><b>Workout cards</b> grouped by month: distance, time, speed or pace, HR, ascent (or energy for gym), load, and the zone strip. Flagged values are struck through; excluded workouts are faded.</li>
+</ul>
+
+<h3>Trends</h3>
+<ul>
+  <li><b>Fitness · Fatigue · Form</b> KPIs and chart (90 days, 6 months, 1 year, all).</li>
+  <li><b>Calendar</b> coloured by daily load; tap a day to open it.</li>
+  <li><b>Weekly volume</b> by distance, time, climbing or load — stacked by sport when you train more than one.</li>
+  <li><b>Best efforts</b> per sport (1, 5, 20, 60 min speed/pace and HR; power only with a power meter), all-time and last 6 weeks.</li>
+  <li><b>Session-by-session progression</b> for one sport at a time (speed, HR, efficiency, distance, climbing, work, load), scrollable sideways, tap a point to open it.</li>
+  <li><b>AI season audit</b> with its own model choice.</li>
+</ul>
+
+<h3>Compare</h3>
+<ul>
+  <li>Pick the sport, then A and B (and optionally C). Presets: <b>Latest vs most similar</b>, <b>Latest vs previous</b>, <b>Latest vs best similar</b>.</li>
+  <li><b>Verdict</b>: faster/slower at what heart rate, and the efficiency change; it also says whether the two sessions are similar enough to compare fairly.</li>
+  <li><b>Paired bars</b> per metric with the B-vs-A difference (green = better for B), zones side by side, <b>overlay chart</b> of speed and HR along the distance (or time for swims/gym).</li>
+  <li><b>Explain the difference</b> asks the Compare coach; its answer is saved for that pair.</li>
+</ul>
+
+<h3>Coach</h3>
+<ul>
+  <li><b>Aether</b>, the season coach (section 7), with the model line under its header and quick prompts.</li>
+  <li><b>Training plan</b>: this/next week, your weekly template, day changes, targets, done/missed ticks, and "Adapt with AI".</li>
+  <li><b>Session conversations</b>: every workout has its own coach thread.</li>
+</ul>
+
+<h3>Reports</h3>
+<ul>
+  <li>Period: 7 days, 30 days, 1 year, all time; activities: All or one sport.</li>
+  <li>Sport tiles with change vs the previous period, load/efficiency/intensity panel, zone bars, all-time records per sport (each with a flag to mark it as a data error), the AI period review and the PDF (section 10).</li>
+</ul>
+
+<h3>Profile</h3>
+<ul>
+  <li>Athlete (name, height, bike), default weekly targets, weight log, training phase, max/resting HR and zones, FTP.</li>
+  <li>Strava connection; <b>AI providers</b> (add free or paid ones, keys, models), automatic fallback, <b>model per coach</b>; <b>coach memory</b>; coach skills (import from GitHub); Samsung Health; AI spending cap.</li>
+  <li>Appearance (light/dark/system), auto-sync, haptics; backups, restore points, Classic rollback; diagnostics.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 3</span>Workout detail</h2>
+<p>Tap any workout. It grows out of its card into a full page.</p>
+<ul>
+  <li><b>Header</b>: share card image, edit intent, and the <b>flag</b> (sport, indoor, data errors, exclude, delete).</li>
+  <li><b>Badges</b>: sport, intent, indoor, Galaxy Watch, power meter, and red badges for anything marked as a data error.</li>
+  <li><b>Route</b> (outdoor GPS only) coloured by heart-rate zone; it draws itself in.</li>
+  <li><b>Hero numbers</b> in the sport's units; flagged numbers are struck through (tap them to change the flag).</li>
+  <li><b>How did it feel?</b> Feel, RPE 1–10 and a private note — all read by the coaches.</li>
+  <li><b>Biometrics</b>: max speed, peak HR (% of max), load, work, climbing VAM, aerobic decoupling, elapsed time, session-RPE load, and NP/IF/TSS for power-meter rides.</li>
+  <li><b>Heart-rate zones</b> on moving time, <b>vs your previous comparable sessions</b> (same sport and intent), <b>best efforts in this session</b>, and the <b>stream chart</b> (speed, HR, power, elevation, cadence).</li>
+  <li><b>AI coach</b>: analyse the session, then chat about it (screenshots allowed). The trash icon next to the title resets that thread.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 4</span>Where data comes from</h2>
+<h3>Strava</h3>
+<table>
+  <tr><th>Imported automatically</th><th>Becomes</th></tr>
+  <tr><td>Ride, Mountain bike, Gravel, E-bike, Virtual ride, Velomobile, Handcycle</td><td><span class="tag ride">Ride</span></td></tr>
+  <tr><td>Run, Trail run, Virtual run</td><td><span class="tag run">Run</span></td></tr>
+  <tr><td>Swim</td><td><span class="tag swim">Swim</span></td></tr>
+  <tr><td>Elliptical, Stair stepper, Weight training, Workout, Rowing, Crossfit, HIIT, Yoga, Pilates, Hike, Rock climbing</td><td><span class="tag gym">Gym &amp; other</span></td></tr>
+  <tr><td>Everything else (Walk, Snowshoe, football…)</td><td>Inbox — you decide</td></tr>
+</table>
+<p>Only activities from 2026-01-01 onwards. Streams (time, distance, GPS, altitude, HR, speed, power, cadence, grade, moving, temperature) are downloaded once per workout. A Strava rate limit pauses stream downloads; the next sync continues.</p>
+
+<h3>Galaxy Watch via Samsung Health → Health Connect</h3>
+<table>
+  <tr><th>Watch exercise</th><th>Becomes</th></tr>
+  <tr><td>Pool swim, open-water swim, swim</td><td><span class="tag swim">Swim</span> (pool = indoor)</td></tr>
+  <tr><td>Treadmill run, run, track</td><td><span class="tag run">Run</span> (treadmill = indoor)</td></tr>
+  <tr><td>Stationary bike</td><td><span class="tag ride">Ride</span>, indoor</td></tr>
+  <tr><td>Elliptical, stair climbing / stepper, rowing (machine), strength, weightlifting, HIIT, circuits, cross training, yoga, pilates, boxing, jump rope…</td><td><span class="tag gym">Gym &amp; other</span></td></tr>
+  <tr><td>Walk, hike and other sports (≥10 min)</td><td>Inbox</td></tr>
+</table>
+<p>Each watch session gets distance, duration, calories and a heart-rate stream from the watch's samples, so zones, load, best HR efforts and the coaches work exactly like for Strava. If the same session is also on Strava (±5 min) the watch copy is skipped — or replaced by the Strava copy later, keeping your intent, rating, note, sport and flags.</p>
+<p><b>Wellness</b> (every 3 hours and on Sync): sleep with stages (counted on the morning you wake up, only asleep stages), steps, weight (optionally copied to the weight log), VO2max, HRV if shared, and resting HR. Samsung Health doesn't share resting HR, so the app estimates it as the day's <b>lowest hourly average heart rate</b> (usually during sleep), marked "estimated". 120 days are kept.</p>
+<p>Permissions are read-only: heart rate, resting HR, HRV, sleep, steps, weight, VO2max, SpO2, respiratory rate, exercise sessions, distance, active calories, and history access. The first manual import after this update asks for the new ones once.</p>
+
+<h3>The inbox</h3>
+<p>Each waiting activity shows type → sport, date, distance and duration. Ticked ones are added (walks and hikes as runs, others as Gym &amp; other), unticked ones are skipped for good. "Every walk from now on" can be set to <i>Include</i> or <i>Skip</i>; you can change it next time the inbox opens.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 5</span>Wrong data, sports and deleting</h2>
+<table>
+  <tr><th>Flag</th><th>Left out of</th></tr>
+  <tr><td>Elevation &amp; climbing</td><td>ascent totals, "Most climbing", VAM records, climbing in compare, AI context</td></tr>
+  <tr><td>Distance &amp; speed (GPS)</td><td>distance totals, speed/pace averages, top speed, speed best efforts, progression, AI context</td></tr>
+  <tr><td>Heart rate</td><td>HR averages, HR best efforts, zones, load (TRIMP) — so also Fitness/Fatigue/Form</td></tr>
+  <tr><td>Power</td><td>power, NP/IF/TSS, power best efforts, work (kJ)</td></tr>
+  <tr><td>Exclude the whole workout</td><td>everything (session counts, totals, load, records, compare defaults, reports); still visible, faded</td></tr>
+  <tr><td>Indoor</td><td>climbing always; for rides also distance and speed (a stationary bike doesn't move)</td></tr>
+</table>
+<p>Changing the sport renumbers that sport's sessions. Deleting asks for confirmation, creates a restore point, deletes the workout, its stream and its chat, and adds it to a "deleted" list that every sync respects. Undo: Profile → Restore points.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 6</span>Calculations</h2>
+
+<h3>Heart-rate zones</h3>
+<p>Five zones from your max HR and four boundaries (default for max 207: 135 / 155 / 171 / 189 bpm). Suggested boundaries are 65.2 %, 74.9 %, 82.6 % and 91.3 % of max. Zone time counts <b>moving</b> time only; gaps longer than 10 s count as 10 s.</p>
+
+<h3>Training load — Banister TRIMP</h3>
+<span class="formula">HRr = (HR − resting HR) / (max HR − resting HR), clamped 0…1
+TRIMP = Σ (Δt in minutes) × HRr × a × e^(b × HRr)
+a = 0.64, b = 1.92 (male) · a = 0.86, b = 1.67 (female)</span>
+<p>Computed from the HR stream (all recorded time); without a stream, from average HR × moving minutes. Works for every sport, so load can be added across sports.</p>
+
+<h3>Fitness, Fatigue, Form</h3>
+<span class="formula">CTL(today) = CTL(yesterday) + (load − CTL(yesterday)) / 42      Fitness
+ATL(today) = ATL(yesterday) + (load − ATL(yesterday)) / 7       Fatigue
+TSB(today) = CTL(yesterday) − ATL(yesterday)                    Form
+Ramp = CTL now − CTL 7 days ago     ACWR = ATL / CTL</span>
+<p>Form labels: &gt; +15 very fresh/detraining, +5…+15 fresh, −10…+5 balanced, −30…−10 productive fatigue, &lt; −30 high fatigue.</p>
+
+<h3>Speed, pace, efficiency</h3>
+<ul>
+  <li>Average speed of a group = total distance ÷ total moving time of the same sessions (duration-weighted), computed only within one sport.</li>
+  <li>Run pace = 60 ÷ km/h (min/km); swim pace = 6 ÷ km/h (min/100 m).</li>
+  <li><b>Efficiency</b> = average speed ÷ average HR × 100 (km/h per 100 bpm). Higher = more speed for the same cardiac cost. Reports use rides ≥ 20 min, weighted by duration.</li>
+</ul>
+
+<h3>Climbing VAM</h3>
+<p>Metres climbed per hour while moving on grades above 3 % (Strava's smoothed grade, or altitude/distance). Needs at least 2 minutes of climbing and 5 m of gain.</p>
+
+<h3>Aerobic decoupling and drift</h3>
+<p>On moving time, after skipping the first 12 minutes, the rest is split into two halves. Only for steady training sessions (intent Training, not intervals) of 30+ minutes.</p>
+<span class="formula">EF = speed / HR   (power / HR with a power meter)
+Decoupling % = (EF₁ − EF₂) / EF₁ × 100       Drift = HR₂ − HR₁ (bpm)</span>
+
+<h3>Best efforts</h3>
+<p>Streams are resampled to 1 sample per second; the best rolling average over 1, 5, 20 and 60 minutes is kept for speed and HR (every session) and for power (5 s … 60 min, power meter only).</p>
+
+<h3>Power (power meter only)</h3>
+<span class="formula">NP = (mean of (30-s rolling average power)⁴)^¼
+FTP = your setting, or 95 % of the best 20-min power of the last 120 days
+IF = NP / FTP      TSS = hours × IF² × 100</span>
+<p>Strava's power estimate for rides without a power meter is shown but never used for calculations.</p>
+
+<h3>Intensity distribution</h3>
+<p>Low = Z1+Z2, middle = Z3, high = Z4+Z5 of zone time. Polarization index = (low + high) ÷ middle; above 2 means a polarized distribution.</p>
+
+<h3>Records</h3>
+<p>Per sport, ignoring excluded workouts and flagged values: longest distance, longest time, most climbing and best VAM (rides/runs), best average speed or pace (rides ≥ 10 km, runs ≥ 3 km, swims ≥ 400 m), top speed (rides), hardest session (TRIMP), biggest week. New records after a sync trigger a toast and confetti.</p>
+
+<h3>Compare similarity</h3>
+<span class="formula">score = 1.2 × |Δdistance| + |Δduration| + 0.4 × |Δclimbing|   (each relative to the larger)
+      + 0.6 if the intent differs + 0.5 if one is indoor and the other isn't</span>
+<p>Below 0.5 = very similar, below 1 = reasonably similar. "Real" sessions are at least 5 minutes and 0.5 km (0.1 km swims).</p>
+
+<h3>Timeline given to the ride coach</h3>
+<p>Per minute (2 minutes for small models) of moving time: distance, average and <b>peak</b> speed (or best pace), average and peak HR, average and peak power, elevation and climb/descent.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 7</span>The AI coaches and exactly what they see</h2>
+<p>Every coach receives: date/time, its role, its <b>coaching skills</b>, the <b>coach memory</b>, the <b>style rules</b> and the <b>data notes</b> (units, estimates, flags, how load works). Then its own context:</p>
+<table>
+  <tr><th style="width:22%">Coach</th><th>Context</th></tr>
+  <tr><td><b>Aether</b> (season coach)</td><td>Athlete profile, weight history, FTP, phase history · load today + weekly load trend (12 weeks) · wellness today + last 14 days · weekly template, this week and next week with done/missed, weekly targets and progress, 14-day adherence, pending proposals · season totals per sport, zone minutes, weekly totals, best efforts per sport · <b>data completeness</b> (sessions without HR, flags, nights with sleep, days with resting HR) · workouts since your last chat · <b>full ledger</b>: last 6 weeks one by one (≥ 25 sessions, each with intent, time, load, rating, VAM, drift, zones, flags, distance, speed/pace, HR, ascent, your note and the coach's verdict from that session's chat), older months summarised · last 12 messages.</td></tr>
+  <tr><td><b>Ride / session coach</b></td><td>Athlete profile · the planned session that day · load going in · wellness that day · that week per sport vs targets · recovery gap since the previous workout · full session block (sport, flags, distance, pace/speed, HR, power, climbing, load, intent, zones, halves, drift, best efforts, your rating and note) · minute-by-minute timeline with peaks · the previous 10 workouts of any sport · the thread (debrief + last 10 messages).</td></tr>
+  <tr><td><b>Compare</b></td><td>For each session: planned session, load going in, wellness, body mass, the full session block and your messages about it.</td></tr>
+  <tr><td><b>Reports</b></td><td>Period and scope (all or one sport) · load at period end and trend · targets and adherence · intensity distribution · period vs previous period, all sports and per sport · 14-day wellness · the ledger of the period.</td></tr>
+  <tr><td><b>Trends audit</b></td><td>Profile with phase history · load and trend · weekly totals · best efforts · season ledger.</td></tr>
+  <tr><td><b>Week planner</b></td><td>Profile · load · 14-day wellness · template · next 7 days as planned · targets · adherence · last 21 days; answers in JSON.</td></tr>
+</table>
+<p><b>Model size.</b> Small models (Groq, local, or names with lite/mini/small/nano or ≤14B) get a compact version: 12 sessions in detail, 6 previous workouts, 8 weeks, 2-minute timeline. Others: 25 sessions (up to 40 when the last 6 weeks hold more), 10 previous workouts, 12 weeks, 1-minute timeline.</p>
+<h3>Style rules (all coaches)</h3>
+<ul>
+  <li>Answer in the first sentence; chat replies ~150 words unless you ask for detail; debriefs/comparisons ~300 words; reviews thorough but tight.</li>
+  <li>Calm and factual, no hype or emojis; body weight only when it matters; no closing question unless needed and never repeated.</li>
+  <li>Only numbers from the context; never invent sessions, symptoms or events; say when data is missing or flagged; readiness without sleep/HRV/resting HR is labelled "load only".</li>
+  <li>Lasting facts and corrections are saved with <code>&lt;remember&gt;</code> into the coach memory.</li>
+</ul>
+<h3>Coaching skills</h3>
+<table>
+  <tr><th>Skill</th><th>Used by</th></tr>
+  <tr><td>coach-voice, intensity-zones</td><td>all coaches</td></tr>
+  <tr><td>load-and-readiness</td><td>Aether, session, reports, trends, planner</td></tr>
+  <tr><td>ride-analysis</td><td>Aether, session, compare, reports</td></tr>
+  <tr><td>fuel-and-recovery</td><td>Aether, session, reports, planner</td></tr>
+  <tr><td>mtb-terrain</td><td>Aether, session, compare</td></tr>
+  <tr><td>plan-design</td><td>Aether, planner</td></tr>
+  <tr><td>plan-actions</td><td>Aether (how to propose plan/target changes)</td></tr>
+</table>
+<p>More skills can be imported from GitHub in Profile and switched on per coach.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 8</span>Models, retries and costs</h2>
+<ul>
+  <li><b>Providers</b>: Google Gemini, Groq, OpenRouter, Mistral (free tiers) and Anthropic Claude, OpenAI, DeepSeek (paid), or any OpenAI-compatible endpoint. Keys stay on the phone.</li>
+  <li><b>Picker</b>: tap the model line in a coach → <i>Automatic</i> or a provider → its models (searchable; free/price tags; "Refresh" reloads the list). Apply to this coach or all coaches. Pick chat models — code-only models answer poorly.</li>
+  <li><b>Automatic / Use another provider</b>: the chosen model first, then your default, then the others (free ones first). A toast says who answered.</li>
+  <li><b>Keep retrying this one</b>: only that model; on rate limits, busy servers, timeouts or no connection it waits 10 s, 20 s, 40 s, 1, 2, 3, then 5 min between tries, for up to 2 hours, showing the countdown under the typing indicator. A wrong key, unknown model or bad request stops at once.</li>
+  <li><b>Timeouts</b>: 75 s for the first streamed word, 45 s silence while streaming, 150 s without streaming.</li>
+  <li><b>Spending</b>: paid providers count tokens × your prices into a monthly total; at 80 % of the cap you're warned, at 100 % paid providers stop (free ones keep working).</li>
+  <li><b>Never lost</b>: Aether and session chats save your message first (marked "sending"), finish in the background, notify you if you left, and retry unanswered messages (last 3 days) when the app returns or the connection comes back.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 9</span>Plan, targets and Aether's changes</h2>
+<ul>
+  <li><b>Weekly template</b>: one session per weekday that repeats. <b>Day changes</b> override a single date (yours, the AI planner's or Aether's — each marked). A session can carry a sport.</li>
+  <li><b>Done</b> = a workout that day or your tick; past planned days without either show as missed.</li>
+  <li><b>Weekly targets</b>: km (riding), hours (all sports) and sessions — default, or for this/next week only.</li>
+  <li><b>Aether's changes</b> arrive as a card with Apply / Dismiss. Apply creates a restore point first. Aether proposes changes only when you ask or agree; "no bike" means other sports unless you say rest, injury or illness.</li>
+  <li><b>Adapt with AI</b> (planner) rewrites the next 7 days around your template, form, wellness and missed sessions.</li>
+</ul>
+
+<h2 style="margin-top:8mm"><span class="k">Section 10</span>Reports and the PDF</h2>
+<p>Pick the period and the activities, write the review (optional), then <b>Export PDF</b>; it opens the share sheet. Pages:</p>
+<ol>
+  <li>Cover band, coach verdict, six KPI tiles vs the previous period, per-sport breakdown with time share, Fitness/Fatigue/Form chart.</li>
+  <li>Weekly training time stacked by sport, intensity donut and zone bars, recovery snapshot and best efforts, week-by-week table (sessions per sport, time, km/m, TRIMP, fitness/form, vs target).</li>
+  <li>One page per sport: summary line, speed/pace vs heart-rate chart, zone split, top sessions table.</li>
+  <li>Highlights and records set in the period, plan adherence and missed sessions, recovery log (sleep, stages, resting HR, HRV, steps, weight), data-quality notes and coach memory.</li>
+  <li>The AI review with numbered sections, then every session colour-coded by sport.</li>
+</ol>
+
+<h2 style="margin-top:8mm"><span class="k">Section 11</span>Backups, privacy and updates</h2>
+<ul>
+  <li>Everything lives on the phone (IndexedDB). Backups and restore points never include API keys or Strava tokens.</li>
+  <li>Restore points are made automatically before syncs, updates, applying plan changes, restoring a backup and deleting a workout; up to six automatic and six manual are kept.</li>
+  <li>Updates install over the old version (same signing key), so data stays. Classic (v2) interface remains available as a rollback.</li>
+  <li>USB debugging of the app's WebView is enabled for diagnostics; it only works from a computer you've authorised for USB debugging.</li>
+</ul>
+</div>
+
+</body>
+</html>

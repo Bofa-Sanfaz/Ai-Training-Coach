@@ -4,7 +4,6 @@
 // (ride threads open inside the ride detail so data and chat sit together)
 // --------------------------------------------------------
 const AETHER = 'Aether';
-let lastPendingHubPayload = null;
 let hubAiBusy = false;
 
 async function renderCoachList() {
@@ -56,7 +55,8 @@ async function renderCoachList() {
 async function openMasterThread() {
   openPanel('threadPanel', () => { if (Router.current === 'coach') renderCoachList(); });
   const count = await db.workouts.count();
-  $('#masterSub').textContent = `Season coach · knows all ${count} rides, your plan and targets`;
+  $('#masterSub').textContent = `Season coach · knows all ${count} workouts, your plan and targets`;
+  refreshModelSelectors();
   await renderHubChat();
   scrollMasterToEnd(false);
 }
@@ -78,26 +78,28 @@ function proposalCardHtml(m) {
   </div>`;
 }
 
+// Your messages are saved the moment you send them (pending until answered), so
+// closing the chat, leaving the app or losing signal never loses them: the reply
+// keeps generating in the background and unanswered messages are retried when the
+// app comes back (see resumePendingChats).
 async function renderHubChat(extra = '') {
   const msgs = await db.master_chat.toArray();
   let html;
   if (!msgs.length) {
     const wt = await getLatestWeight();
     html = `<div class="bubble bubble-coach"><div class="bubble-sender"><span>${AETHER}</span></div>
-      Hi ${escapeHtml(ATHLETE.name)}, I'm ${AETHER}. I keep your whole season in view${wt ? ` (${wt} kg, ${escapeHtml(ATHLETE.bike)})` : ''} — rides, load, your weekly plan and targets.
+      Hi ${escapeHtml(ATHLETE.name)}, I'm ${AETHER}. I keep your whole season in view${wt ? ` (${wt} kg, ${escapeHtml(ATHLETE.bike)})` : ''} — rides, runs, swims, load, your weekly plan and targets.
       <br><br>Ask me anything, paste your own training plan and I'll set it up, or tell me when life changes ("I can only ride twice this week") and I'll adjust the plan and targets for you to approve.</div>`;
   } else {
-    html = msgs.map(m => bubbleHtml(m, AETHER) + (m.proposal ? proposalCardHtml(m) : '')).join('');
+    html = msgs.map(m => bubbleHtml(m, AETHER) + (m.proposal ? proposalCardHtml(m) : '') +
+      (m.pending && !hubAiBusy ? `<div class="retry-card"><span>Not answered yet.</span><button class="btn btn-primary btn-xs" onclick="executeHubMessageDispatch(${m.id})">${icon('refresh', 'ic-sm')}Retry</button></div>` : '')).join('');
   }
-  if (lastPendingHubPayload) {
-    html += bubbleHtml({ role: 'athlete', message: lastPendingHubPayload.text, image_b64: lastPendingHubPayload.image_b64 });
-    if (!hubAiBusy) html += `<div class="retry-card"><span>Message not answered.</span><button class="btn btn-primary btn-xs" onclick="retryHubMessage()">${icon('refresh', 'ic-sm')}Retry</button></div>`;
-  }
+  if (hubAiBusy && !extra) extra = typingHtml(`${AETHER} is still writing`);
   $('#hubChatContainer').innerHTML = html + extra;
 }
 
 async function sendHubReply() {
-  if (hubAiBusy) return;
+  if (hubAiBusy) { toast(`${AETHER} is still answering your last message.`, 'warn'); return; }
   const input = $('#hubReplyInput');
   const text = input.value.trim();
   const img = attachments.HUB;
@@ -105,12 +107,8 @@ async function sendHubReply() {
   input.value = '';
   autoGrow(input);
   clearAttachment('HUB');
-  lastPendingHubPayload = { text, image_b64: img };
-  await executeHubMessageDispatch(lastPendingHubPayload);
-}
-
-async function retryHubMessage() {
-  if (lastPendingHubPayload) await executeHubMessageDispatch(lastPendingHubPayload);
+  const id = await db.master_chat.add({ role: 'athlete', message: text, image_b64: img, created_at: new Date().toISOString(), pending: true });
+  await executeHubMessageDispatch(id);
 }
 
 // Quick prompts under the composer
@@ -120,28 +118,50 @@ function aetherQuick(text) {
   sendHubReply();
 }
 
-async function executeHubMessageDispatch(payload) {
+const hubOpen = () => $('#threadPanel').classList.contains('open');
+
+async function executeHubMessageDispatch(id) {
+  const msg = await db.master_chat.get(id);
+  if (!msg || hubAiBusy) return;
   hubAiBusy = true;
   await renderHubChat(typingHtml(`${AETHER} is reviewing your season`));
   scrollMasterToEnd();
   try {
-    const live = liveBubble($('#hubChatContainer'), AETHER, scrollMasterToEnd);
-    const reply = await callAI(await buildMasterPrompt(payload.text, !!payload.image_b64), payload.image_b64, { onDelta: t => live(hidePlanUpdate(t)) });
+    const host = $('#hubChatContainer');
+    const live = liveBubble(host, AETHER, () => { if (hubOpen()) scrollMasterToEnd(); });
+    const meta = {};
+    const reply = await callAI(await buildMasterPrompt(msg.message, !!msg.image_b64, id), msg.image_b64, {
+      agent: 'aether', meta, onStatus: aiStatusIn(host),
+      onDelta: t => live(hideMemoryTags(hidePlanUpdate(t)))
+    });
     if (reply) {
       haptic('success');
-      const { text, proposal } = extractPlanUpdate(reply);
-      await db.master_chat.add({ role: 'athlete', message: payload.text, image_b64: payload.image_b64, created_at: new Date().toISOString() });
-      await db.master_chat.add({ role: 'coach', message: text || 'Here is the change I propose:', proposal: proposal || undefined, created_at: new Date().toISOString() });
-      lastPendingHubPayload = null;
-      if (proposal) toast(`${AETHER} proposed a plan change — review it below`, 'info', 3500);
+      const { text, proposal } = extractPlanUpdate(await captureMemory(reply, AETHER));
+      await db.master_chat.update(id, { pending: false });
+      await db.master_chat.add(Object.assign({ role: 'coach', message: text || 'Here is the change I propose:', proposal: proposal || undefined, created_at: new Date().toISOString() }, aiMetaFields(meta)));
+      if (proposal) toast(`${AETHER} proposed a plan change — review it in the chat`, 'info', 3500);
+      else if (!hubOpen()) toast(`${AETHER} replied — open Coach to read it`, 'success', 3500);
     }
   } catch (e) {
     toast(`Message failed: ${e.message}`, 'error');
   } finally {
     hubAiBusy = false;
     await renderHubChat();
-    scrollMasterToEnd();
+    if (hubOpen()) scrollMasterToEnd();
+    if (Router.current === 'coach' && !hubOpen()) renderCoachList();
   }
+}
+
+// Unanswered messages (app closed, phone asleep, no signal…) are answered when the
+// app is opened again or the connection returns. Only the newest per chat, once per run.
+const resumedIds = new Set();
+async function resumePendingChats() {
+  if (!navigator.onLine) return;
+  const cutoff = new Date(Date.now() - 3 * 86400000).toISOString();
+  const hub = (await db.master_chat.toArray()).filter(m => m.pending && m.created_at > cutoff && !resumedIds.has(`m${m.id}`)).pop();
+  if (hub && !hubAiBusy) { resumedIds.add(`m${hub.id}`); executeHubMessageDispatch(hub.id); }
+  const ride = (await db.threads.toArray()).filter(t => t.pending && t.created_at > cutoff && !resumedIds.has(`t${t.id}`)).pop();
+  if (ride && typeof executeRideMessageDispatch === 'function' && !rideAiBusy) { resumedIds.add(`t${ride.id}`); executeRideMessageDispatch(ride.id); }
 }
 
 async function resolveProposal(id, apply) {
@@ -163,7 +183,6 @@ async function resetMasterThread() {
   const ok = await uiConfirm(`Reset ${AETHER}?`, `This deletes the whole conversation with ${AETHER}. Your plan, targets and ride threads are not affected.`, { okText: 'Reset', danger: true });
   if (!ok) return;
   await db.master_chat.clear();
-  lastPendingHubPayload = null;
   clearAttachment('HUB');
   await renderHubChat();
   toast('Conversation reset', 'success', 1600);

@@ -5,8 +5,8 @@
 let currentWorkout = null;
 let activeStream = null;
 let selectedMetrics = ['Speed (km/h)', 'Heart Rate (bpm)', 'Elevation (m)'];
-let lastPendingRidePayload = null;
 let rideAiBusy = false;
+let rideBusyFor = null; // strava_id of the session the coach is answering
 const attachments = { RIDE: null, HUB: null };
 
 async function openRide(id, { keepScroll = false, scrollToCoach = false } = {}) {
@@ -16,11 +16,31 @@ async function openRide(id, { keepScroll = false, scrollToCoach = false } = {}) 
   activeStream = row ? row.stream_data : null;
   currentWorkout = await ensureRideMetrics(w, activeStream);
 
-  if (!$('#rideDetail').classList.contains('open')) {
-    openPanel('rideDetail', () => { currentWorkout = null; activeStream = null; if (Router.current === 'rides') renderRides(); });
+  const panel = $('#rideDetail');
+  if (!panel.classList.contains('open')) {
+    const onClose = () => { currentWorkout = null; activeStream = null; if (Router.current === 'rides') renderRides(); };
+    // Container transform: the tapped card grows into the detail screen
+    const card = $(`.ride-card[data-id="${id}"]`);
+    if (card && canViewTransition() && card.getBoundingClientRect().bottom > 0) {
+      card.style.viewTransitionName = 'ride-morph';
+      await viewSwap(async () => {
+        card.style.viewTransitionName = '';
+        panel.classList.add('no-anim');
+        panel.style.viewTransitionName = 'ride-morph';
+        openPanel('rideDetail', onClose);
+        $('#detBody').scrollTop = 0;
+        await renderRideDetail();
+      }, 'morph');
+      setTimeout(() => { panel.style.viewTransitionName = ''; panel.classList.remove('no-anim'); }, 600);
+      if (scrollToCoach) setTimeout(() => $('#coachSection').scrollIntoView({ behavior: 'smooth', block: 'start' }), 450);
+      countUp($('#det_hero'));
+      return;
+    }
+    openPanel('rideDetail', onClose);
   }
   if (!keepScroll) $('#detBody').scrollTop = 0;
   await renderRideDetail();
+  countUp($('#det_hero'));
   if (scrollToCoach) setTimeout(() => $('#coachSection').scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
 }
 
@@ -30,25 +50,35 @@ async function renderRideDetail() {
   $('#det_title').textContent = rideTitle(w);
   $('#det_sub').textContent = rideSubtitle(w);
 
-  const badges = [intentBadge(w, true)];
-  if (w.trainer) badges.push('<span class="badge badge-play">Indoor</span>');
+  const sp = sportOf(w);
+  const meta = SPORTS[sp];
+  const badges = [`<span class="badge badge-sport" style="--sc:${meta.color}">${icon(meta.icon, 'ic-xs')}${escapeHtml(meta.label)}</span>`, intentBadge(w, true)];
+  if (isIndoor(w)) badges.push('<span class="badge badge-play">Indoor</span>');
+  if (w.source === 'health') badges.push(`<span class="badge badge-play">Galaxy Watch</span>`);
   if (w.device_watts) badges.push('<span class="badge badge-ok">Power meter</span>');
-  if (w.sport_type && w.sport_type !== 'Ride') {
+  if (w.sport_type && !['Ride', 'Run', 'Swim'].includes(w.sport_type) && w.source !== 'health') {
     const pretty = w.sport_type.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/E Bike|E Mountain/g, m => m.replace(' ', '-')).toLowerCase().replace(/^./, c => c.toUpperCase());
     badges.push(`<span class="badge badge-play">${escapeHtml(pretty)}</span>`);
   }
+  for (const n of flagNotes(w).filter(x => !x.startsWith('indoor'))) badges.push(`<button class="badge badge-flag" onclick="openQualitySheet(${w.id})">${icon('flag', 'ic-xs')}${escapeHtml(n)}</button>`);
   if (!parseIntent(w) && w.intent_type !== 'PLAY') badges.push(`<button class="btn btn-secondary btn-xs" onclick="editCurrentRideIntent()">${icon('target', 'ic-sm')}Set intent</button>`);
   $('#det_badges').innerHTML = badges.join('');
 
   const userW = await getAthleteWeightForDate(w.date);
   const wpk = userW && w.avg_power_w > 0 ? (w.avg_power_w / userW).toFixed(2) : null;
-  $('#det_hero').innerHTML = `
-    <div class="hero-box"><div class="hero-val">${fmtNum(w.distance_km, 2)}</div><div class="hero-lbl">km</div></div>
-    <div class="hero-box"><div class="hero-val">${escapeHtml(rideDuration(w))}</div><div class="hero-lbl">Moving</div></div>
-    <div class="hero-box"><div class="hero-val">${fmtNum(w.avg_speed_kmh, 1)}</div><div class="hero-lbl">Avg km/h</div></div>
-    <div class="hero-box"><div class="hero-val">${w.avg_power_w > 0 ? w.avg_power_w + ' W' : '--'}</div><div class="hero-lbl">${w.device_watts ? 'Power' : 'Est. power'}${wpk ? ` · ${wpk} W/kg` : ''}</div></div>
-    <div class="hero-box"><div class="hero-val">${w.avg_hr > 0 ? w.avg_hr : '--'}</div><div class="hero-lbl">Avg bpm</div></div>
-    <div class="hero-box"><div class="hero-val">${Math.round(num(w.elevation_gain_m))} m</div><div class="hero-lbl">Ascent</div></div>`;
+  const d = distParts(w), s = speedParts(w);
+  const box = (v, l, flag, count) => `<div class="hero-box${flag ? ' flagged' : ''}"${flag ? ` onclick="openQualitySheet(${w.id}, '${flag}')"` : ''}><div class="hero-val"${count !== undefined ? ` data-count="${count}"` : ''}>${v}</div><div class="hero-lbl">${l}</div></div>`;
+  const fl = k => (isFlagged(w, k) ? k : '');
+  const hero = [
+    sp === 'other' && !(w.distance_km > 0) ? box(w.calories ? String(w.calories) : '--', 'kcal') : box(d.v, d.unit, fl('distance'), num(d.v)),
+    box(escapeHtml(rideDuration(w)), 'Moving'),
+    sp === 'other' ? box(w.max_hr > 0 ? String(w.max_hr) : '--', 'Peak bpm', fl('hr')) : box(s.v, `Avg ${s.unit}`, fl('distance')),
+    sp === 'ride' ? box(w.avg_power_w > 0 ? `${w.avg_power_w} W` : '--', `${w.device_watts ? 'Power' : 'Est. power'}${wpk ? ` · ${wpk} W/kg` : ''}`, fl('power'))
+      : box(hasVal(w.trimp) ? String(Math.round(w.trimp)) : '--', 'Load (TRIMP)', fl('hr')),
+    box(w.avg_hr > 0 ? String(w.avg_hr) : '--', 'Avg bpm', fl('hr'), w.avg_hr || undefined),
+    sp === 'ride' || sp === 'run' ? box(`${Math.round(num(w.elevation_gain_m))} m`, 'Ascent', fl('elevation')) : box(w.calories ? String(w.calories) : '--', 'kcal')
+  ];
+  $('#det_hero').innerHTML = hero.join('');
 
   const gross = grossAscentRate(w);
   const vam = w.climbing_vam ? `${w.climbing_vam} m/h <span class="tiny muted">(>3%)</span>` : (gross > 0 ? `${gross} m/h <span class="tiny muted">(gross)</span>` : '--');
@@ -72,8 +102,8 @@ async function renderRideDetail() {
   await renderBestEfforts(w);
 
   $('#banner_line1_l').textContent = `⏱ ${rideDuration(w)}`;
-  $('#banner_line1_r').textContent = `📏 ${fmtNum(w.distance_km, 2)} km`;
-  $('#banner_line2_l').textContent = `⚡ Avg ${fmtNum(w.avg_speed_kmh, 1)} km/h`;
+  $('#banner_line1_r').textContent = `📏 ${distText(w)}`;
+  $('#banner_line2_l').textContent = `⚡ Avg ${speedText(w)}`;
   $('#banner_line2_r').textContent = `❤️ ${w.avg_hr || '--'} bpm · ⛰ ${Math.round(num(w.elevation_gain_m))} m`;
 
   setupMetricPills();
@@ -133,8 +163,8 @@ async function renderBestEfforts(w) {
   const wrap = $('#det_best_wrap');
   const rows = [];
   const dur = d => BEST_LABELS[d] || `${d}s`;
-  if (w.best_spd) rows.push(['Speed', Object.entries(w.best_spd).map(([d, v]) => [dur(d), `${fmtNum(v, 1)} km/h`])]);
-  if (w.best_hr) rows.push(['Heart rate', Object.entries(w.best_hr).map(([d, v]) => [dur(d), `${Math.round(v)} bpm`])]);
+  if (mv(w, 'best_spd') && sportOf(w) !== 'other') rows.push([speedName(w), Object.entries(w.best_spd).map(([d, v]) => [dur(d), speedText(w, v)])]);
+  if (mv(w, 'best_hr')) rows.push(['Heart rate', Object.entries(w.best_hr).map(([d, v]) => [dur(d), `${Math.round(v)} bpm`])]);
   if (w.power_source === 'meter' && w.mmp) rows.push(['Power', Object.entries(w.mmp).filter(([d]) => [5, 60, 300, 1200, 3600].includes(+d)).map(([d, v]) => [dur(d), `${Math.round(v)} W`])]);
   if (!rows.length) { wrap.classList.add('hidden'); return; }
   wrap.classList.remove('hidden');
@@ -180,19 +210,25 @@ async function renderDeltaTable(w) {
     return;
   }
   const p = aggregateRides(rides);
-  const rows = [
-    ['Distance', `${fmtNum(w.distance_km, 2)} km`, `${fmtNum(p.avgDist, 2)} km`, deltaCell(num(w.distance_km) - p.avgDist, 2, ' km')],
-    ['Speed (weighted)', `${fmtNum(w.avg_speed_kmh, 1)} km/h`, `${fmtNum(p.speed, 1)} km/h`, deltaCell(num(w.avg_speed_kmh) - p.speed, 1, ' km/h')],
-    ['HR (weighted)', w.avg_hr ? `${w.avg_hr} bpm` : '--', p.hr ? `${Math.round(p.hr)} bpm` : '--', w.avg_hr && p.hr ? deltaCell(w.avg_hr - p.hr, 0, ' bpm', true) : '<span class="neu">--</span>'],
-    ['Ascent', `${Math.round(num(w.elevation_gain_m))} m`, `${Math.round(p.avgAsc)} m`, deltaCell(num(w.elevation_gain_m) - p.avgAsc, 0, ' m')]
-  ];
+  const sp = sportOf(w);
+  const na = '<span class="neu">--</span>';
+  const okD = hasVal(mv(w, 'distance_km'));
+  const rows = [];
+  if (sp !== 'other') {
+    rows.push(['Distance', okD ? distText(w) : 'flagged', distText(w, p.avgDist), okD ? deltaCell((num(w.distance_km) - p.avgDist) * (sp === 'swim' ? 1000 : 1), sp === 'swim' ? 0 : 2, sp === 'swim' ? ' m' : ' km') : na]);
+    rows.push([`${speedName(w)} (weighted)`, okD ? speedText(w) : 'flagged', p.speed ? speedText(w, p.speed) : '--', okD && p.speed ? (sp === 'ride' ? deltaCell(num(w.avg_speed_kmh) - p.speed, 1, ' km/h') : `<span class="${w.avg_speed_kmh > p.speed ? 'pos' : 'neg'}">${w.avg_speed_kmh > p.speed ? 'faster' : 'slower'}</span>`) : na]);
+  } else {
+    rows.push(['Moving time', rideDuration(w), formatDuration(p.sec / rides.length), deltaCell((num(w.moving_sec) - p.sec / rides.length) / 60, 0, ' min')]);
+  }
+  rows.push(['HR (weighted)', mv(w, 'avg_hr') ? `${w.avg_hr} bpm` : '--', p.hr ? `${Math.round(p.hr)} bpm` : '--', mv(w, 'avg_hr') && p.hr ? deltaCell(w.avg_hr - p.hr, 0, ' bpm', true) : na]);
+  if (sp === 'ride' || sp === 'run') rows.push(['Ascent', hasVal(mv(w, 'elevation_gain_m')) ? `${Math.round(num(w.elevation_gain_m))} m` : 'flagged', `${Math.round(p.avgAsc)} m`, hasVal(mv(w, 'elevation_gain_m')) ? deltaCell(num(w.elevation_gain_m) - p.avgAsc, 0, ' m') : na]);
   if (hasVal(w.trimp) && p.trimp > 0) {
     const avgLoad = p.trimp / rides.filter(r => hasVal(r.trimp)).length;
     rows.push(['Load', `${Math.round(w.trimp)}`, `${Math.round(avgLoad)}`, deltaCell(w.trimp - avgLoad, 0, '')]);
   }
   host.innerHTML = `
     <div class="table-wrap"><table class="dtable">
-      <thead><tr><th>Metric</th><th>This ride</th><th>Prior ${rides.length} avg</th><th>Δ</th></tr></thead>
+      <thead><tr><th>Metric</th><th>This ${escapeHtml(SPORTS[sp].label.toLowerCase())}</th><th>Prior ${rides.length} avg</th><th>Δ</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</tbody>
     </table></div>
     <div class="hint mt-8">Compared with: ${escapeHtml(basis)}</div>`;
@@ -259,14 +295,12 @@ function renderStreamPlot() {
     traces.push({ x: times, y: norm(cad, 0, Math.max(safeMax(cad, 0), 1)), name: 'Cadence', text: cad.map(c => `${c} rpm`), hovertemplate: '🔄 %{text}<extra></extra>', type: 'scatter', line: { color: '#8b5cf6', width: 1.2 } });
   }
 
-  el.innerHTML = '';
-  Plotly.react(el, traces, plotLayout({
+  drawChart(el, traces, plotLayout({
     margin: { l: 8, r: 8, t: 8, b: 28 },
     xaxis: { ticksuffix: 'm', showgrid: false },
     yaxis: { range: [0, 105], showticklabels: false, dtick: 25 }
-  }), PLOT_CONFIG);
+  }));
 
-  if (el.removeAllListeners) el.removeAllListeners('plotly_hover');
   el.on('plotly_hover', data => {
     const pt = data.points && data.points[0];
     if (!pt) return;
@@ -283,10 +317,12 @@ function renderStreamPlot() {
 // --------------------------------------------------------
 function bubbleHtml(m, coachLabel = 'AI Coach') {
   const coach = m.role === 'coach';
-  return `<div class="bubble ${coach ? 'bubble-coach' : 'bubble-athlete'}">
+  const meta = coach ? aiMetaLabel(m) : '';
+  return `<div class="bubble ${coach ? 'bubble-coach' : 'bubble-athlete'}${m.pending ? ' pending' : ''}">
     <div class="bubble-sender"><span>${coach ? escapeHtml(coachLabel) : escapeHtml(ATHLETE.name)}</span><span>${m.created_at ? escapeHtml(relativeTime(m.created_at)) : ''}</span></div>
     ${m.image_b64 ? `<img class="attach" src="${m.image_b64}" alt="attachment" />` : ''}
     <div class="md">${coach ? renderMarkdown(m.message) : escapeHtml(m.message || '').replace(/\n/g, '<br>')}</div>
+    ${meta ? `<div class="bubble-meta">${icon('sparkle', 'ic-xs')}${escapeHtml(meta)}</div>` : ''}
   </div>`;
 }
 
@@ -313,13 +349,11 @@ async function renderChatThread(extraHtml = '') {
   const w = currentWorkout;
   if (!w) { host.innerHTML = ''; return; }
   const msgs = await rideThreads(w.strava_id).toArray();
+  const busyHere = rideAiBusy && rideBusyFor === Number(w.strava_id);
   let html = msgs.length
-    ? msgs.map(m => bubbleHtml(m)).join('')
-    : `<div class="bubble bubble-coach"><div class="bubble-sender"><span>AI Coach</span></div>Tap <b>Analyze</b> above for a full debrief, or ask me anything about this ride below. You can attach a screenshot too.</div>`;
-  if (lastPendingRidePayload && Number(lastPendingRidePayload.strava_id) === Number(w.strava_id)) {
-    html += bubbleHtml({ role: 'athlete', message: lastPendingRidePayload.text, image_b64: lastPendingRidePayload.image_b64 });
-    if (!rideAiBusy) html += `<div class="retry-card"><span>Message not answered.</span><button class="btn btn-primary btn-xs" onclick="retryRideMessage()">${icon('refresh', 'ic-sm')}Retry</button></div>`;
-  }
+    ? msgs.map(m => bubbleHtml(m) + (m.pending && !busyHere ? `<div class="retry-card"><span>Not answered yet.</span><button class="btn btn-primary btn-xs" onclick="executeRideMessageDispatch(${m.id})">${icon('refresh', 'ic-sm')}Retry</button></div>` : '')).join('')
+    : `<div class="bubble bubble-coach"><div class="bubble-sender"><span>AI Coach</span></div>Tap <b>Analyze</b> above for a full debrief, or ask me anything about this ${escapeHtml(sportMeta(w).label.toLowerCase())} below. You can attach a screenshot too.</div>`;
+  if (busyHere && !extraHtml) extraHtml = typingHtml('Coach is still writing');
   host.innerHTML = html + extraHtml;
 }
 
@@ -330,18 +364,25 @@ function scrollDetailToEnd() {
 
 async function runSingleRideDebrief(targetRide) {
   const w = targetRide || currentWorkout;
-  if (!w || rideAiBusy) return;
+  if (!w) return;
+  if (rideAiBusy) { toast('The coach is still answering — please wait.', 'warn'); return; }
   rideAiBusy = true;
+  rideBusyFor = Number(w.strava_id);
   const btn = $('#btnDebrief');
-  setBusy(btn, true, 'Analyzing ride…');
+  setBusy(btn, true, 'Analyzing…');
   const viewing = () => currentWorkout && Number(currentWorkout.strava_id) === Number(w.strava_id);
-  if (viewing()) { await renderChatThread(typingHtml('Coach is analysing your ride')); scrollDetailToEnd(); }
+  if (viewing()) { await renderChatThread(typingHtml('Coach is analysing this session')); scrollDetailToEnd(); }
   try {
     const prompt = await buildRideDebriefPrompt(w);
-    const reply = await callGemini(prompt, null, { onDelta: viewing() ? liveBubble($('#chatThread'), 'AI Coach', scrollDetailToEnd) : null });
+    const meta = {};
+    const live = liveBubble($('#chatThread'), 'AI Coach', scrollDetailToEnd);
+    const reply = await callAI(prompt, null, { agent: 'ride', meta, onStatus: aiStatusIn($('#chatThread')), onDelta: t => { if (viewing()) live(hideMemoryTags(t)); } });
     if (reply) {
-      await db.threads.where('[strava_id+role]').equals([Number(w.strava_id), 'coach']).delete();
-      await db.threads.add({ strava_id: Number(w.strava_id), ride_number: w.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
+      const text = await captureMemory(reply, rideCode(w));
+      // Only the previous debrief is replaced; follow-up questions and answers stay
+      const old = (await rideThreads(w.strava_id).toArray()).filter(t => t.role === 'coach' && t.kind !== 'chat');
+      await db.threads.bulkDelete(old.filter((t, i) => i === 0).map(t => t.id));
+      await db.threads.add(Object.assign({ strava_id: Number(w.strava_id), ride_number: w.ride_number, role: 'coach', kind: 'debrief', message: text, created_at: new Date().toISOString() }, aiMetaFields(meta)));
       await db.workouts.update(w.id, { debrief_stale: false });
       w.debrief_stale = false;
       if (viewing()) currentWorkout.debrief_stale = false;
@@ -351,13 +392,16 @@ async function runSingleRideDebrief(targetRide) {
     toast(`Debrief failed: ${e.message}`, 'error', 5000);
   } finally {
     rideAiBusy = false;
+    rideBusyFor = null;
     setBusy(btn, false);
     if (viewing()) { await refreshDebriefState(); await renderChatThread(); }
   }
 }
 
+// Messages are saved immediately (pending until answered) — see resumePendingChats
 async function sendAthleteReply() {
-  if (!currentWorkout || rideAiBusy) return;
+  if (!currentWorkout) return;
+  if (rideAiBusy) { toast('The coach is still answering — please wait.', 'warn'); return; }
   const input = $('#replyInput');
   const text = input.value.trim();
   const img = attachments.RIDE;
@@ -365,36 +409,37 @@ async function sendAthleteReply() {
   input.value = '';
   autoGrow(input);
   clearAttachment('RIDE');
-  lastPendingRidePayload = { text, image_b64: img, strava_id: Number(currentWorkout.strava_id), ride_number: currentWorkout.ride_number };
-  await executeRideMessageDispatch(lastPendingRidePayload);
+  const id = await db.threads.add({ strava_id: Number(currentWorkout.strava_id), ride_number: currentWorkout.ride_number, role: 'athlete', message: text, image_b64: img, created_at: new Date().toISOString(), pending: true });
+  await executeRideMessageDispatch(id);
 }
 
-async function retryRideMessage() {
-  if (lastPendingRidePayload) await executeRideMessageDispatch(lastPendingRidePayload);
-}
-
-async function executeRideMessageDispatch(payload) {
+async function executeRideMessageDispatch(id) {
+  const msg = await db.threads.get(id);
+  if (!msg || rideAiBusy) return;
   rideAiBusy = true;
-  await renderChatThread(typingHtml());
-  scrollDetailToEnd();
+  rideBusyFor = Number(msg.strava_id);
+  const viewing = () => currentWorkout && Number(currentWorkout.strava_id) === rideBusyFor;
+  if (viewing()) { await renderChatThread(typingHtml()); scrollDetailToEnd(); }
   try {
-    const w = await db.workouts.where('strava_id').equals(Number(payload.strava_id)).first();
-    if (!w) throw new Error('Ride no longer exists.');
-    const prompt = await buildRideChatPrompt(w, payload.text, !!payload.image_b64);
-    const reply = await callGemini(prompt, payload.image_b64, { onDelta: liveBubble($('#chatThread'), 'AI Coach', scrollDetailToEnd) });
+    const w = await db.workouts.where('strava_id').equals(Number(msg.strava_id)).first();
+    if (!w) throw new Error('Workout no longer exists.');
+    const prompt = await buildRideChatPrompt(w, msg.message, !!msg.image_b64, id);
+    const meta = {};
+    const live = liveBubble($('#chatThread'), 'AI Coach', scrollDetailToEnd);
+    const reply = await callAI(prompt, msg.image_b64, { agent: 'ride', meta, onStatus: aiStatusIn($('#chatThread')), onDelta: t => { if (viewing()) live(hideMemoryTags(t)); } });
     if (reply) {
       haptic('success');
-      const now = new Date().toISOString();
-      await db.threads.add({ strava_id: Number(payload.strava_id), ride_number: payload.ride_number, role: 'athlete', message: payload.text, image_b64: payload.image_b64, created_at: now });
-      await db.threads.add({ strava_id: Number(payload.strava_id), ride_number: payload.ride_number, role: 'coach', message: reply, created_at: new Date().toISOString() });
-      lastPendingRidePayload = null;
+      const text = await captureMemory(reply, rideCode(w));
+      await db.threads.update(id, { pending: false });
+      await db.threads.add(Object.assign({ strava_id: Number(msg.strava_id), ride_number: w.ride_number, role: 'coach', kind: 'chat', message: text, created_at: new Date().toISOString() }, aiMetaFields(meta)));
+      if (!viewing()) toast(`Coach replied about ${rideTitle(w)}`, 'success', 3500);
     }
   } catch (e) {
     toast(`Message failed: ${e.message}`, 'error');
   } finally {
     rideAiBusy = false;
-    await renderChatThread();
-    scrollDetailToEnd();
+    rideBusyFor = null;
+    if (viewing() || (currentWorkout && Number(currentWorkout.strava_id) === Number(msg.strava_id))) { await renderChatThread(); scrollDetailToEnd(); }
   }
 }
 
@@ -406,7 +451,6 @@ async function resetActiveRideThread() {
   await rideThreads(w.strava_id).delete();
   await db.workouts.update(w.id, { debrief_stale: false });
   w.debrief_stale = false;
-  lastPendingRidePayload = null;
   clearAttachment('RIDE');
   await refreshDebriefState();
   await renderChatThread();

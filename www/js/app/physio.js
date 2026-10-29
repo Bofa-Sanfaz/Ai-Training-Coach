@@ -418,29 +418,39 @@ async function build1MinuteTelemetryTimeline(stravaId, stepMin = 1) {
   const watts = s.watts ? s.watts.data : [];
   const moving = s.moving ? s.moving.data : null;
 
+  const w = await db.workouts.where('strava_id').equals(Number(stravaId)).first();
+  const flagSpd = w && isFlagged(w, 'distance'), flagHr = w && isFlagged(w, 'hr'), flagEl = w && isFlagged(w, 'elevation');
+  const sport = { sport: w ? sportOf(w) : 'ride' };
   const buckets = new Map();
   for (let i = 0; i < times.length; i++) {
     if (moving && moving[i] === false) continue;
     const minute = Math.floor(times[i] / (60 * stepMin)) * stepMin + 1;
     let bk = buckets.get(minute);
-    if (!bk) { bk = { spd: 0, n: 0, hr: 0, hrN: 0, pw: 0, pwN: 0, first: i, last: i }; buckets.set(minute, bk); }
-    bk.spd += num(speeds[i]); bk.n++;
-    if (hrs[i] > 0) { bk.hr += hrs[i]; bk.hrN++; }
-    if (watts[i] > 0) { bk.pw += watts[i]; bk.pwN++; }
+    if (!bk) { bk = { spd: 0, n: 0, maxSpd: 0, hr: 0, hrN: 0, maxHr: 0, pw: 0, pwN: 0, maxPw: 0, first: i, last: i }; buckets.set(minute, bk); }
+    const v = num(speeds[i]);
+    bk.spd += v; bk.n++;
+    if (v > bk.maxSpd) bk.maxSpd = v;
+    if (hrs[i] > 0) { bk.hr += hrs[i]; bk.hrN++; if (hrs[i] > bk.maxHr) bk.maxHr = hrs[i]; }
+    if (watts[i] > 0) { bk.pw += watts[i]; bk.pwN++; if (watts[i] > bk.maxPw) bk.maxPw = watts[i]; }
     bk.last = i;
   }
 
+  // Averages hide surges, so every line also carries the peak inside that minute
   const lines = [];
   for (const [minute, bk] of [...buckets.entries()].sort((x, y) => x[0] - y[0])) {
-    const avgSpd = fmtNum((bk.spd / bk.n) * 3.6, 1);
-    const avgHR = bk.hrN ? Math.round(bk.hr / bk.hrN) : '--';
+    const avgSpd = bk.n ? (bk.spd / bk.n) * 3.6 : 0;
+    const spd = flagSpd || !speeds.length ? '' : sport.sport === 'ride'
+      ? `${fmtNum(avgSpd, 1)} km/h (peak ${fmtNum(bk.maxSpd * 3.6, 1)})`
+      : `${speedText(sport, avgSpd)} (best ${speedText(sport, bk.maxSpd * 3.6)})`;
+    const hr = flagHr || !bk.hrN ? '' : `HR ${Math.round(bk.hr / bk.hrN)} (peak ${bk.maxHr})`;
     const startAlt = num(alts[bk.first]);
     const endAlt = num(alts[bk.last]);
     const dEl = Math.round(endAlt - startAlt);
-    const dist = dists[bk.last] ? fmtNum(dists[bk.last] / 1000, 2) : '--';
-    const tag = dEl > 3 ? `(+${dEl}m climb)` : (dEl < -3 ? `(${dEl}m desc)` : '(flat)');
-    const pw = bk.pwN ? ` | ${Math.round(bk.pw / bk.pwN)}W` : '';
-    lines.push(`• Min ${minute} [${dist}km]: ${avgSpd} km/h | HR: ${avgHR} bpm${pw} | Elev: ${Math.round(endAlt)}m ${tag}`);
+    const dist = !flagSpd && dists[bk.last] ? `[${fmtNum(dists[bk.last] / 1000, 2)}km] ` : '';
+    const tag = dEl > 3 ? `+${dEl}m climb` : (dEl < -3 ? `${dEl}m desc` : 'flat');
+    const el = flagEl || !alts.length ? '' : `Elev ${Math.round(endAlt)}m ${tag}`;
+    const pw = bk.pwN ? `${Math.round(bk.pw / bk.pwN)}W (peak ${Math.round(bk.maxPw)})` : '';
+    lines.push(`• Min ${minute} ${dist}${[spd, hr, pw, el].filter(Boolean).join(' | ')}`);
   }
   return lines.join('\n') || 'No moving samples recorded.';
 }
@@ -466,37 +476,50 @@ function comparableKey(w) {
 }
 
 function priorComparable(current, allSorted, max = 5) {
-  const prior = allSorted.filter(w => w.date < current.date && w.id !== current.id).reverse();
+  const prior = allSorted.filter(w => w.date < current.date && w.id !== current.id && sportOf(w) === sportOf(current) && !isExcluded(w)).reverse();
   const type = current.intent_type || 'NONE';
   const exact = prior.filter(w => comparableKey(w) === comparableKey(current)).slice(0, max);
   if (exact.length) return { rides: exact, basis: getCleanIntentLabel(current) };
   return { rides: prior.filter(w => (w.intent_type || 'NONE') === type).slice(0, max), basis: type === 'NONE' ? 'No intent' : type };
 }
 
+// Totals for a set of workouts. Excluded workouts are ignored and flagged values
+// (data errors) are left out. Speed is only meaningful within one sport, so it is
+// computed from the most common sport in the set; bySport has per-sport totals.
 function aggregateRides(rides) {
-  const timed = rides.filter(w => w.moving_sec > 0);
+  rides = rides.filter(w => !isExcluded(w));
+  const sports = {};
+  for (const w of rides) {
+    const s = sportOf(w);
+    const e = sports[s] = sports[s] || { count: 0, dist: 0, sec: 0, asc: 0, trimp: 0 };
+    e.count++; e.dist += num(mv(w, 'distance_km')); e.sec += num(w.moving_sec); e.asc += num(mv(w, 'elevation_gain_m')); e.trimp += num(mv(w, 'trimp'));
+  }
+  const main = Object.keys(sports).sort((a, b) => sports[b].sec - sports[a].sec)[0] || 'ride';
+  const timed = rides.filter(w => w.moving_sec > 0 && sportOf(w) === main && hasVal(mv(w, 'distance_km')));
   const tDist = sumBy(timed, w => w.distance_km);
   const tSec = sumBy(timed, w => w.moving_sec);
   let hrW = 0, hrS = 0;
-  for (const w of rides) if (w.avg_hr > 0 && w.moving_sec > 0) { hrW += w.avg_hr * w.moving_sec; hrS += w.moving_sec; }
+  for (const w of rides) if (mv(w, 'avg_hr') > 0 && w.moving_sec > 0) { hrW += w.avg_hr * w.moving_sec; hrS += w.moving_sec; }
   return {
     count: rides.length,
-    dist: sumBy(rides, w => w.distance_km),
+    dist: sumBy(rides, w => mv(w, 'distance_km')),
     sec: sumBy(rides, w => w.moving_sec),
-    asc: sumBy(rides, w => w.elevation_gain_m),
-    work: sumBy(rides, w => w.kilojoules),
-    trimp: sumBy(rides, w => w.trimp),
-    avgDist: rides.length ? sumBy(rides, w => w.distance_km) / rides.length : 0,
-    avgAsc: rides.length ? sumBy(rides, w => w.elevation_gain_m) / rides.length : 0,
+    asc: sumBy(rides, w => mv(w, 'elevation_gain_m')),
+    work: sumBy(rides, w => mv(w, 'kilojoules')),
+    trimp: sumBy(rides, w => mv(w, 'trimp')),
+    avgDist: rides.length ? sumBy(rides, w => mv(w, 'distance_km')) / rides.length : 0,
+    avgAsc: rides.length ? sumBy(rides, w => mv(w, 'elevation_gain_m')) / rides.length : 0,
     // Duration-weighted speed: same rides in numerator and denominator
-    speed: tSec > 0 ? tDist / (tSec / 3600) : (rides.length ? sumBy(rides, w => w.avg_speed_kmh) / rides.length : 0),
-    hr: hrS > 0 ? hrW / hrS : 0
+    speed: tSec > 0 ? tDist / (tSec / 3600) : 0,
+    speedSport: main,
+    hr: hrS > 0 ? hrW / hrS : 0,
+    bySport: sports
   };
 }
 
 function sumZones(rides) {
   const z = [0, 0, 0, 0, 0];
-  for (const w of rides) if (Array.isArray(w.zone_seconds)) for (let i = 0; i < 5; i++) z[i] += num(w.zone_seconds[i]);
+  for (const w of rides) { const zs = mv(w, 'zone_seconds'); if (Array.isArray(zs)) for (let i = 0; i < 5; i++) z[i] += num(zs[i]); }
   return z;
 }
 
@@ -504,7 +527,7 @@ function sumZones(rides) {
 // TRAINING LOAD MODEL: CTL (42 d), ATL (7 d), TSB = CTL−ATL (yesterday)
 // --------------------------------------------------------
 function computeLoadSeries(workouts, endDate = new Date()) {
-  const withLoad = workouts.filter(w => hasVal(w.trimp) && w.trimp > 0);
+  const withLoad = workouts.filter(w => hasVal(mv(w, 'trimp')) && w.trimp > 0);
   if (!withLoad.length) return null;
   const daily = new Map();
   for (const w of withLoad) {
@@ -571,45 +594,52 @@ function weekSummary(workouts, now = new Date()) {
 function weeklyTotals(workouts) {
   const map = new Map();
   for (const w of workouts) {
+    if (isExcluded(w)) continue;
     const ws = formatLocalDate(startOfWeek(parseSafeDate(w.date)));
-    const e = map.get(ws) || { week: ws, dist: 0, sec: 0, asc: 0, trimp: 0, count: 0 };
-    e.dist += num(w.distance_km); e.sec += num(w.moving_sec); e.asc += num(w.elevation_gain_m); e.trimp += num(w.trimp); e.count++;
+    const e = map.get(ws) || { week: ws, dist: 0, sec: 0, asc: 0, trimp: 0, count: 0, sports: {} };
+    e.dist += num(mv(w, 'distance_km')); e.sec += num(w.moving_sec); e.asc += num(mv(w, 'elevation_gain_m')); e.trimp += num(mv(w, 'trimp')); e.count++;
+    const sp = sportOf(w);
+    const s = e.sports[sp] = e.sports[sp] || { count: 0, dist: 0, sec: 0, trimp: 0 };
+    s.count++; s.dist += num(mv(w, 'distance_km')); s.sec += num(w.moving_sec); s.trimp += num(mv(w, 'trimp'));
     map.set(ws, e);
   }
   return [...map.values()].sort((a, b) => (a.week < b.week ? -1 : 1));
 }
 
-function computeRecords(workouts) {
-  if (!workouts.length) return [];
-  const best = (arr, fn) => arr.reduce((p, c) => (num(fn(c)) > num(fn(p)) ? c : p), arr[0]);
+// Records per sport. Flagged values (marked as data errors) and excluded workouts never count.
+// Each record carries `field` so the UI can offer "mark as data error" on it.
+function computeRecords(workouts, sport = 'ride') {
+  const pool = workouts.filter(w => sportOf(w) === sport && !isExcluded(w));
+  if (!pool.length) return [];
+  const best = (fn, arr = pool) => { const ok = arr.filter(w => num(fn(w)) > 0); return ok.length ? ok.reduce((p, c) => (num(fn(c)) > num(fn(p)) ? c : p), ok[0]) : null; };
+  const label = SPORTS[sport].label.toLowerCase();
   const rec = [];
-  const longest = best(workouts, w => w.distance_km);
-  rec.push({ label: 'Longest ride', icon: 'route', value: `${fmtNum(longest.distance_km, 1)} km`, ride: longest });
-  const longTime = best(workouts, w => w.moving_sec);
-  rec.push({ label: 'Longest time', icon: 'clock', value: formatHours(longTime.moving_sec), ride: longTime });
-  const climb = best(workouts, w => w.elevation_gain_m);
-  rec.push({ label: 'Most climbing', icon: 'mountain', value: `${Math.round(num(climb.elevation_gain_m))} m`, ride: climb });
-  const fastPool = workouts.filter(w => w.distance_km >= 10);
-  if (fastPool.length) {
-    const fast = best(fastPool, w => w.avg_speed_kmh);
-    rec.push({ label: 'Fastest avg (≥10 km)', icon: 'gauge', value: `${fmtNum(fast.avg_speed_kmh, 1)} km/h`, ride: fast });
+  const add = (r, w) => { if (w) rec.push(Object.assign({ ride: w }, r)); };
+  const longest = best(w => mv(w, 'distance_km'));
+  if (longest) add({ label: `Longest ${label}`, icon: 'route', value: distText(longest), field: 'distance' }, longest);
+  const longTime = best(w => w.moving_sec);
+  if (longTime) add({ label: 'Longest time', icon: 'clock', value: formatHours(longTime.moving_sec) }, longTime);
+  if (sport === 'ride' || sport === 'run') {
+    const climb = best(w => mv(w, 'elevation_gain_m'));
+    if (climb) add({ label: 'Most climbing', icon: 'mountain', value: `${Math.round(num(climb.elevation_gain_m))} m`, field: 'elevation' }, climb);
   }
-  const vamPool = workouts.filter(w => w.climbing_vam > 0);
-  if (vamPool.length) {
-    const v = best(vamPool, w => w.climbing_vam);
-    rec.push({ label: 'Best climbing VAM', icon: 'trend', value: `${v.climbing_vam} m/h`, ride: v });
+  const minDist = { ride: 10, run: 3, swim: 0.4 }[sport];
+  const fast = minDist ? best(w => mv(w, 'avg_speed_kmh'), pool.filter(w => num(mv(w, 'distance_km')) >= minDist)) : null;
+  if (fast) add({ label: `${sport === 'ride' ? 'Fastest avg' : 'Best avg pace'} (≥${sport === 'swim' ? `${minDist * 1000} m` : `${minDist} km`})`, icon: 'gauge', value: speedText(fast), field: 'distance' }, fast);
+  if (sport === 'ride' || sport === 'run') {
+    const v = best(w => mv(w, 'climbing_vam'));
+    if (v) add({ label: 'Best climbing VAM', icon: 'trend', value: `${v.climbing_vam} m/h`, field: 'elevation' }, v);
   }
-  const peak = best(workouts, w => w.max_speed_kmh);
-  rec.push({ label: 'Top speed', icon: 'zap', value: `${fmtNum(peak.max_speed_kmh, 1)} km/h`, ride: peak });
-  const loadPool = workouts.filter(w => w.trimp > 0);
-  if (loadPool.length) {
-    const l = best(loadPool, w => w.trimp);
-    rec.push({ label: 'Hardest session', icon: 'flame', value: `${Math.round(l.trimp)} TRIMP`, ride: l });
+  if (sport === 'ride') {
+    const peak = best(w => mv(w, 'max_speed_kmh'));
+    if (peak) add({ label: 'Top speed', icon: 'zap', value: `${fmtNum(peak.max_speed_kmh, 1)} km/h`, field: 'distance' }, peak);
   }
-  const weeks = weeklyTotals(workouts);
+  const l = best(w => mv(w, 'trimp'));
+  if (l) add({ label: 'Hardest session', icon: 'flame', value: `${Math.round(l.trimp)} TRIMP`, field: 'hr' }, l);
+  const weeks = weeklyTotals(pool);
   if (weeks.length) {
     const bw = weeks.reduce((p, c) => (c.dist > p.dist ? c : p), weeks[0]);
-    rec.push({ label: 'Biggest week', icon: 'calendar', value: `${fmtNum(bw.dist, 1)} km`, sub: `Week of ${formatNiceDate(bw.week, false)}` });
+    rec.push({ label: 'Biggest week', icon: 'calendar', value: sport === 'swim' ? `${Math.round(bw.dist * 1000)} m` : `${fmtNum(bw.dist, 1)} km`, sub: `Week of ${formatNiceDate(bw.week, false)}` });
   }
   return rec;
 }

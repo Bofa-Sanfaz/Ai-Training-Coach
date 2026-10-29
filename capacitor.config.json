@@ -1,9 +1,10 @@
 {
   "appId": "com.ridepartner.v2",
-  "appName": "Ride Partner",
+  "appName": "Training Partner",
   "webDir": "www",
   "android": {
-    "backgroundColor": "#f3f5fa"
+    "backgroundColor": "#f3f5fa",
+    "webContentsDebuggingEnabled": true
   },
   "plugins": {
     "SystemBars": {

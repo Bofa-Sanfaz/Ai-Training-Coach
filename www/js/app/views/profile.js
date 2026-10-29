@@ -22,6 +22,8 @@ async function renderProfile() {
   $('#cfg_client_id').value = (await getConfig('strava_client_id')) || DEFAULT_STRAVA_CLIENT_ID;
   $('#cfg_client_secret').value = await getConfig('strava_client_secret');
   await renderProviders();
+  renderAgentModels();
+  await renderMemory();
   await renderSpend();
   renderSkills();
   await renderHealthCard();
@@ -35,7 +37,7 @@ async function renderProfile() {
   if (!$('#cfg_weight_date').value) $('#cfg_weight_date').value = today;
   if (!$('#cfg_goal_date').value) $('#cfg_goal_date').value = today;
   applyTheme(currentThemeChoice());
-  $('#versionTag').textContent = `Ride Partner v${APP_VERSION} · metrics ${METRICS_VERSION}`;
+  $('#versionTag').textContent = `Training Partner v${APP_VERSION} · metrics ${METRICS_VERSION}`;
 
   await renderWeightHistoryUI();
   await renderGoalHistoryUI();
@@ -416,7 +418,7 @@ async function exportDatabaseJson() {
   try {
     const dump = await buildDump({ includeSecrets: false });
     const name = `RidePartner_Backup_${formatLocalDate(new Date())}.json`;
-    const res = await saveOrShareFile(name, JSON.stringify(dump), { mime: 'application/json', title: 'Ride Partner backup' });
+    const res = await saveOrShareFile(name, JSON.stringify(dump), { mime: 'application/json', title: 'Training Partner backup' });
     if (res.ok) toast(`Backup exported → ${res.where}`, 'success');
   } catch (e) {
     toast(`Export failed: ${e.message}`, 'error');
@@ -430,7 +432,7 @@ async function importDatabaseJson(event) {
   let data;
   try {
     data = JSON.parse(await file.text());
-    if (!data || !Array.isArray(data.workouts)) throw new Error('this is not a Ride Partner backup');
+    if (!data || !Array.isArray(data.workouts)) throw new Error('this is not a Training Partner backup');
   } catch (e) {
     toast(`Can't read "${file.name}": ${e.message}`, 'error', 6000);
     return;
@@ -499,4 +501,44 @@ async function switchToClassic() {
   await createRestorePoint('Before switching to Classic v2', 'auto');
   try { localStorage.setItem('rp_ui', 'classic'); } catch (e) {}
   location.href = 'classic.html';
+}
+
+// --------------------------------------------------------
+// MODEL PER COACH + COACH MEMORY
+// --------------------------------------------------------
+function renderAgentModels() {
+  const host = $('#agentModelList');
+  if (!host || !AI) return;
+  host.innerHTML = Object.entries(AI_AGENTS).map(([k, label]) => {
+    const c = agentChoice(k);
+    return `<button class="list-row" onclick="openModelPicker('${k}')">
+      <span class="grow"><b>${escapeHtml(label)}</b><br><span class="tiny muted">${escapeHtml(agentModelLabel(k))}${c && c.strict ? ' · keeps retrying' : ''}</span></span>${icon('chevron', 'ic-sm muted')}</button>`;
+  }).join('');
+}
+
+async function renderMemory() {
+  const host = $('#memoryList');
+  if (!host) return;
+  const m = await getCoachMemory();
+  host.innerHTML = m.length
+    ? m.map(x => `<div class="list-row"><span class="grow">${escapeHtml(x.text)}<br><span class="tiny muted">${escapeHtml(x.source || 'you')} · ${escapeHtml(relativeTime(x.created_at))}</span></span>
+        <button class="x-btn" onclick="removeMemoryFact('${escapeHtml(x.id)}')" aria-label="Delete">${icon('x', 'ic-sm')}</button></div>`).join('')
+    : '<div class="small muted">Nothing yet.</div>';
+}
+
+async function addMemoryFact() {
+  const input = $('#memory_new');
+  const text = input.value.trim().slice(0, 240);
+  if (!text) return;
+  const m = await getCoachMemory();
+  m.push({ id: Date.now().toString(36), text, source: 'you', created_at: new Date().toISOString() });
+  await setJsonConfig('coach_memory', m.slice(-60));
+  input.value = '';
+  haptic('light');
+  await renderMemory();
+}
+
+async function removeMemoryFact(id) {
+  await setJsonConfig('coach_memory', (await getCoachMemory()).filter(x => x.id !== id));
+  await renderMemory();
 }

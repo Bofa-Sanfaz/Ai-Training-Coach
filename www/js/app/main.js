@@ -5,16 +5,28 @@
 const Router = { current: 'rides' };
 const TAB_ALIASES = { feed: 'rides', graphs: 'trends', chats: 'coach', settings: 'profile' };
 
+// Screens push in the direction you move along the tab bar (view transition);
+// the new screen is rendered inside the transition so it arrives complete.
 function switchTab(tab) {
   tab = TAB_ALIASES[tab] || tab;
   ['rideDetail', 'threadPanel'].forEach(closePanel);
   $$('.sheet.open').forEach(s => closeSheet(s.id));
+  const from = Router.current;
   Router.current = tab;
-  $$('.screen').forEach(s => s.classList.toggle('active', s.id === `screen-${tab}`));
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  window.scrollTo({ top: 0 });
+  moveNavIndicator(tab);
   const render = { rides: renderRides, trends: renderTrends, compare: setupComparison, coach: renderCoachList, reports: renderReports, profile: renderProfile }[tab];
-  if (render) Promise.resolve(render()).catch(err => { console.error(err); toast(`Could not load ${tab}: ${err.message}`, 'error'); });
+  // Chart-heavy screens render after the transition so the tab never feels frozen
+  const heavy = ['trends', 'compare', 'reports'].includes(tab);
+  const show = async () => {
+    $$('.screen').forEach(s => s.classList.toggle('active', s.id === `screen-${tab}`));
+    window.scrollTo({ top: 0 });
+    if (render && !heavy) await Promise.race([Promise.resolve(render()), new Promise(r => setTimeout(r, 350))]);
+  };
+  viewSwap(show, from === tab ? 'fade' : tabDirection(from, tab))
+    .then(() => (heavy && render ? render() : null))
+    .then(() => animateIn($(`#screen-${tab}`)))
+    .catch(err => { console.error(err); toast(`Could not load ${tab}: ${err.message}`, 'error'); });
 }
 
 function checkNetwork() {
@@ -24,12 +36,18 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
-### Look & feel
+### New in 3.3 — Training Partner
+- **Rides, runs, swims and gym**: runs from Strava, plus **pool swims, treadmill runs, the gym bike, elliptical, stepper, rowing and strength sessions straight from your Galaxy Watch** (Samsung Health). Every screen and every coach looks at all sports together and each on its own
+- **New activities inbox**: walks, hikes, yoga and other types wait for you — include (walks & hikes count as runs) or skip, and remember the choice. Only workouts from 2026 on are imported
+- **Reports per sport**: choose All, Rides, Runs, Swims or Gym; the PDF is now a full report (week-by-week table, a page per sport, highlights, plan adherence, recovery log)
+- **The full guide** to every function, coach context and calculation is in the project docs (Training-Partner-Guide.pdf)
+- **Mark wrong data**: tap the flag on any workout (or on a record) to mark climbing, distance/speed, heart rate or power as a data error, set the sport, mark it indoor — or delete it (sync never brings it back)
+- **Compare really compares**: same-sport sessions, \
 - Redesigned app with bottom navigation, dark mode, new logo and race-number typography
 - Ride detail opens as a full screen with a chat composer that stays at the bottom
 - Toasts and in-app dialogs instead of pop-up alerts; Android **Back** button now works everywhere
 
-### New in 3.2
+### 3.2
 - **Aether**, your season coach, knows everything and can change your plan and weekly targets when you ask — you approve each change
 - **Your own plan**: a repeating weekly template, one-off day changes and weekly targets; done/missed tracking
 - **Samsung Health** (Galaxy Watch) via Health Connect: sleep, resting HR, HRV, weight, steps — a readiness strip on Rides and better coaching
@@ -64,7 +82,7 @@ function showWhatsNew() {
 
 async function boot() {
   if (window.__rpSafeStart) {
-    window.__rpShowRecovery('Ride Partner failed to start twice in a row.');
+    window.__rpShowRecovery('Training Partner failed to start twice in a row.');
     return;
   }
   if (!window.Dexie) throw new Error('Database library failed to load.');
@@ -106,16 +124,32 @@ async function boot() {
   if (App) {
     App.addListener('appUrlOpen', data => { if (data && data.url) processIncomingUrl(data.url); });
     App.addListener('backButton', handleHardwareBack);
+    App.addListener('resume', () => { resumedIds.clear(); setTimeout(resumePendingChats, 800); });
   }
+  window.addEventListener('online', () => setTimeout(resumePendingChats, 1500));
   if (location.search && location.search.includes('code=')) processIncomingUrl(location.href);
 
   await renderRides();
   window.__rpBootOk();
+  playIntro();
+  setupRipples();
+  moveNavIndicator(Router.current, true);
+  window.addEventListener('resize', debounce(() => moveNavIndicator(Router.current, true), 150));
+  setTimeout(() => { countUp($('#screen-rides')); stagger($$('#rideList .ride-card'), { max: 6 }); }, sessionStorage.getItem('rp_intro_seen') ? 0 : 700);
+  try { sessionStorage.setItem('rp_intro_seen', '1'); } catch (e) {}
 
   if (seen !== APP_VERSION) setTimeout(showWhatsNew, 600);
   setupPullToRefresh();
   await refreshStaleMetrics();
   maybeAutoSync();
+  setTimeout(resumePendingChats, 2000);
+}
+
+// Sync button / pull-to-refresh: Strava plus the watch (Samsung Health workouts & wellness)
+async function syncAll() {
+  const jobs = [syncStrava()];
+  if ((await getConfig('health_enabled')) === '1') jobs.push(syncWellness(true));
+  await Promise.all(jobs);
 }
 
 // Auto-sync on open: Strava connected, online, enabled, last sync > 3 h ago
@@ -163,7 +197,7 @@ function setupPullToRefresh() {
     if (!go) { ptr.style.opacity = '0'; ptr.classList.remove('ready'); return; }
     ptr.classList.add('spin');
     ptr.style.transform = 'translateY(8px)';
-    try { await syncStrava(); } finally {
+    try { await syncAll(); } finally {
       ptr.classList.remove('spin', 'ready');
       ptr.style.opacity = '0';
       ptr.style.transform = '';
@@ -189,6 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
   boot().catch(err => {
     console.error(err);
     if (window.__rpErrors) window.__rpErrors.push(err && err.message ? err.message : String(err));
-    window.__rpShowRecovery('Ride Partner hit an error while starting.');
+    window.__rpShowRecovery('Training Partner hit an error while starting.');
   });
 });

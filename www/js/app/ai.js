@@ -15,22 +15,78 @@
 // The provider client lives in providers.js.
 // --------------------------------------------------------
 
-// Small-context providers get a compact version of the long sections
-function contextBudget() {
-  const p = typeof activeProvider === 'function' ? activeProvider() : null;
-  const small = p && (p.preset === 'groq' || p.preset === 'custom' || /lite|mini|small|8b|7b/i.test(p.model || ''));
-  return small ? { detailedRides: 15, priorRides: 6, weeks: 8, timelineStep: 2 } : { detailedRides: 40, priorRides: 12, weeks: 12, timelineStep: 1 };
+// Small-context models get a compact version of the long sections. Detailed ride
+// lines are capped for every model: they are the biggest part of a prompt and the
+// main reason for slow replies; older rides are summarised by month instead.
+function contextBudget(agent) {
+  const c = agent && typeof agentChoice === 'function' ? agentChoice(agent) : null;
+  const p = c ? c.p : (typeof activeProvider === 'function' ? activeProvider() : null);
+  const model = c ? c.model : p && p.model;
+  // Whole name parts only ("gemini" must not match "mini"); ≤14B open models count as small
+  const small = p && (p.preset === 'groq' || p.preset === 'custom' || /(^|[-_/:.])(lite|mini|small|nano|tiny|(?:[1-9]|1[0-4])b)([-_/:.]|$)/i.test(model || ''));
+  return small ? { detailedRides: 12, priorRides: 6, weeks: 8, timelineStep: 2 } : { detailedRides: 25, priorRides: 10, weeks: 12, timelineStep: 1 };
 }
 
-function formattingRules() {
-  return 'FORMAT: plain English with units; short headed sections and bullets are fine; no LaTeX, no dollar signs, no formula derivations, no pipe tables.';
+// Reply style. Written after reviewing the athlete's real conversations: replies were
+// long (≈3,000 characters), repeated the same closing question, kept bringing up body
+// weight and used hype words. Corrections the athlete gave were forgotten in other threads.
+function formattingRules(kind = 'chat') {
+  const len = { chat: 'Keep it short: answer the question in the first sentence, then at most ~150 words unless the athlete asks for detail.',
+    debrief: 'At most ~300 words.',
+    long: 'Be thorough but tight: no filler, no repetition.' }[kind] || '';
+  return `STYLE: ${len}
+- Plain English with units; short bullets are fine. No LaTeX, no dollar signs, no formula derivations, no pipe tables.
+- Calm, factual, coach-to-athlete tone. No hype ("beast", "insane", "elite"), no flattery, no emojis.
+- Only mention body weight when it changes the answer or the athlete asks.
+- Don't end with a question unless you truly need an answer to continue; never repeat a question already asked in this conversation.
+- If data is missing, flagged as an error or looks implausible, say so briefly instead of building conclusions on it. A readiness call needs sleep/HRV/resting HR — if they are missing, say the call is based on training load only.
+- Use only numbers that appear in the context (max HR, zones, weights, distances…). Never restate a physiological value from memory or invent a session, symptom or event.
+- Address the athlete by the name in the ATHLETE line.
+- If you learn a lasting fact about the athlete or a correction (equipment, injuries, a workout's true type, schedule, goals), add it on its own line as <remember>one short fact</remember> — it is saved to the coach memory every coach reads.`;
 }
 
 function dataNotes() {
   return `DATA NOTES:
+- Sports: rides, runs (incl. treadmill), swims (mostly pool — no GPS) and gym & other (elliptical, stepper, rowing, strength). Sources: Strava, or the Galaxy Watch via Samsung Health. Speeds of different sports are never comparable; load (TRIMP, from heart rate) and time are.
 - Power/kJ are Strava estimates unless a ride is marked "power meter"; NP/IF/TSS appear only for power-meter rides.
+- Values the athlete marked as data errors are shown as "flagged" and must not be used; "indoor" rides have no real distance/speed/climbing.
 - Decoupling is Speed:HR on moving time (Power:HR with a power meter); MTB terrain adds noise.
 - Load = Banister TRIMP from heart rate; Fitness CTL 42-day, Fatigue ATL 7-day, Form TSB = yesterday's CTL - ATL; ACWR = ATL/CTL.`;
+}
+
+// --------------------------------------------------------
+// COACH MEMORY — facts every coach must keep in mind (shared by all agents)
+// Added by the athlete in Profile or by a coach with <remember>…</remember>.
+// --------------------------------------------------------
+const REMEMBER_RE = /<remember>\s*([\s\S]*?)\s*<\/remember>/gi;
+
+async function getCoachMemory() {
+  const m = await getJsonConfig('coach_memory', []);
+  return Array.isArray(m) ? m : [];
+}
+
+async function coachMemoryText() {
+  const m = await getCoachMemory();
+  return m.length ? `COACH MEMORY (facts and corrections from the athlete — always respect these):\n${m.map(x => `- ${x.text}`).join('\n')}` : '';
+}
+
+// Saves <remember> facts from a reply and returns the reply without the tags
+async function captureMemory(text, source) {
+  const facts = [];
+  const clean = String(text || '').replace(REMEMBER_RE, (_, f) => { if (f.trim()) facts.push(f.trim().slice(0, 240)); return ''; }).replace(/\n{3,}/g, '\n\n').trim();
+  if (facts.length) {
+    const m = await getCoachMemory();
+    const have = new Set(m.map(x => x.text.toLowerCase()));
+    for (const f of facts) if (!have.has(f.toLowerCase())) m.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), text: f, source, created_at: new Date().toISOString() });
+    await setJsonConfig('coach_memory', m.slice(-60));
+    toast(`Saved to coach memory: ${facts[0]}${facts.length > 1 ? ` (+${facts.length - 1})` : ''}`, 'info', 3000);
+  }
+  return clean;
+}
+
+// While streaming, hide <remember> tags (complete or still arriving)
+function hideMemoryTags(text) {
+  return String(text || '').replace(REMEMBER_RE, '').replace(/<remember>[\s\S]*$/i, '').replace(/<rem[a-z]*$/i, '');
 }
 
 // ---------- Athlete ----------
@@ -46,7 +102,18 @@ async function athleteContext(dateStr, massOverride) {
 }
 
 function bioLine(ctx) {
-  return `Athlete: ${ATHLETE.name} | Height ${ctx.height} | Mass ${ctx.mass} | Bike: ${ATHLETE.bike} | Max HR ${PHYSIO.max_hr} | Resting HR ${PHYSIO.resting_hr} | Zones: ${zoneFrameworkText()}`;
+  return `Athlete: ${ATHLETE.name} | Height ${ctx.height} | Mass ${ctx.mass} | Bike: ${ATHLETE.bike} | Max HR ${PHYSIO.max_hr} | Resting HR ${PHYSIO.resting_hr} | HR zones (all sports): ${zoneFrameworkText()}`;
+}
+
+// One weeklyTotals() entry, per sport: "3 rides 95 km, 1 run 8 km"
+function weekSportsText(wk) {
+  return Object.entries(wk.sports || {}).map(([s, e]) => `${e.count} ${(e.count > 1 ? SPORTS[s].plural : SPORTS[s].label).toLowerCase()} ${s === 'swim' ? `${Math.round(e.dist * 1000)} m` : `${fmtNum(e.dist, 0)} km`}`).join(', ') || `${wk.count} sessions`;
+}
+
+// Totals per sport, e.g. for the season header
+function sportTotalsText(rides) {
+  const a = aggregateRides(rides);
+  return Object.entries(a.bySport).map(([s, e]) => `${e.count} ${SPORTS[s].plural.toLowerCase()} (${s === 'swim' ? `${Math.round(e.dist * 1000)} m` : `${fmtNum(e.dist, 0)} km`}, ${formatHours(e.sec)}, ${Math.round(e.trimp)} TRIMP)`).join('; ') || 'none';
 }
 
 async function ctxAthlete(dateStr, all, opts = {}) {
@@ -99,7 +166,7 @@ async function loadContextText() {
 // ---------- Plan & targets ----------
 function sessionText(s) {
   if (!s) return 'nothing planned';
-  return s.type === 'rest' ? 'Rest' : `${s.title} (${s.type}, ${s.duration_min} min${s.zone ? `, ${s.zone}` : ''})${s.details ? ` — ${s.details}` : ''}`;
+  return s.type === 'rest' ? 'Rest' : `${s.sport && SPORTS[s.sport] ? `${SPORTS[s.sport].label.toUpperCase()}: ` : ''}${s.title} (${s.type}, ${s.duration_min} min${s.zone ? `, ${s.zone}` : ''})${s.details ? ` — ${s.details}` : ''}`;
 }
 
 async function ctxPlanWeek(offsetWeeks, label) {
@@ -123,11 +190,13 @@ async function ctxTemplate() {
 async function ctxTargets(all, weekOffset = 0) {
   const ws = addDays(startOfWeek(new Date()), weekOffset * 7);
   const t = await getWeeklyGoals(formatLocalDate(ws));
-  const cur = aggregateRides(ridesBetween(all, ws, addDays(ws, 7)));
-  const tgt = [t.km ? `${t.km} km` : '', t.hours ? `${t.hours} h` : '', t.rides ? `${t.rides} rides` : ''].filter(Boolean).join(', ') || 'none set';
+  const week = ridesBetween(all, ws, addDays(ws, 7));
+  const cur = aggregateRides(week);
+  const rideKm = (cur.bySport.ride || { dist: 0 }).dist;
+  const tgt = [t.km ? `${t.km} km riding` : '', t.hours ? `${t.hours} h (all sports)` : '', t.rides ? `${t.rides} sessions` : ''].filter(Boolean).join(', ') || 'none set';
   const def = await getWeeklyGoals();
-  return `WEEKLY TARGETS (week of ${formatLocalDate(ws)}): ${tgt}${t.note ? ` — "${t.note}"` : ''}${t.scope === 'week' ? ' (override for this week)' : ''}. Default targets: ${[def.km ? `${def.km} km` : '', def.hours ? `${def.hours} h` : '', def.rides ? `${def.rides} rides` : ''].filter(Boolean).join(', ') || 'none'}.
-Progress so far that week: ${cur.count} rides, ${fmtNum(cur.dist, 1)} km, ${formatHours(cur.sec)}, ${Math.round(cur.asc)} m climbing, ${Math.round(cur.trimp)} TRIMP.`;
+  return `WEEKLY TARGETS (week of ${formatLocalDate(ws)}): ${tgt}${t.note ? ` — "${t.note}"` : ''}${t.scope === 'week' ? ' (override for this week)' : ''}. Default targets: ${[def.km ? `${def.km} km` : '', def.hours ? `${def.hours} h` : '', def.rides ? `${def.rides} sessions` : ''].filter(Boolean).join(', ') || 'none'}.
+Progress so far that week: ${cur.count} sessions (${sportTotalsText(week)}), ${fmtNum(rideKm, 1)} km ridden, ${formatHours(cur.sec)}, ${Math.round(cur.asc)} m climbing, ${Math.round(cur.trimp)} TRIMP.`;
 }
 
 async function ctxAdherence(days) {
@@ -138,15 +207,27 @@ async function ctxAdherence(days) {
 }
 
 // ---------- Rides ----------
-function rideLedgerLine(w, mass, note) {
-  const massTag = mass ? `${mass}kg` : 'mass n/a';
+const FLAGGED = 'flagged';
+const codeOf = w => (w.exercise_code ? w.exercise_code.split(' - ')[0] : `R${w.ride_number}`);
+
+function rideLedgerLine(w, mass, note, verdict) {
+  if (isExcluded(w)) return `• ${codeOf(w)} [${String(w.date).slice(0, 10)}]: excluded by the athlete (not a real session) — ignore`;
+  const sp = sportOf(w);
+  const massTag = mass ? `${mass}kg | ` : '';
   const pm = w.device_watts ? ' | power meter' : '';
-  const load = hasVal(w.trimp) ? ` | TRIMP ${Math.round(w.trimp)}` : '';
+  const load = hasVal(mv(w, 'trimp')) ? ` | TRIMP ${Math.round(w.trimp)}` : '';
   const feel = w.rpe || w.feel ? ` | ${w.rpe ? `RPE ${w.rpe}/10` : ''}${w.rpe && w.feel ? ', ' : ''}${w.feel ? `felt ${w.feel}` : ''}` : '';
   const notes = [w.note, note].filter(Boolean).join(' / ');
-  const noteStr = notes ? ` | Note: "${String(notes).slice(0, 80)}"` : '';
-  const pmTxt = w.power_source === 'meter' && w.np_w ? ` | NP ${w.np_w}W` : '';
-  return `• R${w.ride_number} [${formatFullDateWithDay(w.date)} | ${massTag} | ${getCleanIntentLabel(w)} | ${rideDuration(w)}${pm}${pmTxt}${load}${feel} | ${vamText(w)} | ${driftText(w)} | ${formatFullZoneSummary(w.zone_seconds)}]: ${fmtNum(w.distance_km, 1)}km, ${fmtNum(w.avg_speed_kmh, 1)}km/h, ${w.avg_hr || '--'}bpm, ${Math.round(num(w.elevation_gain_m))}m${noteStr}`;
+  const noteStr = notes ? ` | athlete: "${String(notes).replace(/\s+/g, ' ').slice(0, 160)}"` : '';
+  const pmTxt = w.power_source === 'meter' && w.np_w && !isFlagged(w, 'power') ? ` | NP ${w.np_w}W` : '';
+  const flags = flagNotes(w);
+  const dist = hasVal(mv(w, 'distance_km')) ? `${distText(w)}, ${speedText(w)}` : `distance/speed ${FLAGGED}`;
+  const asc = sp === 'swim' ? '' : hasVal(mv(w, 'elevation_gain_m')) ? `, ${Math.round(num(w.elevation_gain_m))}m` : `, climbing ${FLAGGED}`;
+  const hr = hasVal(mv(w, 'avg_hr')) ? `${w.avg_hr || '--'}bpm` : `HR ${FLAGGED}`;
+  const extra = sp === 'ride' ? ` | ${isFlagged(w, 'elevation') ? 'VAM n/a' : vamText(w)} | ${driftText(w)}` : '';
+  const when = `${parseSafeDate(w.date).toLocaleDateString('en-GB', { weekday: 'short' })} ${String(w.date).slice(0, 16)}`;
+  const intent = getCleanIntentLabel(w).replace('No intent specified', 'no intent').replace(/ \((Aerobic Base|Recovery|Tempo|Threshold|VO2max)\)/, '');
+  return `• ${codeOf(w)} [${when} | ${massTag}${intent} | ${rideDuration(w)}${pm}${pmTxt}${load}${feel}${extra} | ${zonesCompact(mv(w, 'zone_seconds'))}${flags.length ? ` | ${flags.join('; ')}` : ''}]: ${dist}, ${hr}${asc}${noteStr}${verdict ? ` | coach: "${verdict}"` : ''}`;
 }
 
 function monthSummaryLines(rides) {
@@ -158,25 +239,65 @@ function monthSummaryLines(rides) {
   return [...byMonth.entries()].map(([m, rs]) => {
     const a = aggregateRides(rs);
     const z = sumZones(rs);
-    return `• ${m}: ${a.count} rides, ${fmtNum(a.dist, 0)} km, ${formatHours(a.sec)}, ${Math.round(a.asc)} m, avg ${fmtNum(a.speed, 1)} km/h, HR ${a.hr ? Math.round(a.hr) : '--'}, TRIMP ${Math.round(a.trimp)}, zones ${PHYSIO.zones.map((zz, i) => `${zz.key}:${Math.round(z[i] / 60)}m`).join(' ')}`;
+    const r = rs.filter(w => sportOf(w) === 'ride');
+    const ra = aggregateRides(r);
+    return `• ${m}: ${sportTotalsText(rs)}; total ${formatHours(a.sec)}, ${Math.round(a.asc)} m climbing${ra.speed ? `, ride avg ${fmtNum(ra.speed, 1)} km/h` : ''}, HR ${a.hr ? Math.round(a.hr) : '--'}, zones ${PHYSIO.zones.map((zz, i) => `${zz.key}:${Math.round(z[i] / 60)}m`).join(' ')}`;
   });
 }
 
 // Detailed lines for the newest N rides, monthly summaries for older ones
-async function ctxLedger(rides, detailed, title) {
+// Whole history in three resolutions, so nothing is silently dropped:
+//   every workout of the last 6 weeks (at least `detailed`) → one line each, with the
+//   athlete's note and the coach's verdict from that session's thread;
+//   the 10 weeks before → one line per week; anything older → one line per month.
+// Body mass is printed only when it changes, which keeps lines short.
+async function ctxLedger(rides, detailed, title, opts = {}) {
   const weights = await getWeightHistory();
-  const recent = rides.slice(-detailed);
-  const older = rides.slice(0, Math.max(0, rides.length - detailed));
+  const cut = formatLocalDate(addDays(new Date(), -42));
+  let nDetail = Math.max(detailed, rides.filter(w => String(w.date) >= cut).length);
+  nDetail = Math.min(nDetail, detailed + 15);
+  const recent = rides.slice(-nDetail);
+  const older = rides.slice(0, Math.max(0, rides.length - nDetail));
+  const weekCut = older.length && opts.weekly !== false ? formatLocalDate(addDays(parseSafeDate(String(recent[0] ? recent[0].date : cut).slice(0, 10)), -70)) : '';
+  const byWeek = weekCut ? older.filter(w => String(w.date) >= weekCut) : [];
+  const byMonth = weekCut ? older.filter(w => String(w.date) < weekCut) : older;
   const lines = [];
+  let lastMass = null;
   for (const w of recent) {
     const n = await firstAthleteNote(w.strava_id);
-    lines.push(rideLedgerLine(w, await getAthleteWeightForDate(w.date, weights), n && n.message));
+    const mass = await getAthleteWeightForDate(w.date, weights);
+    const showMass = mass && (!lastMass || Math.abs(mass - lastMass) >= 1);
+    if (mass) lastMass = mass;
+    lines.push(rideLedgerLine(w, showMass ? mass : null, n && n.message, await coachVerdict(w.strava_id)));
   }
-  let out = `${title} (${rides.length} rides${older.length ? `; newest ${recent.length} in detail, older by month` : ''}):`;
-  if (older.length) out += `\nOLDER, BY MONTH:\n${monthSummaryLines(older).join('\n')}`;
-  out += `\nRIDES:\n${lines.join('\n') || 'none'}`;
+  let out = `${title} (${rides.length} workouts: ${recent.length} listed one by one${byWeek.length ? `, ${byWeek.length} as weekly totals` : ''}${byMonth.length ? `, ${byMonth.length} as monthly totals` : ''}):`;
+  if (byMonth.length) out += `\nBY MONTH:\n${monthSummaryLines(byMonth).join('\n')}`;
+  if (byWeek.length) out += `\nBY WEEK:\n${weeklyTotals(byWeek).map(e => `• wk ${e.week}: ${weekSportsText(e)}, ${formatHours(e.sec)}, ${Math.round(e.asc)} m, TRIMP ${Math.round(e.trimp)}`).join('\n')}`;
+  out += `\nSESSIONS (format: code [date | intent | time | load | rating | climbing | drift | zone minutes Z1/Z2/Z3/Z4/Z5 | flags]: distance, speed or pace, HR, ascent | athlete note | coach verdict):\n${lines.join('\n') || 'none'}`;
   return out;
 }
+
+// Tells the coach what is missing so it doesn't mistake gaps for facts
+async function dataCompletenessText(all) {
+  const recent = all.filter(w => String(w.date) >= formatLocalDate(addDays(new Date(), -42)));
+  const noHr = recent.filter(w => !(w.avg_hr > 0)).length;
+  const flagged = all.filter(w => flagNotes(w).length).length;
+  const wl = await getWellness();
+  const k14 = Object.keys(wl.days).filter(k => k >= formatLocalDate(addDays(new Date(), -14)));
+  const sleepN = k14.filter(k => wl.days[k].sleep_min > 0).length, rhrN = k14.filter(k => wl.days[k].rhr > 0).length;
+  return `DATA COMPLETENESS: last 6 weeks ${recent.length} sessions, ${noHr} without heart rate; ${flagged} sessions have values marked as errors; watch data last 14 days: sleep on ${sleepN} nights, resting HR on ${rhrN} days, HRV not shared.`;
+}
+
+// First sentence of the latest coach message in a session's thread (continuity across chats)
+async function coachVerdict(stravaId) {
+  const t = (await rideThreads(stravaId).toArray()).filter(x => x.role === 'coach').pop();
+  if (!t || !t.message) return '';
+  const plain = String(t.message).replace(/[#*_`>]/g, '').replace(/\s+/g, ' ').trim();
+  const m = plain.match(/^(.{20,170}?[.!?])(\s|$)/);
+  return (m ? m[1] : plain.slice(0, 150)).trim();
+}
+
+const zonesCompact = z => (Array.isArray(z) && z.some(v => v > 0) ? `Z ${z.map(v => Math.round(num(v) / 60)).join('/')}m` : 'no HR zones');
 
 function driftPromptText(w) {
   if (!hasVal(w.cardiac_drift_bpm)) return 'n/a (intervals/play or <30 min moving — do not diagnose aerobic drift)';
@@ -186,22 +307,28 @@ function driftPromptText(w) {
 }
 
 async function rideBlock(w, all) {
+  const sp = sportOf(w);
   let pm = `${w.avg_power_w || '--'} W (Strava estimate)`;
   if (w.device_watts) {
     const ftp = currentFtp(all);
     const st = rideStress(w, ftp);
     pm = `${w.avg_power_w} W avg / ${w.np_w || w.norm_power_w || '--'} W NP (power meter)${st ? `, IF ${st.IF.toFixed(2)}, TSS ${st.TSS} (FTP ${ftp.w} W)` : ''}`;
   }
+  if (isFlagged(w, 'power')) pm = FLAGGED;
   const best = [];
-  if (w.best_spd) best.push(`speed ${Object.entries(w.best_spd).map(([d, v]) => `${BEST_LABELS[d]} ${fmtNum(v, 1)}km/h`).join(', ')}`);
-  if (w.best_hr) best.push(`HR ${Object.entries(w.best_hr).map(([d, v]) => `${BEST_LABELS[d]} ${Math.round(v)}bpm`).join(', ')}`);
-  if (w.power_source === 'meter' && w.mmp) best.push(`power ${[5, 60, 300, 1200].filter(d => w.mmp[d]).map(d => `${BEST_LABELS[d]} ${Math.round(w.mmp[d])}W`).join(', ')}`);
-  return `- Session: ${w.exercise_code}${w.name ? ` "${w.name}"` : ''} — ${formatFullDateWithDay(w.date)}${w.trainer ? ' (indoor)' : ''}
-- Distance ${fmtNum(w.distance_km, 2)} km | Moving ${rideDuration(w)} | Elapsed ${w.elapsed_sec ? formatDuration(w.elapsed_sec) : 'n/a'}
-- Speed avg ${fmtNum(w.avg_speed_kmh, 1)} / max ${fmtNum(w.max_speed_kmh, 1)} km/h | HR avg ${w.avg_hr || '--'} / max ${w.max_hr || '--'} bpm${w.avg_cadence ? ` | Cadence ${w.avg_cadence} rpm` : ''}
-- Power: ${pm} | Work ${w.kilojoules || '--'} kJ
-- Ascent ${Math.round(num(w.elevation_gain_m))} m | VAM ${vamText(w, true)}
-- Load ${hasVal(w.trimp) ? `${Math.round(w.trimp)} TRIMP${w.trimp_source === 'avg' ? ' (from average HR)' : ''}` : 'n/a'}${w.rpe ? ` | Session-RPE load ${Math.round(w.rpe * num(w.moving_sec) / 60)}` : ''}
+  const bs = mv(w, 'best_spd'), bh = mv(w, 'best_hr');
+  if (bs) best.push(`${speedName(w).toLowerCase()} ${Object.entries(bs).map(([d, v]) => `${BEST_LABELS[d]} ${speedText(w, v)}`).join(', ')}`);
+  if (bh) best.push(`HR ${Object.entries(bh).map(([d, v]) => `${BEST_LABELS[d]} ${Math.round(v)}bpm`).join(', ')}`);
+  if (w.power_source === 'meter' && w.mmp && !isFlagged(w, 'power')) best.push(`power ${[5, 60, 300, 1200].filter(d => w.mmp[d]).map(d => `${BEST_LABELS[d]} ${Math.round(w.mmp[d])}W`).join(', ')}`);
+  const flags = flagNotes(w);
+  const distLine = hasVal(mv(w, 'distance_km'))
+    ? `- Distance ${distText(w)} | ${speedName(w)} avg ${speedText(w)}${sp === 'ride' ? ` / max ${fmtNum(w.max_speed_kmh, 1)} km/h` : ''}`
+    : `- Distance/speed: ${FLAGGED} (not real — ignore)`;
+  const hrLine = hasVal(mv(w, 'avg_hr')) ? `HR avg ${w.avg_hr || '--'} / max ${w.max_hr || '--'} bpm` : `HR ${FLAGGED}`;
+  return `- Session: ${sp.toUpperCase()} ${w.exercise_code}${w.name ? ` "${w.name}"` : ''} — ${formatFullDateWithDay(w.date)}${w.source === 'health' ? ' (recorded by Galaxy Watch, via Samsung Health)' : ''}
+${flags.length ? `- DATA QUALITY: ${flags.join('; ')}\n` : ''}${distLine} | Moving ${rideDuration(w)} | Elapsed ${w.elapsed_sec ? formatDuration(w.elapsed_sec) : 'n/a'}
+- ${hrLine}${w.avg_cadence ? ` | Cadence ${w.avg_cadence} ${sp === 'run' ? 'spm' : 'rpm'}` : ''}${w.calories ? ` | ${w.calories} kcal` : ''}
+${sp === 'ride' ? `- Power: ${pm} | Work ${isFlagged(w, 'power') ? FLAGGED : `${w.kilojoules || '--'} kJ`}\n` : ''}${sp !== 'swim' ? `- Ascent ${isFlagged(w, 'elevation') ? FLAGGED : `${Math.round(num(w.elevation_gain_m))} m | VAM ${vamText(w, true)}`}\n` : ''}- Load ${hasVal(mv(w, 'trimp')) ? `${Math.round(w.trimp)} TRIMP${w.trimp_source === 'avg' ? ' (from average HR)' : ''}` : 'n/a'}${w.rpe ? ` | Session-RPE load ${Math.round(w.rpe * num(w.moving_sec) / 60)}` : ''}
 - Intent set by athlete: ${getCleanIntentLabel(w)}
 - Zone minutes (moving): ${formatFullZoneSummary(w.zone_seconds)}
 - Halves: ${w.halves_profile || 'n/a'} | Drift: ${driftPromptText(w)}
@@ -231,16 +358,17 @@ async function buildCompactPriorContinuum(target, limit) {
   let gapText = 'First ride in the series.';
   if (prior.length) {
     const last = prior[prior.length - 1];
-    gapText = `${formatRecoveryGap(recoveryGapMs(last, target))} since the end of the previous ride (Ride ${last.ride_number}, ${formatFullDateWithDay(last.date)}).`;
+    gapText = `${formatRecoveryGap(recoveryGapMs(last, target))} since the end of the previous workout (${codeOf(last)}, ${formatFullDateWithDay(last.date)}).`;
   }
   const older = prior.length - recent.length;
   return { continuumText: (older > 0 ? `(${older} older rides not listed)\n` : '') + lines.join('\n'), targetRecoveryGapText: gapText };
 }
 
-function header(agent, roleLine, ctx) {
+async function header(agent, roleLine, ctx) {
+  const mem = await coachMemoryText();
   return `CURRENT DATE/TIME: ${ctx.today}
 ROLE: ${roleLine}
-${skillsFor(agent)}`;
+${skillsFor(agent)}${mem ? `\n${mem}` : ''}`;
 }
 
 // --------------------------------------------------------
@@ -248,7 +376,7 @@ ${skillsFor(agent)}`;
 // --------------------------------------------------------
 async function rideCoachContext(w) {
   const all = await db.workouts.orderBy('date').toArray();
-  const B = contextBudget();
+  const B = contextBudget('ride');
   const day = String(w.date).slice(0, 10);
   const series = computeLoadSeries(all);
   const cont = await buildCompactPriorContinuum(w, B.priorRides);
@@ -258,42 +386,45 @@ async function rideCoachContext(w) {
   const t = await getWeeklyGoals(formatLocalDate(ws));
   return { all, series, cont, timeline, day, text: `${await ctxAthlete(day, all)}
 ${await plannedForRide(w)}
-${loadLine(loadAt(series, formatLocalDate(addDays(parseSafeDate(day), -1))), `Load going into this ride (${day})`)}
+${loadLine(loadAt(series, formatLocalDate(addDays(parseSafeDate(day), -1))), `Load going into this session (${day})`)}
 ${await wellnessContextText(day)}
-That week: ${weekRides.length} rides, ${fmtNum(aggregateRides(weekRides).dist, 0)} km so far; targets ${[t.km ? `${t.km} km` : '', t.hours ? `${t.hours} h` : '', t.rides ? `${t.rides} rides` : ''].filter(Boolean).join(', ') || 'none'}.
+That week: ${sportTotalsText(weekRides)}; targets ${[t.km ? `${t.km} km riding` : '', t.hours ? `${t.hours} h` : '', t.rides ? `${t.rides} sessions` : ''].filter(Boolean).join(', ') || 'none'}.
 Recovery: ${cont.targetRecoveryGapText}
 ${dataNotes()}
 
-RIDE:
+THIS SESSION:
 ${await rideBlock(w, all)}
 
-1-MINUTE TIMELINE (moving):
+TIMELINE (moving time; each line = ${B.timelineStep} min; avg and peak values):
 ${timeline}
 
-PREVIOUS RIDES (with recovery gaps):
+PREVIOUS WORKOUTS (all sports, with recovery gaps):
 ${cont.continuumText || 'none'}` };
 }
+
+const coachRole = w => ({ ride: 'cycling', run: 'running', swim: 'swimming', other: 'strength & conditioning' })[sportOf(w)];
 
 async function buildRideDebriefPrompt(w) {
   const c = await rideCoachContext(w);
   const ctx = await athleteContext(c.day);
   const notes = (await rideThreads(w.strava_id).toArray()).filter(t => t.role === 'athlete').map(t => t.message).join(' | ');
-  return `${header('ride', `You are ${ATHLETE.name}'s cycling coach, debriefing one ride.`, ctx)}
+  return `${await header('ride', `You are ${ATHLETE.name}'s ${coachRole(w)} coach (the athlete rides, runs, swims and does gym work), debriefing one session.`, ctx)}
 
 ${c.text}
 
-ATHLETE MESSAGES ABOUT THIS RIDE: ${notes || 'none'}
+ATHLETE MESSAGES ABOUT THIS SESSION: ${notes || 'none'}
 
-TASK: Debrief this ride. Compare it with what was planned and with the athlete's intent, use the timeline for specifics, judge drift only if valid, factor in recovery, load and wellness on that date, and finish with 2–3 concrete recommendations for the next sessions.
-${formattingRules()}`;
+TASK: Debrief this session. Lead with a one-line verdict. Then: execution vs plan and intent (use timeline peaks for specifics), physiological response (judge drift only if valid), recovery/load/wellness context, and 2–3 concrete actions for the next sessions.
+${formattingRules('debrief')}`;
 }
 
-async function buildRideChatPrompt(w, athleteMessage, hasImage) {
+// excludeId: the athlete's message being answered (already saved, so not repeated in the history)
+async function buildRideChatPrompt(w, athleteMessage, hasImage, excludeId) {
   const c = await rideCoachContext(w);
   const ctx = await athleteContext(c.day);
-  const past = await rideThreads(w.strava_id).toArray();
+  const past = (await rideThreads(w.strava_id).toArray()).filter(t => t.id !== excludeId && !t.pending);
   const turns = past.slice(-10).map(t => `${t.role === 'coach' ? 'COACH' : 'ATHLETE'}: ${t.message}`);
-  return `${header('ride', `You are ${ATHLETE.name}'s cycling coach, discussing one ride.`, ctx)}
+  return `${await header('ride', `You are ${ATHLETE.name}'s ${coachRole(w)} coach (the athlete rides, runs, swims and does gym work), discussing one session.`, ctx)}
 
 ${c.text}
 
@@ -302,7 +433,7 @@ ${turns.join('\n') || 'none'}
 
 ATHLETE: ${athleteMessage || '(no text)'}${hasImage ? '\n(The athlete attached a screenshot — read it directly.)' : ''}
 
-Answer the athlete directly, using the data above. ${formattingRules()}`;
+Answer the athlete directly, using the data above. If the athlete corrects a fact (e.g. the session type or equipment), accept it, use it from now on and save it with <remember>. ${formattingRules()}`;
 }
 
 // --------------------------------------------------------
@@ -324,26 +455,26 @@ Mass that day: ${(await getAthleteWeightForDate(s.date)) || 'n/a'} kg
 ${await rideBlock(s, all)}
 Athlete messages: ${notes || 'none'}`);
   }
-  return `${header('compare', `You are ${ATHLETE.name}'s cycling physiologist comparing rides.`, ctx)}
+  return `${await header('compare', `You are ${ATHLETE.name}'s endurance physiologist comparing sessions of the same sport.`, ctx)}
 
 ${await ctxAthlete(formatLocalDate(new Date()), all)}
 ${dataNotes()}
 
 ${blocks.join('\n\n')}
 
-TASK: Compare these rides like-for-like: execution vs plan and intent, physiological response (HR, drift, zones), climbing, load and the athlete's own ratings, accounting for mass, terrain, recovery and wellness on each date. Finish with a one-line verdict and what to do next.
-${formattingRules()}`;
+TASK: Start with a one-line verdict (which session shows better fitness and why). Then compare like-for-like: pace/speed at what heart rate (efficiency), zones, drift, climbing, load and the athlete's own ratings, accounting for terrain, recovery and wellness on each date. Ignore flagged values. End with what to do next.
+${formattingRules('debrief')}`;
 }
 
 // --------------------------------------------------------
 // TRENDS AUDIT
 // --------------------------------------------------------
 async function buildGraphPrompt(workouts, metrics) {
-  const B = contextBudget();
+  const B = contextBudget('trends');
   const series = computeLoadSeries(workouts);
   const ctx = await athleteContext(formatLocalDate(new Date()), await getLatestWeight());
-  const weeks = weeklyTotals(workouts).slice(-B.weeks).map(w => `${w.week}: ${w.count} rides, ${fmtNum(w.dist, 0)} km, ${formatHours(w.sec)}, ${Math.round(w.asc)} m, TRIMP ${Math.round(w.trimp)}`);
-  return `${header('trends', `You are ${ATHLETE.name}'s sports scientist auditing season progression.`, ctx)}
+  const weeks = weeklyTotals(workouts).slice(-B.weeks).map(w => `${w.week}: ${weekSportsText(w)}, ${formatHours(w.sec)}, ${Math.round(w.asc)} m, TRIMP ${Math.round(w.trimp)}`);
+  return `${await header('trends', `You are ${ATHLETE.name}'s sports scientist auditing season progression.`, ctx)}
 
 ${await ctxAthlete(formatLocalDate(new Date()), workouts, { phaseHistory: true })}
 ${loadLine(loadAt(series, formatLocalDate(new Date())), 'Load today')}
@@ -356,13 +487,15 @@ ${dataNotes()}
 ${await ctxLedger(workouts, B.detailedRides, 'SEASON')}
 
 TASK: Analyse progression in ${metrics.join(', ')}. Separate fitness gains from mass, terrain and intensity-mix effects; comment on the load trend, intensity distribution and consistency; name the 2–3 most useful changes.
-${formattingRules()}`;
+${formattingRules('long')}`;
 }
 
-function buildGraphReplyPrompt(metrics, dialogue) {
+async function buildGraphReplyPrompt(metrics, dialogue) {
+  const mem = await coachMemoryText();
   return `CURRENT DATE: ${formatFullDateWithDay(formatLocalDate(new Date()))}
 ROLE: ${ATHLETE.name}'s sports scientist discussing season progression (${metrics.join(', ')}).
 ${skillsFor('trends')}
+${mem}
 
 CONVERSATION:
 ${dialogue}
@@ -370,21 +503,29 @@ ${dialogue}
 ${formattingRules()}`;
 }
 
+// Best efforts per sport (flagged values never count)
 function bestEffortsText(workouts) {
-  const groups = [['best_spd', 'Speed', v => `${fmtNum(v, 1)} km/h`], ['best_hr', 'HR', v => `${Math.round(v)} bpm`], ['mmp', 'Power (meter)', v => `${Math.round(v)} W`]];
   const lines = [];
-  for (const [f, name, fmt] of groups) {
-    const durs = f === 'mmp' ? [5, 60, 300, 1200, 3600] : [60, 300, 1200, 3600];
-    const cells = durs.map(d => {
-      let best = null;
-      for (const w of workouts) {
-        if (f === 'mmp' && w.power_source !== 'meter') continue;
-        const v = w[f] && w[f][d];
-        if (v && (!best || v > best.v)) best = { v, date: String(w.date).slice(0, 10) };
-      }
-      return best ? `${BEST_LABELS[d]} ${fmt(best.v)} (${best.date})` : null;
-    }).filter(Boolean);
-    if (cells.length) lines.push(`${name}: ${cells.join(', ')}`);
+  for (const sp of sportsPresent(workouts)) {
+    const pool = workouts.filter(w => sportOf(w) === sp);
+    const probe = { sport: sp };
+    const groups = [['best_hr', `${SPORTS[sp].label} HR`, v => `${Math.round(v)} bpm`]];
+    if (sp !== 'other') groups.unshift(['best_spd', SPORTS[sp].label + (sp === 'ride' ? ' speed' : ' pace'), v => speedText(probe, v)]);
+    if (sp === 'ride') groups.push(['mmp', 'Power (meter)', v => `${Math.round(v)} W`]);
+    for (const [f, name, fmt] of groups) {
+      const durs = f === 'mmp' ? [5, 60, 300, 1200, 3600] : [60, 300, 1200, 3600];
+      const cells = durs.map(d => {
+        let best = null;
+        for (const w of pool) {
+          if (f === 'mmp' && (w.power_source !== 'meter' || isFlagged(w, 'power'))) continue;
+          const src = f === 'mmp' ? w.mmp : mv(w, f);
+          const v = src && src[d];
+          if (v && (!best || v > best.v)) best = { v, date: String(w.date).slice(0, 10) };
+        }
+        return best ? `${BEST_LABELS[d]} ${fmt(best.v)} (${best.date})` : null;
+      }).filter(Boolean);
+      if (cells.length) lines.push(`${name}: ${cells.join(', ')}`);
+    }
   }
   return lines.length ? `ALL-TIME BEST EFFORTS:\n${lines.join('\n')}` : '';
 }
@@ -392,28 +533,32 @@ function bestEffortsText(workouts) {
 // --------------------------------------------------------
 // REPORTS
 // --------------------------------------------------------
-async function buildReportPrompt(current, prior, startDate, endDate, timeframe) {
+async function buildReportPrompt(current, prior, startDate, endDate, timeframe, scopeLabel = 'All activities') {
   const all = await db.workouts.orderBy('date').toArray();
-  const B = contextBudget();
+  const B = contextBudget('report');
   const series = computeLoadSeries(all);
   const ctx = await athleteContext(formatLocalDate(new Date()), await getLatestWeight());
   const cur = aggregateRides(current);
-  let pop = 'PREVIOUS PERIOD: no rides in the preceding window of equal length.';
+  let pop = 'PREVIOUS PERIOD: no workouts in the preceding window of equal length.';
   if (prior.length) {
     const pri = aggregateRides(prior);
+    const perSport = sportsPresent(current.concat(prior)).map(sp => {
+      const a = aggregateRides(current.filter(w => sportOf(w) === sp)), b = aggregateRides(prior.filter(w => sportOf(w) === sp));
+      const probe = { sport: sp };
+      return `- ${SPORTS[sp].plural}: ${a.count} vs ${b.count} | ${sp === 'swim' ? `${Math.round(a.dist * 1000)} vs ${Math.round(b.dist * 1000)} m` : `${fmtNum(a.dist, 1)} vs ${fmtNum(b.dist, 1)} km`} | ${formatHours(a.sec)} vs ${formatHours(b.sec)} | ${speedName(probe).toLowerCase()} ${a.speed ? speedText(probe, a.speed) : '--'} vs ${b.speed ? speedText(probe, b.speed) : '--'} | HR ${a.hr ? Math.round(a.hr) : '--'} vs ${b.hr ? Math.round(b.hr) : '--'} bpm`;
+    });
     pop = `PERIOD vs PREVIOUS PERIOD (duration-weighted):
-- Rides ${cur.count} vs ${pri.count} | Distance ${fmtNum(cur.dist, 1)} vs ${fmtNum(pri.dist, 1)} km | Time ${formatHours(cur.sec)} vs ${formatHours(pri.sec)}
-- TRIMP ${Math.round(cur.trimp)} vs ${Math.round(pri.trimp)} | Work ${Math.round(cur.work)} vs ${Math.round(pri.work)} kJ
-- Speed ${fmtNum(cur.speed, 1)} vs ${fmtNum(pri.speed, 1)} km/h | HR ${cur.hr ? Math.round(cur.hr) : '--'} vs ${pri.hr ? Math.round(pri.hr) : '--'} bpm`;
+- All sports: ${cur.count} vs ${pri.count} sessions | Time ${formatHours(cur.sec)} vs ${formatHours(pri.sec)} | TRIMP ${Math.round(cur.trimp)} vs ${Math.round(pri.trimp)} | Climbing ${Math.round(cur.asc)} vs ${Math.round(pri.asc)} m
+${perSport.join('\n')}`;
   }
   const z = sumZones(current);
   const zt = z.reduce((a, b) => a + b, 0) || 1;
   const low = (z[0] + z[1]) / zt, mid = z[2] / zt, high = (z[3] + z[4]) / zt;
   const days = Math.max(1, Math.round((parseSafeDate(endDate) - parseSafeDate(startDate)) / 86400000) + 1);
-  return `${header('report', `You are ${ATHLETE.name}'s sports scientist writing a period review.`, ctx)}
+  return `${await header('report', `You are ${ATHLETE.name}'s sports scientist writing a period review.`, ctx)}
 
 ${await ctxAthlete(endDate, all, { phaseHistory: true })}
-PERIOD: ${formatFullDateWithDay(startDate)} to ${formatFullDateWithDay(endDate)} (${timeframe.toUpperCase()})
+PERIOD: ${formatFullDateWithDay(startDate)} to ${formatFullDateWithDay(endDate)} (${timeframe.toUpperCase()}) · SCOPE: ${scopeLabel}${scopeLabel === 'All activities' ? '' : ' only (load figures still include every sport)'}
 ${loadLine(loadAt(series, endDate), 'Load at period end')}
 ${loadTrendText(series, Math.min(B.weeks, Math.ceil(days / 7) + 1))}
 ${await ctxTargets(all)}
@@ -423,14 +568,14 @@ ${pop}
 ${await wellnessContextText(endDate, 'long')}
 ${dataNotes()}
 
-${await ctxLedger(current, B.detailedRides, 'RIDES IN THIS PERIOD')}
+${await ctxLedger(current, B.detailedRides, 'WORKOUTS IN THIS PERIOD')}
 
-TASK: Write the review in four numbered sections:
-1. Aerobic base & intensity distribution
+TASK: Start with a 2-sentence summary. Then four numbered sections:
+1. Aerobic base & intensity distribution (all sports together, then any sport-specific note)
 2. Drift, decoupling and recovery (including wellness data if present)
-3. Climbing & terrain
-4. Progress vs previous period, plan adherence and next steps
-${formattingRules()} Use plain ASCII characters.`;
+3. ${current.some(w => sportOf(w) !== 'ride') ? 'Each sport on its own: rides (climbing & terrain), runs, swims — only the sports present' : 'Climbing & terrain'}
+4. Progress vs previous period, plan adherence and the 3 next steps
+${formattingRules('long')} Use plain ASCII characters.`;
 }
 
 // --------------------------------------------------------
@@ -443,7 +588,7 @@ async function buildPlannerPrompt() {
   const recent = all.filter(w => parseSafeDate(w.date) >= addDays(new Date(), -21));
   const days = Array.from({ length: 7 }, (_, i) => formatLocalDate(addDays(new Date(), i)));
   const pc = await planContext();
-  return `${header('planner', `You are ${ATHLETE.name}'s coach adapting the next 7 days of the athlete's own plan.`, ctx)}
+  return `${await header('planner', `You are ${ATHLETE.name}'s coach adapting the next 7 days of the athlete's own plan.`, ctx)}
 
 ${await ctxAthlete(formatLocalDate(new Date()), all)}
 ${loadLine(loadAt(series, formatLocalDate(new Date())), 'Load today')}
@@ -464,13 +609,13 @@ Return ONLY JSON:
 // --------------------------------------------------------
 // AETHER — the season coach (fullest context; can change the plan and targets)
 // --------------------------------------------------------
-async function buildMasterPrompt(payloadText, hasImage) {
+async function buildMasterPrompt(payloadText, hasImage, excludeId) {
   const all = await db.workouts.orderBy('date').toArray();
-  const B = contextBudget();
+  const B = contextBudget('aether');
   const series = computeLoadSeries(all);
   const today = formatLocalDate(new Date());
   const ctx = await athleteContext(today, await getLatestWeight());
-  const past = await db.master_chat.toArray();
+  const past = (await db.master_chat.toArray()).filter(m => m.id !== excludeId && !m.pending);
   let elapsed = 'First conversation.';
   let since = [];
   if (past.length) {
@@ -481,10 +626,10 @@ async function buildMasterPrompt(payloadText, hasImage) {
   }
   const agg = aggregateRides(all);
   const z = sumZones(all);
-  const weeks = weeklyTotals(all).slice(-B.weeks).map(w => `${w.week}: ${w.count} rides, ${fmtNum(w.dist, 0)} km, ${formatHours(w.sec)}, ${Math.round(w.asc)} m, TRIMP ${Math.round(w.trimp)}`);
+  const weeks = weeklyTotals(all).slice(-B.weeks).map(w => `${w.week}: ${weekSportsText(w)}, ${formatHours(w.sec)}, ${Math.round(w.asc)} m, TRIMP ${Math.round(w.trimp)}`);
   const pending = past.filter(m => m.proposal && !m.proposal_status).length;
 
-  return `${header('aether', `You are Aether, ${ATHLETE.name}'s head coach and exercise physiologist. You remember the whole season, you manage the athlete's training plan and weekly targets, and you speak as Aether.`, ctx)}
+  return `${await header('aether', `You are Aether, ${ATHLETE.name}'s head coach and exercise physiologist for cycling, running and swimming. You remember the whole season, you manage the athlete's training plan and weekly targets, and you speak as Aether. Judge the sports together (total load, recovery, fatigue) and each on its own (sport-specific fitness).`, ctx)}
 
 ${await ctxAthlete(today, all, { phaseHistory: true })}
 ${loadLine(loadAt(series, today), 'Load today')}
@@ -498,21 +643,22 @@ ${await ctxTargets(all, 0)}
 ${await ctxAdherence(14)}
 ${pending ? `NOTE: ${pending} earlier plan change(s) you proposed are still waiting for the athlete to apply or dismiss.` : ''}
 
-SEASON: ${all.length} rides, ${fmtNum(agg.dist, 0)} km, ${formatHours(agg.sec)}, ${Math.round(agg.asc)} m, ${Math.round(agg.trimp)} TRIMP; zone minutes ${PHYSIO.zones.map((zz, i) => `${zz.key}:${Math.round(z[i] / 60)}`).join(' ')}
+SEASON: ${sportTotalsText(all)}; total ${formatHours(agg.sec)}, ${Math.round(agg.asc)} m climbing, ${Math.round(agg.trimp)} TRIMP; zone minutes ${PHYSIO.zones.map((zz, i) => `${zz.key}:${Math.round(z[i] / 60)}`).join(' ')}
 WEEKLY TOTALS:
 ${weeks.join('\n') || 'none'}
 ${bestEffortsText(all)}
-${elapsed} Rides since then: ${since.length ? since.map(r => `R${r.ride_number} ${fmtNum(r.distance_km, 1)} km (${formatFullDateWithDay(r.date)})`).join(', ') : 'none'}.
+${await dataCompletenessText(all)}
+${elapsed} Workouts since then: ${since.length ? since.map(r => `${codeOf(r)} ${distText(r)} (${formatFullDateWithDay(r.date)})`).join(', ') : 'none'}.
 ${dataNotes()}
 
-${await ctxLedger(all, B.detailedRides, 'SEASON LEDGER')}
+${await ctxLedger(all, B.detailedRides, 'SEASON LEDGER', { weekly: false })}
 
 CONVERSATION SO FAR:
 ${past.slice(-12).map(t => `${t.role === 'coach' ? 'AETHER' : 'ATHLETE'}: ${t.message}`).join('\n') || 'none'}
 
 ATHLETE: ${payloadText || '(no text)'}${hasImage ? '\n(The athlete attached a screenshot — read it directly.)' : ''}
 
-Answer as Aether. If the athlete asks to change the plan or targets (or pastes their plan), follow the plan-actions skill and include the <plan-update> block. ${formattingRules()}`;
+Answer as Aether. If the athlete asks to change the plan or targets (or pastes their plan), follow the plan-actions skill and include the <plan-update> block. ${formattingRules(/plan|week|review|report|analy|explain|detail/i.test(payloadText || '') ? 'debrief' : 'chat')}`;
 }
 
 // --------------------------------------------------------

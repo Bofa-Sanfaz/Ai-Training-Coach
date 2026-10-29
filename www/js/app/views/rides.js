@@ -34,7 +34,7 @@ function zoneStripHtml(z) {
 }
 
 function rideCode(w) {
-  return w.exercise_code ? w.exercise_code.split(' - ')[0] : `Ride ${String(w.ride_number || '').padStart(3, '0')}`;
+  return w.exercise_code ? w.exercise_code.split(' - ')[0] : `${sportMeta(w).code} ${String(w.ride_number || '').padStart(3, '0')}`;
 }
 
 // Strava activity name when known (filled on the next sync for rides imported by v2), else "Ride 012"
@@ -59,7 +59,9 @@ function weekStatHtml(value, label, prevText, goalPct, goalText) {
 async function renderWeekCard(all) {
   const host = $('#weekCard');
   if (!all.length) { host.innerHTML = ''; return; }
-  const { cur, prev, streak } = weekSummary(all);
+  const { cur, prev, streak } = weekSummary(all.filter(w => !isExcluded(w)));
+  const multi = sportsPresent(all).length > 1;
+  const rideKm = s => (s.bySport.ride || { dist: 0 }).dist;
   const goals = await getWeeklyGoals(formatLocalDate(startOfWeek(new Date())));
   const todayItem = await todayPlanItem();
   const readiness = await readinessChipHtml();
@@ -76,11 +78,12 @@ async function renderWeekCard(all) {
         ${fs ? `<span class="form-chip" title="${escapeHtml(fs.label)}">${icon('activity', 'ic-sm')}Form ${signed(snap.tsb, 0)}</span>` : ''}
       </div>
       <div class="week-grid">
-        ${weekStatHtml(cur.count, 'rides', prev.count ? String(prev.count) : '', goals.rides ? (cur.count / goals.rides) * 100 : null, goals.rides ? String(goals.rides) : '')}
-        ${weekStatHtml(fmtNum(cur.dist, cur.dist >= 100 ? 0 : 1), 'km', prev.dist ? fmtNum(prev.dist, 0) : '', goals.km ? (cur.dist / goals.km) * 100 : null, goals.km ? String(goals.km) : '')}
+        ${weekStatHtml(`<span data-count="${cur.count}">${cur.count}</span>`, multi ? 'sessions' : 'rides', prev.count ? String(prev.count) : '', goals.rides ? (cur.count / goals.rides) * 100 : null, goals.rides ? String(goals.rides) : '')}
+        ${weekStatHtml(`<span data-count="${round(rideKm(cur), 1)}">${fmtNum(rideKm(cur), rideKm(cur) >= 100 ? 0 : 1)}</span>`, multi ? 'ride km' : 'km', prev.dist ? fmtNum(rideKm(prev), 0) : '', goals.km ? (rideKm(cur) / goals.km) * 100 : null, goals.km ? String(goals.km) : '')}
         ${weekStatHtml(formatHours(cur.sec), 'time', prev.sec ? formatHours(prev.sec) : '', goals.hours ? (cur.sec / 3600 / goals.hours) * 100 : null, goals.hours ? `${goals.hours}h` : '')}
         ${weekStatHtml(Math.round(cur.asc), 'climb m', prev.asc ? String(Math.round(prev.asc)) : '', null, '')}
       </div>
+      ${multi && cur.count ? `<div class="week-sports">${Object.entries(cur.bySport).map(([s, e]) => `<span style="--sc:${SPORTS[s].color}">${icon(SPORTS[s].icon, 'ic-xs')}${e.count} · ${formatHours(e.sec)}</span>`).join('')}</div>` : ''}
       ${fs ? `<div class="week-foot">${escapeHtml(fs.label)} · fitness ${Math.round(snap.ctl)} · fatigue ${Math.round(snap.atl)}</div>` : ''}
     </div>
     ${readiness}
@@ -91,6 +94,7 @@ async function renderWeekCard(all) {
 }
 
 function rideMatches(w, coachIds) {
+  if (sportFilter !== 'all' && sportOf(w) !== sportFilter) return false;
   if (rideFilter === 'TRAINING' && !(w.intent_type === 'TRAINING' && parseIntent(w))) return false;
   if (rideFilter === 'PLAY' && w.intent_type !== 'PLAY') return false;
   if (rideFilter === 'NONE' && (w.intent_type === 'PLAY' || parseIntent(w))) return false;
@@ -105,9 +109,11 @@ async function renderRides() {
   const all = await db.workouts.orderBy('date').reverse().toArray();
   const lastSync = await getConfig('last_sync_at');
   $('#ridesSub').textContent = all.length
-    ? `${all.length} ride${all.length > 1 ? 's' : ''}${lastSync ? ` · synced ${relativeTime(lastSync)}` : ''}`
+    ? `${all.length} workout${all.length > 1 ? 's' : ''}${lastSync ? ` · synced ${relativeTime(lastSync)}` : ''}`
     : 'Connect Strava to get started';
+  $('#inboxCard').innerHTML = inboxCardHtml(await getInbox());
   await renderWeekCard(all);
+  $('#sportSegRides').innerHTML = sportSegHtml(all, 'setSportFilter');
 
   if (!all.length) {
     list.innerHTML = `<div class="empty mt-16">${icon('bike')}<div><b>No rides stored yet</b></div>
@@ -136,7 +142,7 @@ async function renderRides() {
   const flush = () => {
     if (!monthRides.length) return;
     const agg = aggregateRides(monthRides);
-    html += `<div class="month-head"><span>${escapeHtml(month)}</span><span>${monthRides.length} rides · ${fmtNum(agg.dist, 0)} km</span></div><div>${monthRides.map(w => rideCardHtml(w, coachIds)).join('')}</div>`;
+    html += `<div class="month-head"><span>${escapeHtml(month)}</span><span>${monthRides.length} · ${formatHours(agg.sec)}${agg.bySport.ride ? ` · ${fmtNum(agg.bySport.ride.dist, 0)} km ridden` : ''}</span></div><div>${monthRides.map(w => rideCardHtml(w, coachIds)).join('')}</div>`;
   };
   for (const w of shown.slice(0, 400)) {
     const m = monthLabel(w.date);
@@ -149,24 +155,29 @@ async function renderRides() {
 
 function rideCardHtml(w, coachIds) {
   const reviewed = coachIds.has(Number(w.strava_id));
+  const sp = sportOf(w), meta = SPORTS[sp];
+  const d = distParts(w), s = speedParts(w);
+  const flagged = k => isFlagged(w, k);
+  const stat = (v, l, bad) => `<div class="ride-stat${bad ? ' flagged' : ''}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  const stats = [
+    sp === 'other' && !(w.distance_km > 0) ? stat(w.calories ? `<span>${w.calories}</span><small>kcal</small>` : '--', 'Energy') : stat(`${d.v}<small>${d.unit}</small>`, 'Distance', flagged('distance')),
+    stat(escapeHtml(rideDuration(w)), 'Moving'),
+    sp === 'other' ? stat(w.max_hr > 0 ? `${w.max_hr}<small>bpm</small>` : '--', 'Peak HR', flagged('hr')) : stat(`${s.v}<small>${s.unit}</small>`, speedName(w), flagged('distance')),
+    stat(w.avg_hr > 0 ? `${w.avg_hr}<small>bpm</small>` : '--', 'Avg HR', flagged('hr')),
+    sp === 'ride' || sp === 'run' ? stat(`${Math.round(num(w.elevation_gain_m))}<small>m</small>`, 'Ascent', flagged('elevation')) : stat(w.max_hr > 0 && sp !== 'other' ? `${w.max_hr}<small>bpm</small>` : (w.calories ? `${w.calories}<small>kcal</small>` : '--'), sp !== 'other' ? 'Peak HR' : 'Energy'),
+    stat(hasVal(w.trimp) ? Math.round(w.trimp) : '--', 'Load', flagged('hr'))
+  ];
   const status = !reviewed ? '<span class="badge badge-new">Review</span>' : (w.debrief_stale ? '<span class="badge badge-stale">Update</span>' : '');
   return `
-    <div class="ride-card" style="--accent:${intentAccent(w)}" onclick="openRide(${w.id})">
+    <div class="ride-card${isExcluded(w) ? ' excluded' : ''}" data-id="${w.id}" style="--accent:${intentAccent(w)};--sc:${meta.color}" onclick="openRide(${w.id})">
       <div class="ride-top">
         <div class="grow">
-          <div class="ride-name">${escapeHtml(rideTitle(w))}</div>
-          <div class="ride-date">${escapeHtml(rideSubtitle(w))}${w.demo ? ' · demo' : ''}</div>
+          <div class="ride-name"><span class="sport-ic">${icon(meta.icon, 'ic-sm')}</span>${escapeHtml(rideTitle(w))}</div>
+          <div class="ride-date">${escapeHtml(rideSubtitle(w))}${isIndoor(w) ? ' · indoor' : ''}${w.source === 'health' ? ' · watch' : ''}${w.demo ? ' · demo' : ''}</div>
         </div>
         <div class="ride-badges">${intentBadge(w)}${status}</div>
       </div>
-      <div class="ride-stats">
-        <div class="ride-stat"><div class="v">${fmtNum(w.distance_km, 1)}<small>km</small></div><div class="l">Distance</div></div>
-        <div class="ride-stat"><div class="v">${escapeHtml(rideDuration(w))}</div><div class="l">Moving</div></div>
-        <div class="ride-stat"><div class="v">${fmtNum(w.avg_speed_kmh, 1)}<small>km/h</small></div><div class="l">Speed</div></div>
-        <div class="ride-stat"><div class="v">${w.avg_hr > 0 ? `${w.avg_hr}<small>bpm</small>` : '--'}</div><div class="l">Avg HR</div></div>
-        <div class="ride-stat"><div class="v">${Math.round(num(w.elevation_gain_m))}<small>m</small></div><div class="l">Ascent</div></div>
-        <div class="ride-stat"><div class="v">${hasVal(w.trimp) ? Math.round(w.trimp) : '--'}</div><div class="l">Load</div></div>
-      </div>
+      <div class="ride-stats">${stats.join('')}</div>
       ${zoneStripHtml(w.zone_seconds)}
     </div>`;
 }
@@ -221,7 +232,7 @@ function selectRideFormat(fmt) {
 function fillIntentSheet(w, title) {
   populateZoneSelect();
   $('#intentModalTitle').textContent = title;
-  $('#intentModalSub').textContent = `${rideTitle(w)} · ${fmtNum(w.distance_km, 1)} km · ${rideDuration(w)} · ${fmtNum(w.avg_speed_kmh, 1)} km/h${w.avg_hr ? ` · ${w.avg_hr} bpm` : ''}`;
+  $('#intentModalSub').textContent = `${rideTitle(w)} · ${distText(w)} · ${rideDuration(w)} · ${speedText(w)}${w.avg_hr ? ` · ${w.avg_hr} bpm` : ''}`;
   $('#intentQueueCount').textContent = intentModalQueue.length ? `+${intentModalQueue.length} more` : '';
   const it = parseIntent(w);
   if (w.intent_type === 'PLAY') {
@@ -243,7 +254,7 @@ function openNextIntentModal() {
     return;
   }
   activeIntentItem = intentModalQueue.shift();
-  fillIntentSheet(activeIntentItem, `What was this ride for?`);
+  fillIntentSheet(activeIntentItem, `What was this ${sportMeta(activeIntentItem).label.toLowerCase()} for?`);
   if (!$('#intentSheet').classList.contains('open')) openSheet('intentSheet', () => { intentModalQueue = []; activeIntentItem = null; });
 }
 
