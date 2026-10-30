@@ -14,8 +14,9 @@ import '../../www/js/app/squad-core.js';
 import { accountRoute } from './account.js';
 import { runAI, aiDue, extractWorkout, publicAiConfig, localToday, rid, parse, nowIso, AI_NAME, CH_COLS } from './ai.js';
 
-const MAX_MEMBERS = 6;
-const MAX_CHALLENGES = 40;
+// A private two-person app for now; local tests raise the challenge cap with --var SQUAD_MAX_CHALLENGES
+const MAX_MEMBERS = 2;
+const maxChallenges = env => int(env.SQUAD_MAX_CHALLENGES, 1, 1000, 3);
 const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2'];
 const SPORTS = ['ride', 'run', 'walk', 'swim', 'other'];
 const KIND_LIMIT = { msg: 6000, activity: 12000, comment: 3000, reaction: 300, delete: 300, daily: 600 };
@@ -184,7 +185,7 @@ async function createChallenge(env, req) {
   const name = str(b.name, 60) || 'Our challenge';
   // A private server: strangers can't fill the free database (or the cron's time) with challenges
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM challenges').first();
-  if (count.n >= MAX_CHALLENGES) fail(403, 'this server is not taking new challenges');
+  if (count.n >= maxChallenges(env)) fail(403, 'this server is not taking new challenges');
   const memberId = rid(12), cid = rid(14), t = token(), now = nowIso();
   for (let attempt = 0; attempt < 4; attempt++) {
     const invite = inviteCode();

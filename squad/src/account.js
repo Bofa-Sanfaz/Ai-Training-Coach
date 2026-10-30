@@ -9,7 +9,8 @@
 const USER_RE = /^[a-z0-9][a-z0-9_.-]{2,23}$/;
 const PART_MAX = 1400000;   // base64 characters (≈ 1 MB of data)
 const MAX_PARTS = 40;
-const MAX_ACCOUNTS = 30;     // a private app: keeps the free storage from being filled by strangers
+// A private two-person app: keeps the free storage from being filled by strangers (local tests: --var SQUAD_MAX_ACCOUNTS)
+const maxAccounts = env => { const n = Math.round(+env.SQUAD_MAX_ACCOUNTS); return n >= 1 && n <= 1000 ? n : 2; };
 const LOCK_AFTER = 8, LOCK_MS = 15 * 60000;
 
 async function sha256(s) {
@@ -45,7 +46,7 @@ export async function accountRoute(env, req, url, { json, fail, readJson }) {
     const exists = await env.DB.prepare('SELECT 1 FROM accounts WHERE username=?').bind(username).first();
     if (exists) fail(409, 'this username is taken');
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts').first();
-    if (count.n >= MAX_ACCOUNTS) fail(403, 'this server is not taking new accounts');
+    if (count.n >= maxAccounts(env)) fail(403, 'this server is not taking new accounts');
     await env.DB.prepare('INSERT INTO accounts (username, auth_hash, created_at) VALUES (?,?,?)').bind(username, await sha256(b.auth), now()).run();
     return json({ username, token: await issue(env, username, b.device), vault_version: 0 }, 201);
   }

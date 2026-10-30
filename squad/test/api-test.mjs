@@ -1,6 +1,6 @@
 // End-to-end test of the Squad server against `wrangler dev` (local D1) with a mock AI.
 // Run:  npx wrangler d1 migrations apply squad --local
-//       npx wrangler dev --port 8787 --var ALLOW_HTTP_AI:1 --var SQUAD_QUIET_MS:1500 --test-scheduled
+//       npx wrangler dev --port 8787 --var ALLOW_HTTP_AI:1 --var SQUAD_QUIET_MS:1500 --var SQUAD_MAX_ACCOUNTS:1000 --var SQUAD_MAX_CHALLENGES:1000 --test-scheduled
 //       node test/api-test.mjs
 import http from 'node:http';
 import '../../www/js/app/squad-core.js';
@@ -376,8 +376,10 @@ try {
   r = await call('POST', '/api/challenges', { name: 'Big', member: { name: 'P1' } });
   const inv2 = r.d.challenge.invite;
   let last;
-  for (let i = 2; i <= 7; i++) last = await call('POST', '/api/join', { invite: inv2, member: { name: `P${i}` } });
-  ok(last.status === 409, 'max 6 members', last.d);
+  r = await call('POST', '/api/join', { invite: inv2, member: { name: 'P2' } });
+  ok(r.status === 201, 'second member joins', r.d);
+  r = await call('POST', '/api/join', { invite: inv2, member: { name: 'P3' } });
+  ok(r.status === 409 && /full/.test(r.d.error || ''), 'max 2 members', r.d);
 } catch (e) {
   failed++;
   console.log('CRASH', e.stack);

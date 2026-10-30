@@ -43,9 +43,9 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.6</div>
+    <div class="kick">User guide · version 3.8</div>
     <h1>Training Partner</h1>
-    <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus everything that changed in 3.3.</div>
+    <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus the squad, screenshots, web accounts and arcs.</div>
   </div>
   <div class="toc">
     <div><b>1</b>What changed in 3.3</div>
@@ -61,6 +61,9 @@
     <div><b>11</b>Backups, privacy, updates</div>
     <div><b>12</b>Squad — training together</div>
     <div><b>13</b>Huawei, introduction, web app</div>
+    <div><b>14</b>Screenshots &amp; logging by hand</div>
+    <div><b>15</b>Web accounts</div>
+    <div><b>16</b>Arcs — starting fresh</div>
   </div>
 </div>
 
@@ -362,7 +365,7 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
 <!-- ============================================================ -->
 <div class="section">
 <h2><span class="k">Section 12 · new in 3.5</span>Squad — training together</h2>
-<p>The <b>Squad</b> tab is a small app of its own for challenges with friends (made for training with Assad: iPhone, Huawei Watch Fit 5 Pro, mostly walking and swimming). Your personal side stays exactly as it was — the squad only receives <b>summaries</b>. Walks are now their own sport too (<span class="tag" style="background:#ca8a04">Walk</span>: pace /km, steps, cadence) instead of counting as runs.</p>
+<p>The <b>Squad</b> tab is a small app of its own for a challenge with a friend (two people for now) (made for training with Assad: iPhone, Huawei Watch Fit 5 Pro, mostly walking and swimming). Your personal side stays exactly as it was — the squad only receives <b>summaries</b>. Walks are now their own sport too (<span class="tag" style="background:#ca8a04">Walk</span>: pace /km, steps, cadence) instead of counting as runs.</p>
 
 <h3>The sections</h3>
 <table>
@@ -371,8 +374,8 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
   <tr><td><b>Chat</b></td><td>3-way chat: you, your friend(s) and Aether. Workouts appear inline. Tap a message or workout to react, reply, or ask Aether for a <b>review</b> or a <b>roast</b>. Mention <code>@Aether</code> to ask anything.</td></tr>
   <tr><td><b>Feed</b></td><td>Every shared workout by day, filter by person or sport; reactions and comments; open one for all its numbers (every swim length too).</td></tr>
   <tr><td><b>Stats</b></td><td>Per-person table (last 4 weeks or whole challenge), points per week, minutes per week against each person's own usual (dashed), pace against own usual, weekly duels, sport mix, time of day, training calendar, and — for those who share it — weight change, steps, resting HR and sleep; personal bests.</td></tr>
-  <tr><td><b>Report</b></td><td>Monthly report per person (workouts, active days, time, distance, load, best streak, PBs, weight change, sleep, steps, sports), minutes per day, "on track vs own usual", points per week, Aether's written monthly report and a <b>PDF</b>.</td></tr>
-  <tr><td><b>Crew</b></td><td>Each person's profile and baseline (what he is measured against), wins, streaks, PBs; challenge rules; invite code; settings; leave.</td></tr>
+  <tr><td><b>Report</b></td><td>Monthly report per person (workouts, active days, time, distance, load, best streak, PBs, weight change, sleep, steps, sports), minutes per day, "on track vs own usual", points per week, Aether's written monthly report and a <b>PDF</b>. Since 3.8 also one 🏁 chip per finished arc (section 16).</td></tr>
+  <tr><td><b>Crew</b></td><td>Each person's profile and baseline (what he is measured against), wins, streaks, PBs; challenge rules; invite code; <b>Start Arc N</b> (section 16); settings; leave.</td></tr>
 </table>
 
 <h3>Fair scoring — everyone against himself</h3>
@@ -399,9 +402,8 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
 
 <h3>Your friend on iPhone</h3>
 <ol>
-  <li>Open the invite link in Safari → Share → <b>Add to Home Screen</b>. The <b>introduction</b> opens: name, age and heart rate (his own zones), weight, a free Google Gemini key for his coaches, and joining the challenge.</li>
-  <li>Workouts straight from <b>Huawei Health</b> (no Strava): see section 13.</li>
-  <li>A single session can always be added with Squad → <b>Add from screenshot</b>.</li>
+  <li>Open the invite link in Safari → Share → <b>Add to Home Screen</b>. The <b>introduction</b> opens: his <b>account</b> (section 15), name, age and heart rate (his own zones), weight, his Huawei history, joining the challenge and a free Google Gemini key for his coaches.</li>
+  <li>Workouts from <b>Huawei Health</b> (no Strava): screenshots or the Log form (section 14), and the Huawei data export for history (section 13).</li>
 </ol>
 </div>
 
@@ -427,7 +429,78 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
 <h3>The introduction</h3>
 <p>Shown once on a new phone or the web app (never on a phone that already has workouts) and any time from Profile → <b>Introduction</b>. Max heart rate is estimated from age (208 − 0.7 × age) unless entered; the zone limits are then set at 65 %, 75 %, 83 % and 91 % of that max, so zones, load and coaching fit the person.</p>
 <h3>The web app's AI</h3>
-<p>On the iPhone web app the personal coaches use Google Gemini only (one free key). In each coach's model choice: <b>Use another Gemini model</b> (if the chosen one is busy or out of free quota) or <b>Keep retrying this one</b> (waits and retries until it answers).</p>
+<p>On the iPhone web app the personal coaches use Google Gemini only (one free key). In each coach's model choice: <b>Use another Gemini model</b> (if the chosen one is busy or out of free quota) or <b>Keep retrying this one</b> (waits and retries until it answers). Strava is not part of the web app: new Strava API apps need a paid plan, and the owner's Strava connection stays his own.</p>
+<p class="muted">Everything the web app uses is free: the Cloudflare free plan for the server and the web app, a free Gemini key, and Huawei Health's own export.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 14 · new in 3.6–3.8</span>Screenshots and logging by hand</h2>
+<p>Huawei Health can't send workouts to the web app on its own, so a session gets in by <b>screenshots</b> (the main way) or the <b>Log</b> form. Both open from Training (camera · Log) and from Squad's quick actions.</p>
+
+<h3>Reading screenshots</h3>
+<ol>
+  <li>Pick up to <b>8 screenshots</b> at once — the summary, the heart-rate, pace, elevation and cadence graphs, splits, swim lengths, zone times. They may belong to several workouts.</li>
+  <li>One AI call groups the screens per workout and reads every number, every table row and the shape of every graph. It uses the person's own free Gemini key when set up, otherwise the squad's Aether.</li>
+  <li>The <b>approval screen</b> shows, per workout: the numbers (all editable), the screenshots it used, a preview chart (pace and splits in m:ss), the tables it read, include-toggles for each graph, and <b>checks</b>.</li>
+  <li>Save — or change anything first. Nothing is added without this approval.</li>
+</ol>
+<table>
+  <tr><th style="width:42%">Check on the approval screen</th><th>What it catches</th></tr>
+  <tr><td>Splits vs duration and distance</td><td>a split row read wrong or missing</td></tr>
+  <tr><td>Pool lengths vs distance</td><td>missing or doubled lengths</td></tr>
+  <tr><td>Graph average vs summary (heart rate, pace)</td><td>a graph misread — leave that graph out</td></tr>
+  <tr><td>Pace vs distance ÷ time</td><td>a misread distance, time or pace</td></tr>
+  <tr><td>Zone times vs duration</td><td>zone minutes that don't add up</td></tr>
+  <tr><td>Date in the future / no date on the screen</td><td>Huawei shows "Oct 28" without a year: the AI is told today's date, a future date is moved back one year and flagged, a missing date must be set</td></tr>
+  <tr><td>Reply cut short</td><td>very long reads: the workouts that came through completely are kept, with a warning</td></tr>
+</table>
+<h3>What a saved screenshot workout contains</h3>
+<ul>
+  <li>The graph curves become a 10-second stream: heart rate (so zones and training load are real), speed scaled so it matches the summary distance, altitude and cadence — the same charts as any other workout.</li>
+  <li>Pool swims: every length (time, strokes, stroke, SWOLF) in the same per-length model as watch swims — best 50/100/200/400 m, splits, the per-length chart.</li>
+  <li>Watch extras kept with the workout: lowest HR, max cadence, stride, descent, VO2max, training effect, recovery time, zone minutes, splits.</li>
+  <li><b>Moving time</b>: when the screens show both total and moving time, pace and speed use the moving time (4.5 km in 45:00 moving = 6.0 km/h, even if the total with stops was 50:00); the total is kept as elapsed time.</li>
+</ul>
+<p class="muted">Screenshots are read at up to 2000 px on the long side so small graph labels stay readable.</p>
+
+<h3>Log a workout by hand</h3>
+<p>The form changes with the sport: <b>swim</b> (pool length × lengths → distance, main stroke, HR, calories, SWOLF, strokes), <b>walk / run</b> (distance, steps, cadence, climbing, HR, calories, treadmill), <b>ride</b> (distance, climbing, power, cadence, HR, calories, indoor), <b>gym</b> (activity, HR, calories, reps). All have effort (RPE 1–10) and a note, and a live pace/speed preview. "Fill from screenshot(s)" fills the same form.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 15 · new in 3.8</span>Web accounts — the same app on every device</h2>
+<p>On the web app (Assad's iPhone) everything lives in the browser. An <b>account</b> keeps it safe and lets him open the app on another phone, tablet or computer with everything there. The Android app doesn't use accounts — its data stays on the phone with backups and restore points as before.</p>
+<ul>
+  <li><b>Required in the introduction</b>: Welcome → <b>Account</b> → <b>About you</b> → Huawei history → Squad → AI coach → Done. There's no Skip until the account and About you are done.</li>
+  <li><b>Username + password.</b> From the password the device makes two keys: one to sign in (the server only keeps a fingerprint of it) and one to encrypt — the encryption key <b>never leaves the device</b>.</li>
+  <li><b>Everything is backed up</b>: workouts, streams, coach chats, settings (including his Gemini key), squad membership. It is compressed, encrypted on the device, then uploaded — 2 minutes after a change and whenever the app is closed or hidden. The server stores only scrambled data it cannot read.</li>
+  <li><b>Another device</b>: sign in with the same username and password; everything comes back.</li>
+  <li><b>Two devices at once</b>: if one device uploaded while the other still had a new workout, the newer copy is pulled first and the local workout is merged in and uploaded again — nothing is lost.</li>
+  <li><b>Wrong passwords</b>: 8 in a row lock the account for 15 minutes. A forgotten password can't be recovered (nobody, including the server, can decrypt the data) — write it down.</li>
+  <li><b>Sign out</b> (Profile → Account): warns if the last backup failed, and offers <b>Remove from this device</b> — for a borrowed phone.</li>
+</ul>
+<p class="muted">The server is private to two people: it accepts 2 accounts, 2 members per challenge and 3 challenges, so strangers can't fill the free storage.</p>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 16 · new in 3.8</span>Arcs — starting fresh together</h2>
+<p>An <b>arc</b> is one round of the challenge. When you both want a clean slate — a new season, after a break, or just for fun — start the next arc.</p>
+<ol>
+  <li>Squad → Crew → <b>Start Arc N</b> (asks to confirm).</li>
+  <li>A banner appears for both of you with who has approved (✓ / ⏳) and <b>Approve</b> · <b>Not now</b> · <b>Call it off</b>.</li>
+  <li>When <b>everyone</b> has approved, the challenge restarts <b>today</b>: points, streaks and weekly duels start from zero, the Home, Feed and Chat show only the new arc (earlier workouts and messages are one tap away).</li>
+  <li>Every device plays the <b>ARC N</b> animation once: a light streak, the old number glitches and shatters, the new number slams in with a screen shake, shockwave rings, light rays, sparks and embers, confetti cannons, the crew flies in with a VS — and from Arc 2 the <b>champion of the last arc</b> with the final score. Tap to close. On the Android phone it vibrates on the big moments; with reduced motion it stays calm.</li>
+</ol>
+<h3>The end-of-arc report (from Arc 2 on)</h3>
+<ul>
+  <li>The arc that ended is archived with its dates and a <b>snapshot of each person's "own usual"</b> at that time, so its scores and champion never change afterwards.</li>
+  <li>The new arc measures everyone against his <b>last 4 weeks</b> (the baselines refresh).</li>
+  <li>Aether writes a thorough <b>end-of-arc report and analysis</b> in the squad chat: the winner on relative points, and for each person volume, consistency against his own target, improvement against his own usual, personal bests, streaks, best and weakest sessions, patterns (days, times, sports) and — supportively — shared wellness; the story of the weekly duels; one funny award each; 3 concrete goals per person for the next arc.</li>
+  <li>Squad → Report gets a 🏁 chip per finished arc: the arc's own points, weeks won, graphs, the AI analysis and a <b>PDF</b>. Workouts from earlier arcs stay shared so those reports keep working.</li>
+</ul>
 </div>
 
 </body>

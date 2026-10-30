@@ -79,7 +79,7 @@ npx wrangler d1 migrations apply squad --local
 ```
 
 ```bash
-npx wrangler dev --port 8787 --var ALLOW_HTTP_AI:1 --var SQUAD_QUIET_MS:1500 --test-scheduled
+npx wrangler dev --port 8787 --var ALLOW_HTTP_AI:1 --var SQUAD_QUIET_MS:1500 --var SQUAD_MAX_ACCOUNTS:1000 --var SQUAD_MAX_CHALLENGES:1000 --test-scheduled
 ```
 
 ```bash
