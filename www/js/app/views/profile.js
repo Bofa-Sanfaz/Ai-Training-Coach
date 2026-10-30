@@ -4,6 +4,7 @@
 // appearance, backup & rollback, diagnostics
 // --------------------------------------------------------
 async function renderProfile() {
+  if (typeof accountRenderCard === 'function') accountRenderCard();
   $('#cfg_name').value = ATHLETE.name || '';
   $('#cfg_height').value = (await getConfig('athlete_height')) || '';
   $('#cfg_bike').value = (await getConfig('bike_name')) || (isNative() ? ATHLETE.bike || '' : '');

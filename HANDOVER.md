@@ -47,6 +47,8 @@ www/js/app/views/squad-stats.js Squad Stats + monthly Report (Plotly) + Report P
 www/manifest.webmanifest  web app (friends on iPhone add it to the home screen)
 www/js/app/huawei.js      Huawei Health data-export importer (zip.js for AES ZIPs)
 www/js/app/views/intro.js first-run introduction (fresh installs / web app)
+www/js/app/shots.js       screenshot reader: grouped multi-image AI read, checks, approval detail, curves → stream
+www/js/app/account.js     web app accounts: encrypted multi-device vault (not used on Android)
 squad/                    Squad server: Cloudflare Worker + D1 (see squad/README.md — deploy, limits, tests)
 scripts/                  build-apk.ps1, patch-android.js, phone-update.ps1, phone-rescue.js, phone-eval.js
 ```
@@ -59,7 +61,10 @@ scripts/                  build-apk.ps1, patch-android.js, phone-update.ps1, pho
 - Fairness: scores only against own baseline; weight only as a change (UI, PDF, AI).
 - AI context digest: phones upload `SquadCore.digest` after each sync (`PUT /api/c/:id/digest`); AI runs use it when it covers the newest activity/wellness seq, else read history (keeps AI runs ≈10 ms CPU on the free plan).
 - Web app (friend's iPhone): Gemini-only personal AI (`geminiOnly()`), Huawei import, introduction; Samsung card explains it is Android-only. Config keys: `intro_done`, `athlete_age`, `huawei_zip_pw` (sensitive), `huawei_last_import`.
-- **Live** since 2026-10-29: https://training-partner-squad.training-partner-squad.workers.dev (owner's Cloudflare account; wrangler is logged in on this PC). Redeploy with `cd squad; npx wrangler deploy` (also republishes the web app from `www/`). Tests: `squad/test/api-test.mjs` (68 local checks), live smoke test 15/15 (test data removed).
+- **Live** since 2026-10-29: https://training-partner-squad.training-partner-squad.workers.dev (owner's Cloudflare account; wrangler is logged in on this PC). Redeploy with `cd squad; npx wrangler d1 migrations apply squad --remote; npx wrangler deploy` (also republishes the web app from `www/`). Tests: `squad/test/api-test.mjs` (101 local checks), live smoke test 15/15 (test data removed).
+- **Arcs (3.8)**: `POST /api/c/:id/arc {action: propose|approve|cancel}`; all active members approve → `starts` = today, `arc_seq` = first event of the arc, the ended arc goes to `arcs` (from Arc 2 on) and an AI request `{mode:'arc', from, to, arc}` is posted. Clients: `squadInArc` / `squadArcEvent` filter Home/Feed/Chat to the current arc; `arc_seen` in `squad_data_<id>` triggers `squadArcCelebrate` once per device; Report chips `arc:N` (`sqPeriod`). Shared workouts are never un-shared for being before the start once an arc exists.
+- **Web accounts (3.8)**: `account.js` + `squad/src/account.js`; localStorage `rp_account` holds the session token and the derived encryption key (device-local); vault = encrypted dump in `vault_parts`. Android never uses it.
+- **Screenshots (3.8)**: `shots.js` (`SHOT_PROMPT_V2`, also copied in `squad/src/ai.js` — keep both in sync).
 
 ## 4. Data (IndexedDB "RidePartnerDB", phone only)
 `workouts` (+ `sport`, `indoor`, `data_flags`, `source:'health'` with negative `strava_id`), `streams`, `threads` (session chats; `pending`, `kind`, `ai_*`), `master_chat` (Aether; `pending`, proposals, `ai_*`), `graph_threads`, `reports`, `config`.

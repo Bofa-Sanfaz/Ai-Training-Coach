@@ -25,7 +25,7 @@ const CHAT_TRIGGER_MSGS = 10;
 const STREAK_MARKS = [3, 5, 7, 10, 14, 21, 30, 45, 60, 90];
 const AI_NAME = 'Aether';
 // Every column except the (large) ai_digest, which only AI runs read
-export const CH_COLS = 'id, name, invite, owner, starts, ends, rules, tz_offset, seq, ai_config, ai_state, ai_lock, ai_month, ai_spend, created_at';
+export const CH_COLS = 'id, name, invite, owner, starts, ends, rules, tz_offset, seq, ai_config, ai_state, ai_lock, ai_month, ai_spend, created_at, arc, arc_seq, arc_vote, arcs';
 
 // ---------- small helpers ----------
 const nowIso = () => new Date().toISOString();
@@ -51,12 +51,13 @@ export function publicAiConfig(ch) {
 // ---------- provider call (non-streaming; same request shapes as the app's providers.js) ----------
 export async function callModel(cfg, prompt, opts = {}) {
   const base = String(cfg.baseUrl || '').replace(/\/$/, '');
-  const img = opts.image ? (opts.image.includes(',') ? opts.image.split(',')[1] : opts.image) : null;
+  const imgs = (Array.isArray(opts.image) ? opts.image : opts.image ? [opts.image] : []).map(x => (x.includes(',') ? x.split(',')[1] : x));
+  const img = imgs[0] || null;
   const maxTokens = opts.maxTokens || 2000;
   let url, headers = { 'Content-Type': 'application/json' }, body, read;
   if (cfg.type === 'gemini') {
     const parts = [{ text: prompt }];
-    if (img) parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
+    for (const im of imgs) parts.push({ inlineData: { mimeType: 'image/jpeg', data: im } });
     const generationConfig = { maxOutputTokens: maxTokens };
     if (opts.json) generationConfig.responseMimeType = 'application/json';
     url = `${base}/models/${encodeURIComponent(cfg.model)}:generateContent`;
@@ -70,7 +71,7 @@ export async function callModel(cfg, prompt, opts = {}) {
     };
   } else if (cfg.type === 'anthropic') {
     const content = [];
-    if (img) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img } });
+    for (const im of imgs) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: im } });
     content.push({ type: 'text', text: opts.json ? `${prompt}\n\nReply with JSON only.` : prompt });
     url = `${base}/messages`;
     headers['x-api-key'] = cfg.apiKey;
@@ -81,7 +82,7 @@ export async function callModel(cfg, prompt, opts = {}) {
   } else {
     const official = /api\.openai\.com/.test(base);
     const msg = img
-      ? { role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } }] }
+      ? { role: 'user', content: [{ type: 'text', text: prompt }].concat(imgs.map(im => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${im}` } }))) }
       : { role: 'user', content: opts.json ? `${prompt}\n\nReply with JSON only.` : prompt };
     url = `${base}/chat/completions`;
     if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`;
@@ -131,21 +132,39 @@ export async function modelFor(env, ch, prompt, opts) {
 }
 
 // ---------- screenshot → workout (Assad's Huawei screens) ----------
-export async function extractWorkout(env, ch, image, hint) {
-  const prompt = `Read this screenshot from a fitness app (often Huawei Health; may also be Apple Fitness, Strava, Samsung Health).
-Extract ONE workout. Use only numbers that are visible — never guess; use null when a value is not shown.
-${hint ? `The user says: ${String(hint).slice(0, 300)}\n` : ''}Return JSON:
-{"sport":"walk|swim|run|ride|other","type":"e.g. Outdoor walk, Pool swim","date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
-"dur_s":number,"dist_m":number,"avg_hr":number,"max_hr":number,"calories":number,"steps":number,"cadence":number,
-"pace_km_s":number (seconds per km, walk/run),"pace100_s":number (seconds per 100 m, swim),"speed_kmh":number,
-"swolf":number,"pool_m":number,"strokes":number,"main_stroke":"free|breast|back|fly|mixed|null",
-"laps":[{"n":1,"sec":number,"strokes":number,"swolf":number,"stroke":"free"}],"elev_m":number,"notes":"anything else useful, short"}
-Durations like 1:02:03 are h:mm:ss; 7'45" pace means 7 min 45 s per km.`;
-  const r = await modelFor(env, ch, prompt, { image, json: true, maxTokens: 3000 });
+// Same prompt as the app's www/js/app/shots.js (keep the two in step)
+const SHOT_PROMPT_V2 = `You read screenshots from a fitness app (usually Huawei Health; also Apple Fitness, Samsung Health, Strava, Garmin).
+The images (numbered from 0) may show one or several workouts. Several images can belong to the SAME workout (summary, heart-rate chart, pace chart, splits or lengths table, heart-rate zone times). Group them by workout (same date, time and type).
+
+Rules:
+- Copy numbers exactly as shown. Never invent a value: use null when it is not visible.
+- Units: distances in metres; durations in seconds (1:02:03 = h:mm:ss, 25:13 = mm:ss); pace 7'45" or 7:45 /km = 465 s per km; swim pace per 100 m in seconds; calories in kcal.
+- Charts: read the curve at regular points along the time axis (about one point per minute, at most 120) using the axis labels; be as precise as the chart allows.
+- Tables: copy every row in order.
+Return JSON only:
+{"workouts":[{"screens":[image numbers used],
+"sport":"walk|run|swim|ride|other","type":"name as shown, e.g. Outdoor walk, Indoor run, Pool swim, Strength","date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
+"dur_s":number,"moving_s":number|null,"dist_m":number|null,"calories":number|null,
+"avg_hr":number|null,"max_hr":number|null,"min_hr":number|null,
+"steps":number|null,"cadence":number|null,"max_cadence":number|null,"stride_cm":number|null,
+"pace_km_s":number|null,"best_pace_km_s":number|null,"speed_kmh":number|null,"max_speed_kmh":number|null,
+"elev_gain_m":number|null,"elev_loss_m":number|null,
+"pool_m":number|null,"swolf":number|null,"strokes":number|null,"stroke_rate":number|null,"main_stroke":"free|breast|back|fly|mixed|null",
+"training_effect":number|null,"training_load":number|null,"recovery_h":number|null,"vo2max":number|null,
+"hr_zones":[{"name":"as shown","from_bpm":number|null,"to_bpm":number|null,"sec":number}],
+"splits":[{"km":number,"sec":number,"avg_hr":number|null,"pace_s":number|null}],
+"laps":[{"n":number,"dist_m":number|null,"sec":number,"strokes":number|null,"swolf":number|null,"stroke":"free|breast|back|fly|kick|mixed|null"}],
+"hr_curve":[{"t_s":number,"bpm":number}],"pace_curve":[{"t_s":number,"pace_s_per_km":number}],
+"elev_curve":[{"t_s":number,"m":number}],"cadence_curve":[{"t_s":number,"spm":number}],
+"notes":"anything else useful that is visible, short"}]}`;
+
+// Screenshots (one or several, of one or several workouts) → { workouts: [...] }
+export async function extractWorkout(env, ch, images) {
+  const r = await modelFor(env, ch, SHOT_PROMPT_V2, { image: images, json: true, maxTokens: 16000 });
   const t = String(r.text || '').replace(/```(?:json)?/g, '');
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   const w = a >= 0 && b > a ? parse(t.slice(a, b + 1), null) : null;
-  if (!w) throw Object.assign(new Error('the AI could not read a workout from that image'), { status: 422 });
+  if (!w) throw Object.assign(new Error('the AI could not read a workout from these images'), { status: 422 });
   return w;
 }
 
@@ -271,8 +290,9 @@ function wellnessLines(w, days = 14) {
   return out.join('\n');
 }
 
-function monthLines(w, ym) {
-  const mo = SquadCore.month(w.members.filter(m => m.active || w.activities.some(a => a.author === m.id)), w.activities, w.st.daily, ym, w.score);
+function monthLines(w, ym, range) {
+  const people = w.members.filter(m => m.active || w.activities.some(a => a.author === m.id));
+  const mo = range ? SquadCore.period(people, w.activities, w.st.daily, range.from, range.to, range.score) : SquadCore.month(people, w.activities, w.st.daily, ym, w.score);
   return Object.values(mo.members).map(x => {
     const sports = Object.entries(x.by_sport).map(([s, v]) => `${s} ${v.n}× ${v.minutes} min${v.dist_m ? ` ${(v.dist_m / 1000).toFixed(1)} km` : ''}`).join(', ');
     return `${x.name}: ${x.sessions} sessions on ${x.active_days} days, ${x.minutes} min, load ${x.load}; ${sports || 'no sports'}; best streak ${x.best_streak} d; PBs: ${x.pbs.join('; ') || 'none'}; avg weekly score ${x.avg_week_points ?? '–'}${x.longest ? `; longest: ${x.longest.title} ${Math.round(x.longest.dur_s / 60)} min on ${x.longest.date}` : ''}${x.weight_start && x.weight_end !== x.weight_start ? `; weight ${x.weight_end - x.weight_start > 0 ? '+' : ''}${(x.weight_end - x.weight_start).toFixed(1)} kg this month` : ''}${x.avg_sleep_min ? `; sleep ${(x.avg_sleep_min / 60).toFixed(1)} h` : ''}${x.avg_rhr ? `; resting HR ${x.avg_rhr}` : ''}${x.avg_steps ? `; ${x.avg_steps} steps/day` : ''}`;
@@ -341,6 +361,26 @@ function requestPrompt(w, req) {
   const target = targetText(w, ai.ref);
   const text = String(req.body.text || '').slice(0, 2000);
   let task;
+  if (ai.mode === 'arc' && ai.from && ai.to) {
+    const people = w.members.filter(m => m.active || w.activities.some(a => a.author === m.id));
+    const score = SquadCore.compute({ starts: ai.from, ends: ai.to, rules: w.rules }, people, w.activities, ai.to);
+    const duels = score.duels.map(d => `W${d.week}: ${d.winners.length === 1 ? w.nameOf(d.winners[0]) : 'tie'}`).join(', ');
+    const sc = people.map(m => { const x = score.members[m.id]; return x ? `${m.name}: ${x.total} pts over the arc, ${score.wins[m.id] || 0} weeks won, best streak ${x.best_streak} d, ${x.pbs} PBs; weekly points ${x.weeks.map(k => Math.round(k.total)).join('/')}` : ''; }).filter(Boolean).join('\n');
+    const acts = w.activities.filter(a => a.date >= ai.from && a.date <= ai.to).sort((a, b) => a.date.localeCompare(b.date));
+    return `${basePrompt(w, 14)}
+ARC ${ai.arc || ''} (${ai.from} to ${ai.to}) — FINAL NUMBERS
+${monthLines(w, null, { from: ai.from, to: ai.to, score })}
+
+SCOREBOARD OF THE ARC (relative to self)
+${sc}
+Weekly duels: ${duels || 'none'}
+
+EVERY SESSION OF THE ARC
+${acts.map(a => activityLine(a, w.nameOf)).join('\n') || 'none'}
+
+TASK: The squad just closed Arc ${ai.arc || ''}. Write the THOROUGH END-OF-ARC REPORT AND ANALYSIS: a headline and the winner on relative points; for each person — volume, consistency against his own target, improvement against his own usual (pace/speed per sport), personal bests, streaks, his best and weakest sessions, patterns (days, times, sports), and — supportively — the wellness he shared; the weekly duels story; one funny award each; 3 concrete goals per person for the next arc; one line to hype the new arc. Use **bold** for key numbers and short headings per person. 20–35 lines.
+Write only your chat message.`;
+  }
   if (ai.mode === 'report') {
     const ym = ai.month || w.today.slice(0, 7);
     return `${basePrompt(w, 31)}
@@ -503,11 +543,11 @@ export async function runAI(env, cid, post, opts = {}) {
       if (reqs.length) {
         for (const r of reqs) {
           r.body = parse(r.body, {});
-          const w = await getWorld(ch);
+          const w = r.body.ai && r.body.ai.mode === 'arc' ? await fullWorld(env, ch) : await getWorld(ch);
           if (!w.st.messages.some(m => m.id === r.id)) w.st.messages.push(r);
           await l.renew();
           try {
-            const out = await modelFor(env, ch, requestPrompt(w, r), { maxTokens: { report: 3000, review: 1500 }[r.body.ai.mode] || 800 });
+            const out = await modelFor(env, ch, requestPrompt(w, r), { maxTokens: { arc: 5000, report: 3000, review: 1500 }[r.body.ai.mode] || 800 });
             const text = String(out.text || '').trim();
             const body = { text, mode: r.body.ai.mode, reply_to: r.id, target: r.body.ai.ref || null };
             if (text) { const seq = await post(ch, { kind: 'msg', ref: r.id, body }); posted.push(seq); remember(seq, body); }

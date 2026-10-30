@@ -18,24 +18,39 @@ async function stravaCreds() {
   };
 }
 
+// A friend's web app without his own Strava API app (new ones need a paid Strava plan) signs in
+// through the squad server, which holds the owner's Strava app keys; returns the squad entry
+// to use, or null when this app uses its own keys (the Android app always does).
+async function stravaViaSquad() {
+  if (isNative() || (await getConfig('strava_client_secret'))) return null;
+  return (typeof Squad !== 'undefined' && Squad.list.find(c => !c.revoked)) || null;
+}
+
+async function stravaTokenExchange(body) {
+  const sq = await stravaViaSquad();
+  if (sq) return squadApi(sq.server, 'POST', '/api/strava/token', body, sq.token, 30000);
+  const { clientId, clientSecret } = await stravaCreds();
+  const res = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ client_id: clientId, client_secret: clientSecret }, body))
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) throw new Error(`Strava auth error (${res.status}): ${data.message || JSON.stringify(data).slice(0, 160)}`);
+  return data;
+}
+
 // Reuses the 6-hour access token instead of refreshing on every call
 async function getStravaAccessToken(force = false) {
   const { clientId, clientSecret, refreshToken } = await stravaCreds();
-  if (!clientId || !clientSecret || !refreshToken) throw new Error('NOT_CONNECTED');
+  const viaSquad = !!(await stravaViaSquad());
+  if (!refreshToken || (!viaSquad && (!clientId || !clientSecret))) throw new Error('NOT_CONNECTED');
 
   const cached = String(await getConfig('strava_access_token'));
   const expires = num(await getConfig('strava_token_expires'));
   if (!force && cached && expires * 1000 > Date.now() + 120000) return cached;
 
-  const res = await fetch('https://www.strava.com/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken })
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) {
-    throw new Error(`Strava auth error (${res.status}): ${data.message || JSON.stringify(data).slice(0, 160)}`);
-  }
+  const data = await stravaTokenExchange({ grant_type: 'refresh_token', refresh_token: refreshToken });
   if (data.refresh_token) await setConfig('strava_refresh_token', data.refresh_token);
   await setConfig('strava_access_token', data.access_token);
   await setConfig('strava_token_expires', String(data.expires_at || 0));
@@ -54,8 +69,8 @@ async function processIncomingUrl(urlStr) {
     box.classList.remove('hidden');
     box.textContent = `Deep link detected: code=${code.substring(0, 6)}…\nExchanging token with Strava API…\n`;
   }
-  const { clientId, clientSecret } = await stravaCreds();
-  if (!clientSecret) {
+  const { clientSecret } = await stravaCreds();
+  if (!clientSecret && !(await stravaViaSquad())) {
     isOauthExchanging = false;
     toast('Save your Strava Client Secret in Profile first, then sign in again.', 'warn', 5000);
     switchTab('profile');
@@ -63,32 +78,22 @@ async function processIncomingUrl(urlStr) {
   }
 
   try {
-    const res = await fetch('https://www.strava.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, grant_type: 'authorization_code' })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (data.refresh_token) {
-      await setConfig('strava_refresh_token', data.refresh_token);
-      if (data.access_token) {
-        await setConfig('strava_access_token', data.access_token);
-        await setConfig('strava_token_expires', String(data.expires_at || 0));
-      }
-      if (data.athlete && data.athlete.firstname && !(await getConfig('athlete_name'))) {
-        await setConfig('athlete_name', data.athlete.firstname);
-        await loadPhysioConfig();
-      }
-      toast('Strava connected. Syncing rides…', 'success');
-      switchTab('rides');
-      syncStrava();
-    } else if (box) {
-      box.textContent += 'Exchange Error: ' + JSON.stringify(data, null, 2);
-      toast('Strava sign-in failed — see Diagnostics in Profile.', 'error');
+    const data = await stravaTokenExchange({ code, grant_type: 'authorization_code' });
+    await setConfig('strava_refresh_token', data.refresh_token);
+    await setConfig('strava_access_token', data.access_token);
+    await setConfig('strava_token_expires', String(data.expires_at || 0));
+    if (data.athlete && data.athlete.firstname && !(await getConfig('athlete_name'))) {
+      await setConfig('athlete_name', data.athlete.firstname);
+      await loadPhysioConfig();
     }
+    toast('Strava connected. Syncing your workouts…', 'success');
+    switchTab('rides');
+    syncStrava();
   } catch (e) {
-    if (box) box.textContent += 'Network exception: ' + e.message;
-    toast('Network error during Strava sign-in.', 'error');
+    if (box) box.textContent += `Exchange error: ${e.message}`;
+    toast(/limit|capacity|exceed/i.test(e.message)
+      ? 'Strava refused: the Strava app connected to this squad only allows its owner. Use Training → camera / Log for now.'
+      : `Strava sign-in failed: ${e.message}`, 'error', 8000);
   } finally {
     isOauthExchanging = false;
     // Web app: drop ?code=… from the address so a reload never re-uses the one-time code
@@ -97,24 +102,27 @@ async function processIncomingUrl(urlStr) {
 }
 
 async function startAutomaticOAuth() {
-  const clientId = ($('#cfg_client_id').value || '').trim() || DEFAULT_STRAVA_CLIENT_ID;
+  const ownId = ($('#cfg_client_id').value || '').trim();
   const secret = ($('#cfg_client_secret').value || '').trim();
   if (secret) {
-    await setConfig('strava_client_id', clientId);
+    await setConfig('strava_client_id', ownId || DEFAULT_STRAVA_CLIENT_ID);
     await setConfig('strava_client_secret', secret);
   }
   // Web app (e.g. iPhone home-screen app): Strava sends the browser back to this page with ?code=…
-  // (the Strava API app's "Authorization Callback Domain" must be this site's host)
   if (!isNative()) {
-    // New Strava API apps only work for their owner, so every person needs his own Client ID
-    if (!($('#cfg_client_id').value || '').trim() || !secret) {
-      toast(`Create your own free Strava API app (strava.com/settings/api, callback domain ${location.host}) and enter its Client ID and Secret first.`, 'warn', 7000);
-      return;
+    let clientId = ownId;
+    if (!secret) {
+      // No own Strava API app: sign in through the squad's Strava app (keys stay on the server)
+      const sq = Squad.list.find(c => !c.revoked);
+      if (!sq) { toast('Join your friend\'s challenge first (Squad → Join) — Strava connects through it.', 'warn', 6000); return; }
+      try { clientId = (await squadApi(sq.server, 'GET', '/api/strava/client')).client_id; } catch (e) { clientId = null; }
+      if (!clientId) { toast('Strava isn\'t set up on the squad server yet — ask the challenge owner.', 'warn', 6000); return; }
     }
     const back = encodeURIComponent(`${location.origin}${location.pathname}`);
     location.href = `https://www.strava.com/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${back}&response_type=code&approval_prompt=auto&scope=read,activity:read_all,profile:read_all`;
     return;
   }
+  const clientId = ownId || DEFAULT_STRAVA_CLIENT_ID;
   const redirectUri = encodeURIComponent('aicoachv2://aicoach.app');
   const authUrl = `https://www.strava.com/oauth/mobile/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${redirectUri}&response_type=code&approval_prompt=force&scope=read,activity:read_all,profile:read_all`;
   window.open(authUrl, '_system');

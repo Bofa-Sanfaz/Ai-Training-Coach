@@ -98,7 +98,7 @@ async function squadSync(cid) {
   if (Squad.busy[cid]) { Squad.busy[cid] = 'again'; return; }
   Squad.busy[cid] = true;
   const st = await squadStore(cid);
-  let aiDue = false, changed = false;
+  let aiDue = false, changed = false, arcFx = null;
   try {
     // 1. Send the outbox (in order, 50 at a time)
     for (;;) {
@@ -125,6 +125,15 @@ async function squadSync(cid) {
     }
     if (st.events.length > 6000) st.events = st.events.slice(-5000);
     if (c.name !== st.challenge.name) { c.name = st.challenge.name; await squadSaveList(); }
+    // A new arc started since we last looked: celebrate it once (a fresh device just takes note)
+    const arc = st.challenge.arc || 0;
+    if (st.arc_seen === undefined) st.arc_seen = arc;
+    else if (arc > st.arc_seen) {
+      const ev = st.events.filter(e => e.kind === 'system' && e.body && e.body.type === 'arc_started' && e.body.arc === arc).pop();
+      arcFx = { arc, prev: ev && ev.body.prev ? ev.body.prev.n : null };
+      st.arc_seen = arc;
+      Squad.feedAll = false; Squad.chatAll = false;
+    }
     await squadPersist(cid);
     Squad.offline = false;
     // 3. The AI's context, built here (the server stays within its free CPU budget)
@@ -142,6 +151,7 @@ async function squadSync(cid) {
     Squad.busy[cid] = false;
     if (changed) squadRenderLive(cid);
     squadBadge();
+    if (arcFx) squadArcCelebrate(cid, arcFx.arc, arcFx.prev);
     if (aiDue) squadRunAi(cid);
     if (again) setTimeout(() => squadSync(cid), 50);
   }
@@ -306,10 +316,12 @@ async function squadShareWorkouts() {
       c.shared[s.key] = h;
       dirty = true;
     }
-    // Deleted or excluded here → removed from the squad too
+    // Deleted or excluded here → removed from the squad too. Before the start only while no arc
+    // has begun (a moved start date); sessions of earlier arcs stay for their reports.
+    const floor = st.challenge.arc ? '' : from;
     for (const key of Object.keys(c.shared)) {
       const w = byKey.get(key);
-      if (w && !isExcluded(w) && String(w.date).slice(0, 10) >= from) continue;
+      if (w && !isExcluded(w) && String(w.date).slice(0, 10) >= floor) continue;
       squadQueueQuiet(c.id, 'delete', {}, SquadCore.actRef(st.me, key));
       delete c.shared[key];
       dirty = true;
@@ -393,16 +405,6 @@ async function saveSquadWeight() {
 // The AI reads the numbers off the screen: the person's own AI key (personal coach) when one
 // is set up, otherwise the squad's Aether on the server. Several screenshots can be picked at
 // once; each opens the Log form pre-filled, one after the other, to check and save.
-const SHOT_PROMPT = `Read this screenshot from a fitness app (often Huawei Health; may also be Apple Fitness, Strava, Samsung Health).
-Extract ONE workout. Use only numbers that are visible — never guess; use null when a value is not shown.
-Return JSON:
-{"sport":"walk|swim|run|ride|other","type":"e.g. Outdoor walk, Pool swim, Strength","date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
-"dur_s":number,"dist_m":number,"avg_hr":number,"max_hr":number,"calories":number,"steps":number,"cadence":number,
-"pace_km_s":number,"pace100_s":number,"speed_kmh":number,"swolf":number,"pool_m":number,"strokes":number,
-"main_stroke":"free|breast|back|fly|mixed|null","laps":[{"n":1,"sec":number,"strokes":number,"swolf":number,"stroke":"free"}],
-"elev_m":number,"notes":"anything else useful, short"}
-Durations like 1:02:03 are h:mm:ss; 7'45" pace means 7 min 45 s per km. Distances in km must be converted to metres.`;
-
 function squadPersonalAiReady() {
   return !!(typeof AI !== 'undefined' && AI && AI.providers.some(p => providerReady(p) && (!geminiOnly() || p.type === 'gemini')));
 }
@@ -421,7 +423,7 @@ function openSquadImport() {
   $('#squadImportFile').click();
 }
 
-function squadShrinkImage(file, max = 1600) {
+function squadShrinkImage(file, max = 1400) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -437,51 +439,31 @@ function squadShrinkImage(file, max = 1600) {
   });
 }
 
-function squadParseShotJson(text) {
-  const t = String(text || '').replace(/```(?:json)?/g, '');
-  const a = t.indexOf('{'), b = t.lastIndexOf('}');
-  if (a < 0 || b <= a) return null;
-  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { return null; }
-}
-
-// One screenshot → workout fields (own key first, squad AI as fallback)
-async function squadReadShot(image) {
-  if (squadPersonalAiReady()) {
-    const text = await callAI(SHOT_PROMPT, image, { json: true, maxTokens: 3000 });
-    const w = squadParseShotJson(text);
-    if (w) return w;
-  }
-  if (squadSquadAiReady()) {
-    const r = await squadCall(squadEntry(Squad.cur), 'POST', '/ai/extract', { image }, 120000);
-    return r.workout;
-  }
-  throw new Error('the AI could not read a workout from that image');
-}
-
+// Picked screenshots (up to ${SHOT_MAX_IMAGES} per go) → one AI call groups them per workout → each
+// workout opens the approval form in turn (saving or closing moves on to the next)
 async function squadImportPicked(ev) {
   const files = Array.from((ev.target.files) || []).filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name));
   if (!files.length) return;
-  Squad.shotQueue = files;
-  Squad.shotTotal = files.length;
-  await squadNextShot();
+  if (files.length > SHOT_MAX_IMAGES) toast(`Reading the first ${SHOT_MAX_IMAGES} screenshots — add the rest in a second go.`, 'warn', 5000);
+  toast(`Reading ${Math.min(files.length, SHOT_MAX_IMAGES)} screenshot${files.length > 1 ? 's' : ''}… (about ${files.length > 2 ? '30–60' : '15–30'} s)`, 'info', 9000);
+  try {
+    const images = [];
+    for (const f of files.slice(0, SHOT_MAX_IMAGES)) images.push(await squadShrinkImage(f));
+    const drafts = await readShots(images);
+    Squad.shotQueue = drafts.map((w, i) => Object.assign(w, { shotN: i + 1, shotTotal: drafts.length }));
+    if (drafts.length > 1) toast(`Found ${drafts.length} workouts — check each one and save.`, 'success', 4000);
+    squadNextShot();
+  } catch (e) {
+    toast(`Could not read the screenshots: ${e.message}`, 'error', 6000);
+  }
 }
 
-async function squadNextShot() {
-  const file = Squad.shotQueue && Squad.shotQueue.shift();
-  if (!file) { Squad.shotQueue = null; return; }
-  const n = Squad.shotTotal - Squad.shotQueue.length;
-  toast(`Reading screenshot${Squad.shotTotal > 1 ? ` ${n} of ${Squad.shotTotal}` : ''}…`, 'info', 6000);
-  try {
-    const image = await squadShrinkImage(file);
-    const w = await squadReadShot(image);
-    Squad.importDraft = Object.assign({ image, shotN: n, shotTotal: Squad.shotTotal }, w);
-    squadFillImport();
-    // Saving or closing moves on to the next screenshot
-    openSheet('squadImportSheet', () => { if (Squad.shotQueue && Squad.shotQueue.length) setTimeout(squadNextShot, 350); });
-  } catch (e) {
-    toast(`Could not read that screenshot: ${e.message}`, 'error', 5000);
-    if (Squad.shotQueue && Squad.shotQueue.length) setTimeout(squadNextShot, 600);
-  }
+function squadNextShot() {
+  const w = Squad.shotQueue && Squad.shotQueue.shift();
+  if (!w) { Squad.shotQueue = null; return; }
+  Squad.importDraft = w;
+  squadFillImport();
+  openSheet('squadImportSheet', () => { if (Squad.shotQueue && Squad.shotQueue.length) setTimeout(squadNextShot, 350); });
 }
 
 // Log a workout by hand (pool swims, gym…) — or check what the AI read from a screenshot.
@@ -581,9 +563,8 @@ function squadFillImport() {
   $('#sqi_head').textContent = manual ? 'Log a workout' : `Workout from screenshot${w.shotTotal > 1 ? ` (${w.shotN} of ${w.shotTotal})` : ''}`;
   $('#sqiShotBtn').classList.toggle('hidden', !manual);
   $('#sqi_sub').textContent = manual ? 'For sessions that don\'t sync (e.g. pool swims, gym). It\'s added to your own workouts and shared with the squad.'
-    : 'Aether read these numbers — check them, fix anything wrong, then save. It\'s added to your own workouts and shared with the squad.';
-  $('#sqi_thumb').classList.toggle('hidden', !w.image);
-  $('#sqi_thumb').src = w.image || '';
+    : 'Read from your screenshots — check everything below, fix anything wrong, then save. Graphs, splits and lengths become your workout\'s charts.';
+  $('#sqi_thumb').classList.add('hidden'); // screenshots are shown in the detail section
   const sport = SPORTS[w.sport] ? w.sport : 'other';
   const stroke = { free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY', mixed: 'MIXED' }[String(w.main_stroke || '').toLowerCase()];
   const pool = w.pool_m > 0 ? Math.round(w.pool_m) : 25;
@@ -592,7 +573,7 @@ function squadFillImport() {
     pool: String([25, 50, 33, 20].includes(pool) ? pool : 25), lengths: w.pool_m && w.dist_m ? Math.round(w.dist_m / w.pool_m) : '',
     dist_m: sport === 'swim' && w.dist_m ? Math.round(w.dist_m) : '', stroke: stroke || 'FREESTYLE', swolf: w.swolf || '', strokes: w.strokes || '',
     dist: sport !== 'swim' && w.dist_m ? round(w.dist_m / 1000, 2) : '', dist_opt: '', avg_hr: w.avg_hr || '', max_hr: w.max_hr || '', kcal: w.calories || '',
-    steps: w.steps || '', cadence_spm: w.cadence || '', cadence_rpm: w.cadence || '', elev: w.elev_m || '', power: '', reps: '', gym: 'WeightTraining',
+    steps: w.steps || '', cadence_spm: w.cadence || '', cadence_rpm: w.cadence || '', elev: w.elev_gain_m || w.elev_m || '', power: '', reps: '', gym: 'WeightTraining',
     indoor: /treadmill|indoor/i.test(w.type || ''), indoor_ride: /indoor|trainer/i.test(w.type || '')
   };
   Squad.manualRpe = null;
@@ -607,6 +588,9 @@ function squadFillImport() {
   $$('#sqi_sportSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === sport));
   squadRenderManualFields();
   squadRenderRpe(null);
+  // From screenshots: what else was read (checks, graphs, splits, lengths, zones) to approve
+  $('#sqi_detail').innerHTML = manual ? '' : shotDetailHtml(w);
+  if (!manual) setTimeout(shotRenderChart, 80);
 }
 
 function squadParseDuration(s) {
@@ -658,18 +642,15 @@ async function saveSquadImport() {
     w.main_stroke = x.stroke || 'FREESTYLE';
     if (int('swolf')) w.swolf_manual = int('swolf');
     if (int('strokes')) w.strokes_total = int('strokes');
-    // Per-length detail only when the AI actually read every length off the screen
-    if (Array.isArray(d.laps) && d.laps.length && d.pool_m > 0) {
-      const style = s => ({ free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY' })[String(s || '').toLowerCase()] || w.main_stroke;
-      const sw = buildSwimDetail({ poolLength: d.pool_m, laps: d.laps.map(l => ({ sec: num(l.sec), strokes: num(l.strokes), style: style(l.stroke) })) }, dur);
-      if (sw) w.swim = sw;
-    }
   }
   if (Squad.manualRpe) w.rpe = Squad.manualRpe;
   const note = $('#sqi_note').value.trim();
   if (note) w.note = note;
+  // From screenshots: graphs → stream, lengths → swim model, splits/zones/extras as read (and approved)
+  const stream = d.manual ? null : shotApply(w, d, dur);
   w.id = await db.workouts.add(w);
-  await ensureRideMetrics(w, null, true);
+  if (stream) await db.streams.put({ strava_id: w.strava_id, stream_data: stream });
+  await ensureRideMetrics(w, stream, true);
   await renumberRides();
   closeSheet('squadImportSheet');
   Squad.importDraft = null;
@@ -800,7 +781,7 @@ async function renderSquad() {
   $('#squadHead').classList.add('hidden');
   document.documentElement.style.setProperty('--appbar-h', `${$('#appbar').offsetHeight}px`);
   $('#sqName').textContent = S.ch.name;
-  $('#sqDay').textContent = `${squadDayInfo(S)}${live.length > 1 ? ` · ${live.length} challenges` : ''}`;
+  $('#sqDay').textContent = `${S.ch.arc ? `Arc ${S.ch.arc} · ` : ''}${squadDayInfo(S)}${live.length > 1 ? ` · ${live.length} challenges` : ''}`;
   const unread = squadUnread(Squad.cur);
   $('#sqTabs').innerHTML = SQUAD_VIEWS.map(([v, label, ic]) => `<button class="${Squad.view === v ? 'active' : ''}" onclick="squadView('${v}')">${icon(ic, 'ic-sm')}<span>${label}</span>${v === 'chat' && unread ? `<b class="sq-tab-badge">${unread > 9 ? '9+' : unread}</b>` : ''}</button>`).join('');
   const views = { home: squadHomeHtml, feed: squadFeedHtml, stats: squadStatsHtml, report: squadReportHtml, crew: squadCrewHtml };
@@ -852,10 +833,140 @@ function squadTodayHtml(S) {
   }).join('')}</div>`;
 }
 
+// ---------- ARCS (a new arc resets scores, feed and chat; everyone has to agree) ----------
+const squadInArc = (S, a) => !S.ch.arc || a.date >= S.ch.starts;
+const squadArcEvent = (S, e) => !S.ch.arc || e.seq >= (S.ch.arc_seq || 0);
+
+function squadArcBannerHtml(S) {
+  const v = S.ch.arc_vote;
+  if (!v) return '';
+  const ms = S.members.filter(m => m.active);
+  const mine = v.by.includes(S.me);
+  const waiting = ms.filter(m => !v.by.includes(m.id));
+  return `<div class="card sq-arc-vote">
+    <div class="sq-arc-vote-k">🏁 New arc proposed</div>
+    <div class="sq-arc-vote-t">Start Arc ${v.arc}?</div>
+    <div class="small">${escapeHtml(squadName(S, v.proposer))} wants a fresh start: scores, streaks, feed and chat reset${S.ch.arc ? `, and Arc ${S.ch.arc} gets its own report${S.ch.ai && S.ch.ai.enabled ? ` with ${SQUAD_AI}'s full analysis` : ''}` : ''}. Starts the moment everyone approves.</div>
+    <div class="sq-arc-votes">${ms.map(m => `<span class="${v.by.includes(m.id) ? 'ok' : ''}">${squadAvatar(m, 'xs')}${escapeHtml(m.id === S.me ? 'You' : m.name)} ${v.by.includes(m.id) ? '✓' : '⏳'}</span>`).join('')}</div>
+    <div class="${mine ? 'row between mt-8' : 'btn-row mt-8'}">${mine
+      ? `<span class="tiny muted">Waiting for ${escapeHtml(waiting.map(m => m.name).join(', '))}…</span><button class="btn btn-ghost btn-sm" onclick="squadArc('cancel')">Call it off</button>`
+      : `<button class="btn btn-primary btn-sm" onclick="squadArc('approve')">${icon('check')}Approve</button><button class="btn btn-ghost btn-sm" onclick="squadArc('cancel')">Not now</button>`}</div>
+  </div>`;
+}
+
+async function squadArc(action) {
+  const S = squadState(Squad.cur);
+  const c = squadEntry(Squad.cur);
+  if (!S || !S.ch || !c) return;
+  const next = (S.ch.arc || 0) + 1;
+  if (action === 'propose') {
+    const solo = S.members.filter(m => m.active).length < 2;
+    const ok = await uiConfirm(`Start Arc ${next}?`, `${S.ch.arc ? `Arc ${S.ch.arc} gets archived with its own report and ${SQUAD_AI}'s full analysis. ` : ''}Scores, streaks, the feed and the chat start fresh from today.${solo ? '' : ' Everyone in the challenge has to approve first.'}`, { okText: solo ? `Start Arc ${next}` : 'Ask for approval' });
+    if (!ok) return;
+  }
+  try {
+    const r = await squadCall(c, 'POST', '/arc', { action });
+    haptic(r.started ? 'heavy' : 'light');
+    if (!r.started) toast(action === 'cancel' ? 'Arc vote called off' : 'Waiting for the others to approve', 'info');
+  } catch (e) { toast(`Arc: ${e.message}`, 'error'); }
+  await squadSync(Squad.cur);
+  renderSquad();
+}
+
+// Full-screen "ARC N" moment, shown once per device when a new arc starts
+function squadArcCelebrate(cid, n, prev) {
+  const S = squadState(cid);
+  if (!S || !S.ch) return;
+  const old = document.getElementById('arcFx');
+  if (old) old.remove();
+  const ms = S.members.filter(m => m.active);
+  const el = document.createElement('div');
+  el.id = 'arcFx';
+  el.className = 'arc-fx';
+  el.innerHTML = `<canvas></canvas><div class="arc-fx-flash"></div>
+    <div class="arc-fx-in">
+      <div class="arc-fx-kicker">${escapeHtml(S.ch.name)}${prev ? ` · Arc ${prev} is in the books` : ''}</div>
+      <div class="arc-fx-word">ARC</div>
+      <div class="arc-fx-num">${n}</div>
+      <div class="arc-fx-duel">${ms.map((m, i) => `${i ? '<span class="arc-fx-vs">vs</span>' : ''}<div class="arc-fx-p" style="--d:${i}">${squadAvatar(m, 'lg')}<b>${escapeHtml(m.name)}</b><span>0 pts</span></div>`).join('')}</div>
+      <div class="arc-fx-sub">${prev ? `Scores, streaks and the chat start fresh. ${S.ch.ai && S.ch.ai.enabled ? `${SQUAD_AI} is writing the full report of Arc ${prev}.` : `Arc ${prev}'s report waits in the Report tab.`}` : 'Scores, streaks and the chat start fresh. Everyone against his own usual. Go.'}</div>
+      <div class="arc-fx-btns"><button class="btn btn-primary" data-go>Let's go</button>${prev ? `<button class="btn btn-secondary" data-report>Arc ${prev} report</button>` : ''}</div>
+    </div>`;
+  document.body.appendChild(el);
+  haptic('heavy');
+  const born = Date.now();
+  let alive = true;
+  const close = report => {
+    if (!alive) return;
+    alive = false;
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 450);
+    Squad.cur = cid;
+    Squad.view = report ? 'report' : 'home';
+    if (report) Squad.month = `arc:${prev}`;
+    if (Router.current !== 'squad') switchTab('squad'); else renderSquad();
+  };
+  el.addEventListener('click', ev => {
+    const b = ev.target.closest('button');
+    if (b) close(b.hasAttribute('data-report'));
+    else if (Date.now() - born > 2600) close(false);
+  });
+  // Particles: a shockwave of sparks in everyone's colours, then confetti rain
+  const cv = el.querySelector('canvas');
+  const ctx = cv.getContext('2d');
+  if (!ctx || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const fit = () => { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; };
+  fit();
+  const colors = ms.map(m => m.color).concat(['#fc5200', '#ffd166', '#ffffff']);
+  const parts = [];
+  const burst = (k, speed) => {
+    const cx = cv.width / 2, cy = cv.height * 0.42;
+    for (let i = 0; i < k; i++) {
+      const a = Math.random() * Math.PI * 2, v = (speed * (0.35 + Math.random())) * dpr;
+      parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (1.5 + Math.random() * 3.5) * dpr, c: colors[i % colors.length], life: 1, decay: 0.006 + Math.random() * 0.012, spin: Math.random() * 6, rect: Math.random() < 0.55 });
+    }
+  };
+  const rain = () => {
+    for (let i = 0; i < 2; i++) parts.push({ x: Math.random() * cv.width, y: -10 * dpr, vx: (Math.random() - 0.5) * 1.5 * dpr, vy: (1.5 + Math.random() * 2.5) * dpr, r: (2 + Math.random() * 3) * dpr, c: colors[Math.floor(Math.random() * colors.length)], life: 1, decay: 0.003, spin: Math.random() * 6, rect: true });
+  };
+  setTimeout(() => burst(160, 14), 650);
+  setTimeout(() => burst(90, 9), 1250);
+  let ring = 0;
+  const frame = () => {
+    if (!alive || !el.isConnected) return;
+    if (cv.width !== innerWidth * dpr) fit();
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const t = Date.now() - born;
+    // Shockwave ring when the number lands
+    if (t > 600 && ring < 1) {
+      ring = Math.min(1, (t - 600) / 900);
+      ctx.beginPath();
+      ctx.arc(cv.width / 2, cv.height * 0.42, ring * Math.max(cv.width, cv.height) * 0.75, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(252,82,0,${0.7 * (1 - ring)})`;
+      ctx.lineWidth = 10 * dpr * (1 - ring) + 1;
+      ctx.stroke();
+    }
+    if (t > 1400 && t < 5500 && Math.random() < 0.35) rain();
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.985; p.vy = p.vy * 0.985 + 0.12 * dpr; p.life -= p.decay; p.spin += 0.15;
+      if (p.life <= 0 || p.y > cv.height + 20) { parts.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.4));
+      ctx.fillStyle = p.c;
+      if (p.rect) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.spin); ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); ctx.restore(); }
+      else { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+    if (t < 12000 || parts.length) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
 function squadHomeHtml(S) {
-  const acts = Array.from(S.folded.activities.values()).sort((a, b) => `${b.date}${b.start || ''}`.localeCompare(`${a.date}${a.start || ''}`));
-  const recap = S.folded.messages.filter(m => m.author === 'ai' && ['recap', 'final', 'report'].includes(m.body.mode)).pop();
-  return `${squadHeroHtml(S)}
+  const acts = Array.from(S.folded.activities.values()).filter(a => squadInArc(S, a)).sort((a, b) => `${b.date}${b.start || ''}`.localeCompare(`${a.date}${a.start || ''}`));
+  const recap = S.folded.messages.filter(m => m.author === 'ai' && ['recap', 'final', 'report', 'arc'].includes(m.body.mode) && squadArcEvent(S, m)).pop();
+  return `${squadArcBannerHtml(S)}${squadHeroHtml(S)}
     <div class="section-title"><span>Today</span><span class="tiny muted">${escapeHtml(formatNiceDate(S.st.today, false))}</span></div>
     ${squadTodayHtml(S)}
     ${squadChatRowHtml(S)}
@@ -866,7 +977,7 @@ function squadHomeHtml(S) {
       <button onclick="squadAskQuick()">${icon('sparkle')}<span>Ask ${SQUAD_AI}</span></button>
     </div>
     ${squadBoardHtml(S)}
-    ${recap ? `<div class="section-title"><span>${SQUAD_AI}'s latest ${recap.body.mode === 'report' ? 'monthly report' : 'recap'}</span><span class="tiny muted">${escapeHtml(relativeTime(recap.created_at))}</span></div><div class="card sq-recap" onclick="openSquadChat()"><div class="md">${renderMarkdown(recap.body.text)}</div></div>` : ''}
+    ${recap ? `<div class="section-title"><span>${SQUAD_AI}'s latest ${recap.body.mode === 'report' ? 'monthly report' : recap.body.mode === 'arc' ? 'arc report' : 'recap'}</span><span class="tiny muted">${escapeHtml(relativeTime(recap.created_at))}</span></div><div class="card sq-recap" onclick="openSquadChat()"><div class="md">${renderMarkdown(recap.body.text)}</div></div>` : ''}
     <div class="section-title"><span>Latest workouts</span>${acts.length > 3 ? `<button class="btn btn-ghost btn-xs" onclick="squadView('feed')">See all ${acts.length}</button>` : ''}</div>
     ${acts.length ? acts.slice(0, 3).map(a => squadActCardHtml(S, a)).join('') : squadNoActsHtml()}`;
 }
@@ -895,7 +1006,7 @@ function squadHeroHtml(S) {
   const duel = sc.duels[sc.duels.length - 1];
   const wk = duel && duel.winners.length === 1 ? `${squadName(S, duel.winners[0])} leads week ${duel.week}` : 'This week is level';
   return `<div class="card card-hero sq-top">
-    <div class="sq-kicker">Total points · each against his own usual</div>
+    <div class="sq-kicker">${S.ch.arc ? `<b class="sq-arc-tag">Arc ${S.ch.arc}</b> ` : ''}Total points · each against his own usual</div>
     <div class="sq-duel">${ms.map((m, i) => {
       const x = sc.members[m.id] || { total: 0, streak: 0 };
       return `${i ? '<span class="sq-vs">vs</span>' : ''}<div class="sq-duelist ${leader && leader.id === m.id && x.total > 0 ? 'lead' : ''}">${squadAvatar(m, 'lg')}<div class="sq-pts" data-count="${Math.round(x.total)}">${Math.round(x.total)}</div><div class="sq-who">${escapeHtml(m.name)}${m.id === S.me ? ' (you)' : ''}</div><div class="sq-mini">🏆 ${sc.wins[m.id] || 0} · 🔥 ${x.streak} d</div></div>`;
@@ -972,7 +1083,9 @@ function squadActCardHtml(S, a, compact) {
 
 // ---------- FEED ----------
 function squadFeedHtml(S) {
-  const all = Array.from(S.folded.activities.values()).sort((a, b) => `${b.date}${b.start || ''}`.localeCompare(`${a.date}${a.start || ''}`));
+  const every = Array.from(S.folded.activities.values());
+  const older = every.filter(a => !squadInArc(S, a)).length;
+  const all = every.filter(a => Squad.feedAll || squadInArc(S, a)).sort((a, b) => `${b.date}${b.start || ''}`.localeCompare(`${a.date}${a.start || ''}`));
   const f = Squad.feedFilter || 'all';
   const acts = all.filter(a => f === 'all' || a.author === f || a.sport === f);
   const people = S.members.filter(m => all.some(a => a.author === m.id));
@@ -986,7 +1099,8 @@ function squadFeedHtml(S) {
   }
   return `<div class="row between mb-8"><div class="tiny muted">${acts.length} workout${acts.length === 1 ? '' : 's'}</div><button class="btn btn-secondary btn-xs" onclick="openSquadImport()">${icon('camera', 'ic-sm')}Add from screenshot</button></div>
     <div class="chip-rack mb-8">${chip('all', 'All')}${people.map(m => chip(m.id, escapeHtml(m.id === S.me ? 'Me' : m.name))).join('')}${sports.map(s => chip(s, `${icon(SPORTS[s].icon, 'ic-sm')}${SPORTS[s].plural}`)).join('')}</div>
-    ${html || squadNoActsHtml()}`;
+    ${html || squadNoActsHtml()}
+    ${older ? `<div class="center mt-12"><button class="btn btn-ghost btn-sm" onclick="Squad.feedAll=!Squad.feedAll; renderSquad()">${Squad.feedAll ? `Only Arc ${S.ch.arc}` : `Show ${older} from earlier arcs`}</button></div>` : ''}`;
 }
 
 // ---------- CREW ----------
@@ -999,7 +1113,7 @@ function squadCrewHtml(S) {
   const people = S.members.map(m => {
     const x = sc.members[m.id];
     const b = m.baseline || {};
-    const mine = acts.filter(a => a.author === m.id);
+    const mine = acts.filter(a => a.author === m.id && squadInArc(S, a));
     const pbs = mine.flatMap(a => (a.pb || []).map(p => `${p} · ${formatNiceDate(a.date, false)}`));
     const sharesWellness = Object.keys(S.folded.daily[m.id] || {}).length > 0;
     return `<div class="card sq-crew ${m.active ? '' : 'left'}" style="--mc:${escapeHtml(m.color)}">
@@ -1014,7 +1128,15 @@ function squadCrewHtml(S) {
       ${sharesWellness ? `<div class="tiny muted mt-4">${icon('heart', 'ic-xs')} shares body &amp; wellness trends</div>` : ''}
     </div>`;
   }).join('');
-  return `${people}
+  const next = (S.ch.arc || 0) + 1;
+  const past = (S.ch.arcs || []).filter(a => a && a.n).slice().reverse();
+  return `${squadArcBannerHtml(S)}${people}
+    <div class="card sq-arc-card mt-12">
+      <div class="card-title">🏁 Arcs</div>
+      <div class="card-sub">${S.ch.arc ? `You're in <b>Arc ${S.ch.arc}</b> since ${escapeHtml(formatNiceDate(S.ch.starts, false))}.` : 'Kick off Arc 1 when you are all ready.'} A new arc resets scores, streaks, the feed and the chat${S.ch.arc ? `, and ${SQUAD_AI} writes a thorough report of the arc that ends` : ''}. Everyone has to approve.</div>
+      ${past.length ? `<div class="sq-arc-list">${past.map(a => `<button class="pick-row" onclick="Squad.month='arc:${a.n}'; squadView('report')"><span class="sq-arc-n">${a.n}</span><span class="grow"><b>Arc ${a.n}</b><span class="tiny muted">${escapeHtml(formatNiceDate(a.from, false))} → ${escapeHtml(formatNiceDate(a.to, false))}</span></span>${icon('report', 'ic-sm')}</button>`).join('')}</div>` : ''}
+      <div class="btn-row mt-12"><button class="btn btn-primary btn-sm" ${S.ch.arc_vote ? 'disabled' : ''} onclick="squadArc('propose')">${icon('flag', 'ic-sm')}Start Arc ${next}</button>${S.ch.arc_vote ? '<span class="tiny muted">vote running ↑</span>' : ''}</div>
+    </div>
     <div class="card mt-12">
       <div class="card-title">${icon('flag')}The challenge</div>
       <div class="kv-grid mt-8">
@@ -1053,7 +1175,9 @@ function squadMsgHtml(S, e) {
   const b = e.body || {};
   if (e.kind === 'system') {
     const who = b.member ? squadName(S, b.member) : '';
-    const text = b.type === 'joined' ? `${who} joined the challenge` : b.type === 'left' ? `${b.name || who} left` : b.type === 'created' ? `${who} started “${b.name || S.ch.name}”` : b.type === 'settings' ? `${who} changed the challenge settings` : b.type === 'ai' ? `${who} ${b.enabled ? 'set up' : 'switched off'} ${SQUAD_AI}` : b.text || '';
+    if (b.type === 'arc_started') return `<div class="sq-sys sq-sys-arc"><b>🏁 Arc ${b.arc} started</b><span>${b.prev ? `Arc ${b.prev.n} (${escapeHtml(b.prev.from)} → ${escapeHtml(b.prev.to)}) is archived · ` : ''}scores, streaks and chat start fresh</span></div>`;
+    const text = b.type === 'joined' ? `${who} joined the challenge` : b.type === 'left' ? `${b.name || who} left` : b.type === 'created' ? `${who} started “${b.name || S.ch.name}”` : b.type === 'settings' ? `${who} changed the challenge settings` : b.type === 'ai' ? `${who} ${b.enabled ? 'set up' : 'switched off'} ${SQUAD_AI}`
+      : b.type === 'arc_vote' ? `${who} ${b.by && b.by.length > 1 ? 'approved' : 'proposed'} Arc ${b.arc} (${(b.by || []).length}/${S.members.filter(m => m.active).length} approved)` : b.type === 'arc_cancel' ? `${who} called off the Arc ${b.arc} vote` : b.text || '';
     return text ? `<div class="sq-sys ${b.type === 'ai_error' ? 'err' : ''}">${escapeHtml(text)}</div>` : '';
   }
   const mine = e.author === S.me, ai = e.author === 'ai';
@@ -1062,7 +1186,7 @@ function squadMsgHtml(S, e) {
   const replied = replyId && S.folded.messages.find(x => x.id === replyId);
   const target = b.target || (b.ai && b.ai.ref) || (e.ref && String(e.ref).startsWith('act:') ? e.ref : null);
   const act = target && S.folded.activities.get(target);
-  const modeChip = ai && b.mode ? `<span class="sq-mode m-${escapeHtml(b.mode)}">${{ roast: '🔥 Roast', review: '🔍 Review', recap: '📋 Daily recap', final: '🏁 Final recap', interrupt: '💬 Chimed in', ask: '' }[b.mode] || ''}</span>` : '';
+  const modeChip = ai && b.mode ? `<span class="sq-mode m-${escapeHtml(b.mode)}">${{ roast: '🔥 Roast', review: '🔍 Review', recap: '📋 Daily recap', final: '🏁 Final recap', interrupt: '💬 Chimed in', report: '📊 Monthly report', arc: '🏁 Arc report', ask: '' }[b.mode] || ''}</span>` : '';
   const askChip = b.ai ? `<span class="sq-mode m-ask">${b.ai.mode === 'roast' ? '🔥 asked for a roast' : b.ai.mode === 'review' ? '🔍 asked for a review' : `@${SQUAD_AI}`}</span>` : '';
   return `<div class="sq-msg ${mine ? 'mine' : ai ? 'ai' : 'theirs'} ${e.pending ? 'pending' : ''}" onclick="openSquadMsg('${e.id}')">
     ${mine ? '' : squadAvatar(ai ? null : m, 'sm')}
@@ -1088,11 +1212,14 @@ function squadRenderChat(forceBottom) {
   const others = S.members.filter(m => m.active && m.id !== S.me);
   $('#squadChatSub').textContent = others.length ? others.map(m => `${m.name}${m.last_seen ? ` · seen ${relativeTime(m.last_seen)}` : ''}`).join(' · ') : 'Share the invite code to bring a friend in';
   // Chat timeline: messages, system notes and shared workouts, in server order
-  const items = S.st.events.concat(Squad.outbox.filter(o => o.cid === Squad.cur).map((o, i) => Object.assign({ seq: 1e12 + i, pending: true }, o.ev)))
+  const timeline = S.st.events.concat(Squad.outbox.filter(o => o.cid === Squad.cur).map((o, i) => Object.assign({ seq: 1e12 + i, pending: true }, o.ev)))
     .filter(e => e.kind === 'msg' || e.kind === 'system' || e.kind === 'activity')
     .sort((a, b) => a.seq - b.seq);
+  // A new arc starts with a clean chat; earlier arcs stay one tap away
+  const items = Squad.chatAll ? timeline : timeline.filter(e => squadArcEvent(S, e));
+  const hidden = timeline.length - items.length;
   const shownActs = new Set();
-  let html = '', lastDay = '';
+  let html = hidden || Squad.chatAll && S.ch.arc ? `<div class="center"><button class="btn btn-ghost btn-xs" onclick="Squad.chatAll=!Squad.chatAll; squadRenderChat(false)">${Squad.chatAll ? `Hide earlier arcs` : `Show ${hidden} earlier message${hidden === 1 ? '' : 's'} (before Arc ${S.ch.arc})`}</button></div>` : '', lastDay = '';
   for (const e of items) {
     if (S.folded.deleted.has(e.id)) continue;
     const day = String(e.created_at).slice(0, 10);

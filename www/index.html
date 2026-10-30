@@ -102,7 +102,7 @@
         <div class="screen-sub" id="ridesSub">Loading…</div>
       </div>
       <div class="row" style="gap:6px">
-        <button class="btn btn-secondary btn-sm" onclick="openSquadImport()" aria-label="Add workouts from screenshots"><svg class="ic"><use href="#i-camera"/></svg></button>
+        <button class="btn btn-secondary btn-sm" id="btnShot" onclick="openSquadImport()" aria-label="Add workouts from screenshots"><svg class="ic"><use href="#i-camera"/></svg></button>
         <button class="btn btn-secondary btn-sm" onclick="openManualWorkout()" aria-label="Log a workout by hand"><svg class="ic"><use href="#i-plus"/></svg><span>Log</span></button>
         <button id="btnSync" class="btn btn-primary btn-sm" onclick="syncAll()"><svg class="ic"><use href="#i-refresh"/></svg><span>Sync</span></button>
       </div>
@@ -395,7 +395,7 @@
     <div class="card">
       <div class="card-title"><svg class="ic"><use href="#i-link"/></svg>Connections</div>
       <details id="stravaWebSteps" class="hidden mt-8">
-        <summary class="small" style="cursor:pointer"><b>Optional:</b> automatic via Huawei Health → Strava (if your Huawei app lists Strava under Third-party services)</summary>
+        <summary class="small" style="cursor:pointer"><b>Automatic via Huawei Health → Strava:</b> link Strava in Huawei Health (Me → Third-party services), join the challenge, then tap <b>Sign in with Strava</b> below with the fields empty — no Strava app needed. Only if you have your own Strava API app:</summary>
         <ol class="hw-steps mt-8">
           <li><b>Huawei Health</b> app → <b>Me</b> → <b>Data sharing and authorization</b> (or Third-party services) → <b>Strava</b> → sign in / create a free Strava account → allow.</li>
           <li>Open <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> (signed in to that Strava account) and create an app: name <b>Training Partner</b>, category <b>Training</b>, website <b id="stravaSite"></b>, <b>Authorization Callback Domain</b>: <b id="stravaHost"></b>. Upload any picture as icon if asked.</li>
@@ -480,6 +480,11 @@
         <input type="file" id="shExportInput" multiple class="hidden" onchange="importSamsungExport(event)" />
         <button class="btn btn-secondary btn-sm mt-8" onclick="$('#shExportInput').click()"><svg class="ic"><use href="#i-swim"/></svg>Import Samsung Health export</button>
       </div>
+    </div>
+
+    <div class="card hidden" id="accountCard">
+      <div class="card-title"><svg class="ic"><use href="#i-user"/></svg>Account</div>
+      <div id="accountBody" class="mt-8"></div>
     </div>
 
     <div class="card" id="huaweiCard">
@@ -744,6 +749,18 @@
   <button class="btn btn-primary mt-12" id="sqjJoin" onclick="joinSquadChallenge()"><svg class="ic"><use href="#i-link"/></svg>Join</button>
 </div>
 
+<div class="sheet" id="accountSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title" id="acc_title">Create your account</div>
+  <div class="sheet-sub mb-12" id="acc_sub"></div>
+  <div class="field"><label for="acc_user">Username</label><input id="acc_user" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="24" placeholder="e.g. assad" /></div>
+  <div class="field mt-8"><label for="acc_pw">Password</label><input id="acc_pw" type="password" class="input" autocomplete="current-password" minlength="8" /></div>
+  <div class="field mt-8" id="acc_pw2_row"><label for="acc_pw2">Password again</label><input id="acc_pw2" type="password" class="input" autocomplete="new-password" /></div>
+  <button class="btn btn-primary mt-12" id="accSubmit" onclick="accountSubmit()">Create account</button>
+  <div class="small mt-8" id="acc_status" role="status"></div>
+  <button class="btn btn-ghost btn-sm mt-8" id="acc_switch" onclick="accountMode = accountMode === 'signup' ? 'signin' : 'signup'; accountRenderSheet()"></button>
+</div>
+
 <div class="sheet" id="huaweiSheet" role="dialog" aria-modal="true">
   <div class="sheet-grip"></div>
   <div class="sheet-title">Import from Huawei Health</div>
@@ -800,6 +817,7 @@
     <div class="field"><label for="sqi_dur">Duration</label><input id="sqi_dur" class="input" placeholder="h:mm:ss or mm:ss" /></div>
   </div>
   <div class="sq-form-grid mt-8" id="sqi_fields"></div>
+  <div id="sqi_detail" class="mt-8"></div>
   <div class="field mt-8"><label>Effort (RPE 1–10)</label><div class="rpe-row" id="sqi_rpe"></div></div>
   <div class="field mt-8"><label for="sqi_note">Note</label><input id="sqi_note" class="input" maxlength="240" placeholder="How it felt, what you did…" /></div>
   <div class="hint mt-8" id="sqi_extra"></div>
@@ -1046,6 +1064,7 @@
 <script src="js/app/skills.js"></script>
 <script src="js/app/health.js"></script>
 <script src="js/app/huawei.js"></script>
+<script src="js/app/account.js"></script>
 <script src="js/app/ai.js"></script>
 <script src="js/app/charts.js"></script>
 <script src="js/app/route.js"></script>
@@ -1059,6 +1078,7 @@
 <script src="js/app/squad-core.js"></script>
 <script src="js/app/views/squad.js"></script>
 <script src="js/app/views/squad-stats.js"></script>
+<script src="js/app/shots.js"></script>
 <script src="js/app/views/reports.js"></script>
 <script src="js/app/views/profile.js"></script>
 <script src="js/app/views/intro.js"></script>

@@ -373,11 +373,13 @@ const estTokens = s => Math.ceil(String(s || '').length / 4);
 // Each returns { url, headers, body, parse(json), onEvent(evt, acc) }
 // --------------------------------------------------------
 function buildRequest(p, prompt, imageB64, opts, stream) {
-  const img = imageB64 ? (imageB64.includes(',') ? imageB64.split(',')[1] : imageB64) : null;
+  // One image (data URL / base64) or several (array) — e.g. all screens of one workout
+  const imgs = (Array.isArray(imageB64) ? imageB64 : imageB64 ? [imageB64] : []).map(x => (x.includes(',') ? x.split(',')[1] : x));
+  const img = imgs[0] || null;
 
   if (p.type === 'gemini') {
     const parts = [{ text: prompt }];
-    if (img) parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
+    for (const im of imgs) parts.push({ inlineData: { mimeType: 'image/jpeg', data: im } });
     const generationConfig = { maxOutputTokens: opts.maxTokens || 8192 };
     if (opts.json) generationConfig.responseMimeType = 'application/json';
     const textOf = d => {
@@ -402,7 +404,7 @@ function buildRequest(p, prompt, imageB64, opts, stream) {
 
   if (p.type === 'anthropic') {
     const content = [];
-    if (img) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img } });
+    for (const im of imgs) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: im } });
     content.push({ type: 'text', text: opts.json ? `${prompt}\n\nReply with JSON only.` : prompt });
     const req = { model: p.model, max_tokens: stream ? 32000 : 16000, messages: [{ role: 'user', content }] };
     if (stream) req.stream = true;
@@ -439,7 +441,7 @@ function buildRequest(p, prompt, imageB64, opts, stream) {
   // OpenAI-compatible chat completions
   const official = /api\.openai\.com/.test(p.baseUrl);
   const msg = img
-    ? { role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}` } }] }
+    ? { role: 'user', content: [{ type: 'text', text: prompt }].concat(imgs.map(im => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${im}` } }))) }
     : { role: 'user', content: opts.json ? `${prompt}\n\nReply with JSON only.` : prompt };
   const req = { model: p.model, messages: [msg] };
   req[official ? 'max_completion_tokens' : 'max_tokens'] = opts.maxTokens || 8192;

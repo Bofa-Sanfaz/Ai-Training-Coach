@@ -29,11 +29,12 @@ const mock = http.createServer((req, res) => {
     const b = JSON.parse(raw || '{}');
     const m = b.messages[0];
     const text = typeof m.content === 'string' ? m.content : m.content.map(c => c.text || '').join('');
-    const hasImage = Array.isArray(m.content) && m.content.some(c => c.type === 'image_url');
-    prompts.push({ text, hasImage, auth: req.headers.authorization });
+    const images = Array.isArray(m.content) ? m.content.filter(c => c.type === 'image_url').length : 0;
+    const hasImage = images > 0;
+    prompts.push({ text, hasImage, images, auth: req.headers.authorization });
     if (slowMs) await sleep(slowMs);
     let reply;
-    if (hasImage) reply = JSON.stringify({ sport: 'swim', type: 'Pool swim', date: '2026-10-28', dur_s: 1800, dist_m: 1000, pace100_s: 160, swolf: 41, pool_m: 25 });
+    if (hasImage) reply = JSON.stringify({ workouts: [{ screens: [1, 2], sport: 'swim', type: 'Pool swim', date: '2026-10-28', dur_s: 1800, dist_m: 1000, swolf: 41, pool_m: 25, laps: [{ n: 1, dist_m: 25, time_s: 36 }] }, { screens: [3], sport: 'walk', date: '2026-10-27', dur_s: 2400, dist_m: 3100 }] });
     else if (/reply exactly PASS/.test(text)) reply = 'PB alert! Mock interrupt.';
     else if (/DAILY RECAP|final recap/i.test(text)) reply = 'Mock recap of the day.';
     else reply = `Mock answer to: ${(text.match(/TASK: (.{0,40})/) || [])[1]}`;
@@ -262,8 +263,79 @@ try {
 
   // Screenshot import
   prompts.length = 0;
-  r = await call('POST', `/api/c/${cid}/ai/extract`, { image: 'A'.repeat(500), hint: 'Huawei pool swim' }, B);
-  ok(r.status === 200 && r.d.workout.sport === 'swim' && r.d.workout.swolf === 41 && prompts[0].hasImage, 'screenshot → workout JSON', r.d);
+  r = await call('POST', `/api/c/${cid}/ai/extract`, { images: ['A'.repeat(500), 'B'.repeat(500), 'C'.repeat(500)] }, B);
+  ok(r.status === 200 && r.d.result.workouts.length === 2 && r.d.result.workouts[0].swolf === 41 && prompts[0].images === 3, 'screenshots (3) → grouped workouts JSON', { d: r.d, p: prompts.map(p => p.images) });
+  r = await call('POST', `/api/c/${cid}/ai/extract`, { images: [] }, B);
+  ok(r.status === 400, 'extract without images → 400', r.status);
+
+  // ---------- arcs ----------
+  r = await call('POST', `/api/c/${cid}/arc`, { action: 'propose' }, A);
+  ok(r.status === 200 && r.d.started === false && r.d.arc_vote.arc === 1 && r.d.arc_vote.by.length === 1, 'arc 1 proposed, waits for Assad', r.d);
+  r = await call('POST', `/api/c/${cid}/arc`, { action: 'cancel' }, B);
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  ok(r.d.challenge.arc_vote === null && r.d.events.some(e => e.body.type === 'arc_cancel'), 'arc vote called off', r.d.challenge);
+  await call('POST', `/api/c/${cid}/arc`, { action: 'propose' }, A);
+  r = await call('POST', `/api/c/${cid}/arc`, { action: 'approve' }, B);
+  ok(r.status === 200 && r.d.started === true && r.d.arc === 1 && r.d.prev === null, 'both approved → Arc 1 starts (no report for arc 0)', r.d);
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  ok(r.d.challenge.arc === 1 && r.d.challenge.starts === today && r.d.challenge.arc_seq > 0 && r.d.events.some(e => e.body.type === 'arc_started' && e.body.arc === 1 && e.seq === r.d.challenge.arc_seq), 'challenge restarts today as Arc 1', r.d.challenge);
+  ok(!r.d.events.some(e => e.body.ai && e.body.ai.mode === 'arc'), 'no AI report request for Arc 0');
+  await call('POST', `/api/c/${cid}/arc`, { action: 'propose' }, B);
+  r = await call('POST', `/api/c/${cid}/arc`, { action: 'approve' }, A);
+  ok(r.d.started === true && r.d.arc === 2 && r.d.prev && r.d.prev.n === 1 && r.d.prev.from === today, 'Arc 2 starts, Arc 1 archived', r.d);
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, B);
+  ok(r.d.challenge.arcs.length === 1 && r.d.challenge.arcs[0].n === 1, 'past arcs listed on the challenge', r.d.challenge.arcs);
+  const arcReq = r.d.events.find(e => e.kind === 'msg' && e.body.ai && e.body.ai.mode === 'arc');
+  ok(arcReq && arcReq.body.ai.arc === 1 && arcReq.body.ai.from === today, 'Arc 1 report requested automatically', arcReq);
+  prompts.length = 0;
+  await call('POST', `/api/c/${cid}/ai/run`, {}, A);
+  ok(prompts.some(p => /END-OF-ARC/.test(p.text)), 'AI writes the thorough arc report', prompts.map(p => p.text.slice(0, 120)));
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  ok(r.d.events.some(e => e.author === 'ai' && e.body.mode === 'arc' && e.body.reply_to === arcReq.id), 'arc report posted as a reply', r.d.events.filter(e => e.author === 'ai').slice(-2));
+  r = await call('POST', `/api/c/${cid}/arc`, { action: 'dance' }, A);
+  ok(r.status === 400, 'unknown arc action → 400', r.status);
+
+  // ---------- accounts (multi-device sign-in, encrypted vault) ----------
+  const user = `t_${Math.random().toString(36).slice(2, 10)}`;
+  const authKey = 'ab'.repeat(32), badKey = 'cd'.repeat(32);
+  r = await call('POST', '/api/account/signup', { username: user.toUpperCase(), auth: authKey, device: 'test' });
+  ok(r.status === 201 && r.d.username === user && r.d.token && r.d.vault_version === 0, 'sign up (username lower-cased)', r.d);
+  const T1 = r.d.token;
+  r = await call('POST', '/api/account/signup', { username: user, auth: authKey });
+  ok(r.status === 409, 'username taken → 409', r.status);
+  r = await call('POST', '/api/account/signup', { username: 'a', auth: authKey });
+  ok(r.status === 400, 'too short username → 400', r.status);
+  r = await call('POST', '/api/account/login', { username: user, auth: badKey });
+  ok(r.status === 401, 'wrong password → 401', r.status);
+  const putPart = (tok, i, v, n, bytes) => fetch(`${API}/api/account/vault/${i}?version=${v}&parts=${n}`, { method: 'PUT', headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/octet-stream' }, body: bytes });
+  const blob = n => { const b = new Uint8Array(n); for (let i = 0; i < n; i++) b[i] = (i * 7 + 3) & 255; return b; };
+  let vr = await putPart(T1, 0, 1, 2, blob(600000));
+  ok(vr.status === 200, 'vault part 1/2 stored', vr.status);
+  vr = await putPart(T1, 1, 1, 2, blob(1000));
+  const vj = await vr.json();
+  ok(vr.status === 200 && vj.committed === 1 && vj.size === 601000, 'vault v1 committed on last part', vj);
+  r = await call('POST', '/api/account/login', { username: user, auth: authKey, device: 'phone 2' });
+  ok(r.status === 200 && r.d.vault_version === 1, 'sign in on a second device', r.d);
+  const T2 = r.d.token;
+  r = await call('GET', '/api/account/vault', null, T2);
+  ok(r.d.version === 1 && r.d.parts === 2 && r.d.size === 601000, 'vault info', r.d);
+  const got = new Uint8Array(await (await fetch(`${API}/api/account/vault/0?version=1`, { headers: { Authorization: `Bearer ${T2}` } })).arrayBuffer());
+  const want = blob(600000);
+  ok(got.length === 600000 && got.every((x, i) => x === want[i]), 'vault part downloads byte-exact', got.length);
+  vr = await putPart(T2, 0, 1, 1, blob(10));
+  ok(vr.status === 409, 'stale version → 409 (pull first)', vr.status);
+  vr = await putPart(T2, 0, 2, 1, blob(2000));
+  ok(vr.status === 200, 'second device commits v2', vr.status);
+  vr = await fetch(`${API}/api/account/vault/0?version=1`, { headers: { Authorization: `Bearer ${T1}` } });
+  ok(vr.status === 404, 'old vault parts deleted', vr.status);
+  r = await call('POST', '/api/account/logout', null, T1);
+  r = await call('GET', '/api/account/vault', null, T1);
+  ok(r.status === 401, 'signed out token stops working', r.status);
+  vr = await putPart(T2, 0, 3, 1, blob(1048577));
+  ok(vr.status === 413, 'oversized part refused', vr.status);
+  for (let i = 0; i < 8; i++) await call('POST', '/api/account/login', { username: user, auth: badKey });
+  r = await call('POST', '/api/account/login', { username: user, auth: authKey });
+  ok(r.status === 429, '8 wrong passwords → locked for 15 min', r.status);
 
   // Spend cap: 1000 in + 100 out at $1/$5 per M ≈ $0.0015 per call; set cap tiny → refused
   await call('PUT', `/api/c/${cid}/ai`, { config: { type: 'openai', baseUrl: 'http://127.0.0.1:8799/v1', model: 'mock2', priceIn: 1, priceOut: 5, capUsd: 0.001 } }, A);

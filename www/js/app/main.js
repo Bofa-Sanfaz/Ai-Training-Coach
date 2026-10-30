@@ -168,11 +168,15 @@ async function boot() {
   try { if ((await dedupeWorkouts()) + (await migrateWalks())) await renderRides(); } catch (e) { console.warn('dedupe/walks', e); }
   maybeAutoSync();
   setTimeout(resumePendingChats, 2000);
-  // Web app: Strava needs the person's own (free) Strava API app — show how, with this site's address
+  // Web app (the friend's): no Strava (a new Strava API app needs a paid plan) — workouts come from
+  // screenshots, Log and the Huawei export; his account keeps the data on all his devices
   if (!isNative()) {
-    $('#stravaWebSteps').classList.remove('hidden');
-    $('#stravaHost').textContent = location.host;
-    $('#stravaSite').textContent = location.origin;
+    const conn = $('#cfg_client_id') && $('#cfg_client_id').closest('.card');
+    if (conn) conn.classList.add('hidden');
+    $('#btnSync').classList.add('hidden');
+    const shot = $('#btnShot');
+    if (shot) { shot.className = 'btn btn-primary btn-sm'; shot.innerHTML = `${icon('camera')}<span>Screenshot</span>`; }
+    try { await accountBoot(); } catch (e) { console.warn('account', e); }
   }
   // First run (fresh install / friend's web app): the introduction, which also handles an invite link
   let intro = false;
@@ -184,6 +188,12 @@ async function boot() {
 
 // Sync button / pull-to-refresh: Strava plus the watch (Samsung Health workouts & wellness)
 async function syncAll() {
+  // The web app has no Strava: pulling down refreshes the squad and backs up the account instead
+  if (!isNative() && !(await getConfig('strava_refresh_token'))) {
+    if (typeof Squad !== 'undefined' && Squad.list.length) await squadTick(true);
+    if (typeof accountGet === 'function' && accountGet()) await accountUpload('pull to refresh');
+    return;
+  }
   const jobs = [syncStrava()];
   if ((await getConfig('health_enabled')) === '1') jobs.push(syncWellness(true));
   await Promise.all(jobs);

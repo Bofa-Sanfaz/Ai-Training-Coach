@@ -179,10 +179,13 @@ const SquadCore = (() => {
    * month: 'YYYY-MM'. daily: fold().daily. score: compute() result (for weekly points in the month).
    */
   function month(members, activities, daily, ym, score) {
-    const from = `${ym}-01`;
     const last = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
-    const to = `${ym}-${String(last).padStart(2, '0')}`;
-    const out = { month: ym, from, to, days: last, members: {} };
+    return Object.assign(period(members, activities, daily, `${ym}-01`, `${ym}-${String(last).padStart(2, '0')}`, score), { month: ym });
+  }
+
+  // Any date range (a month, an arc…) in numbers per member
+  function period(members, activities, daily, from, to, score) {
+    const out = { from, to, days: dayNum(to) - dayNum(from) + 1, members: {} };
     for (const m of members) {
       const acts = activities.filter(a => a.author === m.id && a.date >= from && a.date <= to);
       const by = {};
@@ -241,6 +244,6 @@ const SquadCore = (() => {
     return { v: 1, seq, today, score, recent, daily, last_dates: last };
   }
 
-  return { fold, actRef, compute, month, digest, METRIC, WEIGHTS: W };
+  return { fold, actRef, compute, month, period, digest, METRIC, WEIGHTS: W };
 })();
 if (typeof globalThis !== 'undefined') globalThis.SquadCore = SquadCore;

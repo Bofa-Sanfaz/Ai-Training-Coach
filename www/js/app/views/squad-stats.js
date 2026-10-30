@@ -52,7 +52,7 @@ function squadStatsHtml(S) {
   const pbs = acts.filter(a => a.pb && a.pb.length).sort((a, b) => b.date.localeCompare(a.date));
   return `<div class="segmented mb-8" id="sqRangeSeg">
       <button class="${Squad.statsRange === 'last4' ? 'active' : ''}" onclick="Squad.statsRange='last4'; renderSquad()">Last 4 weeks</button>
-      <button class="${Squad.statsRange !== 'last4' ? 'active' : ''}" onclick="Squad.statsRange='challenge'; renderSquad()">Whole challenge</button>
+      <button class="${Squad.statsRange !== 'last4' ? 'active' : ''}" onclick="Squad.statsRange='challenge'; renderSquad()">${S.ch.arc ? `Whole Arc ${S.ch.arc}` : 'Whole challenge'}</button>
     </div>
     <div class="table-wrap"><table class="dtable sq-vs-table"><thead><tr><th></th>${ms.map(m => `<th style="color:${escapeHtml(m.color)}">${escapeHtml(m.name)}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(([label, fn]) => `<tr><td>${label}</td>${ms.map(m => `<td>${escapeHtml(stat(m, l => fn(l, m)))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
@@ -175,36 +175,60 @@ function sqMonths(S) {
 
 const sqMonthName = ym => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
-function sqMonthData(S, ym) {
-  return SquadCore.month(sqMembers(S), Array.from(S.folded.activities.values()), S.folded.daily, ym, S.score);
+// Finished arcs, newest first: { n, from, to, seq_from, seq_to }
+const sqPastArcs = S => (S.ch.arcs || []).filter(a => a && a.n).slice().reverse();
+
+// A report period: a month of the running arc ('YYYY-MM') or a whole finished arc ('arc:N')
+function sqPeriod(S, key) {
+  const ms = sqMembers(S);
+  const acts = Array.from(S.folded.activities.values());
+  const arc = /^arc:\d+$/.test(key || '') ? sqPastArcs(S).find(a => `arc:${a.n}` === key) : null;
+  if (arc) {
+    const people = S.members.filter(m => m.active || acts.some(a => a.author === m.id && a.date >= arc.from && a.date <= arc.to));
+    const score = SquadCore.compute({ starts: arc.from, ends: arc.to, rules: S.ch.rules }, people, acts, S.st.today);
+    return Object.assign(SquadCore.period(people, acts, S.folded.daily, arc.from, arc.to, score), { key, kind: 'arc', arc, score, people, label: `Arc ${arc.n}` });
+  }
+  return Object.assign(SquadCore.month(ms, acts, S.folded.daily, key, S.score), { key, kind: 'month', score: S.score, people: ms, label: sqMonthName(key) });
 }
 
-// The AI's latest monthly report for this month (answer to a 'report' request)
-function sqMonthAiReport(S, ym) {
-  const reqs = new Map(S.folded.messages.filter(m => m.body.ai && m.body.ai.mode === 'report').map(m => [m.id, m]));
-  return S.folded.messages.filter(m => m.author === 'ai' && m.body.mode === 'report' && reqs.has(m.body.reply_to) && (reqs.get(m.body.reply_to).body.ai.month || ym) === ym).pop() || null;
+// The AI's latest report for this period (answer to a 'report' or 'arc' request)
+function sqPeriodAiReport(S, P) {
+  const mode = P.kind === 'arc' ? 'arc' : 'report';
+  const fits = q => (P.kind === 'arc' ? q.body.ai.arc === P.arc.n : (q.body.ai.month || P.key) === P.key);
+  const reqs = new Map(S.folded.messages.filter(m => m.body.ai && m.body.ai.mode === mode && fits(m)).map(m => [m.id, m]));
+  const answer = S.folded.messages.filter(m => m.author === 'ai' && m.body.mode === mode && reqs.has(m.body.reply_to)).pop() || null;
+  const asked = Array.from(reqs.values()).some(q => !S.folded.messages.some(r => r.body.reply_to === q.id));
+  return { answer, asked };
 }
+
+const sqSpan = P => `${formatNiceDate(P.from, false)} → ${formatNiceDate(P.to, false)}`;
 
 function squadReportHtml(S) {
   const months = sqMonths(S);
-  if (!Squad.month || !months.includes(Squad.month)) Squad.month = months[months.length - 1];
-  const ym = Squad.month;
-  const mo = sqMonthData(S, ym);
-  const ms = sqMembers(S);
-  const ai = sqMonthAiReport(S, ym);
-  const asked = S.folded.messages.some(m => m.body.ai && m.body.ai.mode === 'report' && m.body.ai.month === ym && !S.folded.messages.some(r => r.body.reply_to === m.id));
-  const best = ms.map(m => ({ m, v: mo.members[m.id] && mo.members[m.id].avg_week_points })).filter(x => x.v !== null && x.v !== undefined).sort((a, b) => b.v - a.v);
+  const arcs = sqPastArcs(S);
+  const keys = months.concat(arcs.map(a => `arc:${a.n}`));
+  if (!Squad.month || !keys.includes(Squad.month)) Squad.month = months[months.length - 1];
+  const key = Squad.month;
+  const mo = sqPeriod(S, key);
+  const isArc = mo.kind === 'arc';
+  const ms = mo.people;
+  const { answer: ai, asked } = sqPeriodAiReport(S, mo);
+  // An arc is won on total points, a month on average points per week
+  const val = m => (isArc ? (mo.score.members[m.id] ? mo.score.members[m.id].total : null) : mo.members[m.id] && mo.members[m.id].avg_week_points);
+  const best = ms.map(m => ({ m, v: val(m) })).filter(x => x.v !== null && x.v !== undefined).sort((a, b) => b.v - a.v);
   const winner = best.length > 1 && best[0].v > best[1].v ? best[0].m : null;
   const tile = (v, l) => `<div class="sq-tile"><b>${v}</b><span>${l}</span></div>`;
   const cards = ms.map(m => {
     const x = mo.members[m.id];
     if (!x) return '';
+    const sc = mo.score.members[m.id];
     const wd = x.weight_start && x.weight_end ? round(x.weight_end - x.weight_start, 1) : null;
     const sportBars = Object.entries(x.by_sport).sort((a, b) => b[1].minutes - a[1].minutes);
     const maxMin = Math.max(1, ...sportBars.map(([, v]) => v.minutes));
     return `<div class="card sq-month-card" style="--mc:${escapeHtml(m.color)}">
-      <div class="row between"><div class="row" style="gap:8px">${squadAvatar(m)}<b>${escapeHtml(m.name)}</b></div>${x.avg_week_points !== null ? `<div class="sq-week-pts">${Math.round(x.avg_week_points)}<small> avg pts/week</small></div>` : ''}</div>
+      <div class="row between"><div class="row" style="gap:8px">${squadAvatar(m)}<b>${escapeHtml(m.name)}</b></div>${isArc && sc ? `<div class="sq-week-pts">${Math.round(sc.total)}<small> arc points</small></div>` : x.avg_week_points !== null ? `<div class="sq-week-pts">${Math.round(x.avg_week_points)}<small> avg pts/week</small></div>` : ''}</div>
       <div class="sq-tiles">
+        ${isArc && sc ? `${tile(mo.score.wins[m.id] || 0, 'weeks won')}${tile(x.avg_week_points !== null ? Math.round(x.avg_week_points) : '–', 'avg pts/week')}` : ''}
         ${tile(x.sessions, 'workouts')}${tile(x.active_days, 'active days')}${tile(formatHours(x.minutes * 60), 'time')}
         ${tile(x.dist_m ? `${fmtNum(x.dist_m / 1000, 1)}<small>km</small>` : '–', 'distance')}${tile(x.load || '–', 'load')}${tile(x.best_streak ? `${x.best_streak}<small>d</small>` : '–', 'best streak')}
         ${wd !== null ? tile(`${wd > 0 ? '+' : ''}${fmtNum(wd, 1)}<small>kg</small>`, 'weight change') : ''}
@@ -217,51 +241,59 @@ function squadReportHtml(S) {
       ${x.longest ? `<div class="tiny muted mt-8">Longest: ${escapeHtml(x.longest.title)} · ${formatDuration(x.longest.dur_s)}${x.longest.dist_m ? ` · ${fmtNum(x.longest.dist_m / 1000, 1)} km` : ''} · ${escapeHtml(formatNiceDate(x.longest.date, false))}</div>` : ''}
     </div>`;
   }).join('');
-  return `<div class="chip-rack mb-8">${months.map(m => `<button class="chip ${m === ym ? 'active' : ''}" onclick="Squad.month='${m}'; renderSquad()">${escapeHtml(sqMonthName(m))}</button>`).join('')}</div>
-    <div class="card card-hero sq-top sq-month-hero">
-      <div class="sq-kicker">Monthly report · ${escapeHtml(S.ch.name)}</div>
-      <div class="sq-title">${escapeHtml(sqMonthName(ym))}</div>
-      <div class="sq-week-note">${winner ? `🏆 ${escapeHtml(winner.name)} wins the month on relative points` : best.length > 1 ? 'Dead level on relative points' : 'Relative points per week, averaged over the month'}</div>
+  const chip = (k, label, cls = '') => `<button class="chip ${cls} ${k === key ? 'active' : ''}" onclick="Squad.month='${k}'; renderSquad()">${label}</button>`;
+  const what = isArc ? 'arc' : 'month';
+  return `<div class="chip-rack mb-8">${months.map(m => chip(m, escapeHtml(sqMonthName(m)))).join('')}${arcs.map(a => chip(`arc:${a.n}`, `🏁 Arc ${a.n}`, 'sq-arc-chip')).join('')}</div>
+    <div class="card card-hero sq-top sq-month-hero ${isArc ? 'sq-arc-hero' : ''}">
+      <div class="sq-kicker">${isArc ? 'Arc report' : `Monthly report${S.ch.arc ? ` · Arc ${S.ch.arc}` : ''}`} · ${escapeHtml(S.ch.name)}</div>
+      <div class="sq-title">${escapeHtml(mo.label)}</div>
+      ${isArc ? `<div class="tiny" style="opacity:.85">${escapeHtml(sqSpan(mo))} · ${mo.days} day${mo.days === 1 ? '' : 's'} · ${mo.score.weeks} week${mo.score.weeks === 1 ? '' : 's'}</div>` : ''}
+      <div class="sq-week-note">${winner ? `🏆 ${escapeHtml(winner.name)} wins the ${what} on relative points${isArc ? ` (${Math.round(best[0].v)} vs ${Math.round(best[1].v)})` : ''}` : best.length > 1 ? 'Dead level on relative points' : isArc ? 'Total relative points over the arc' : 'Relative points per week, averaged over the month'}</div>
     </div>
     <div class="sq-score-grid mt-12">${cards}</div>
-    <div class="section-title"><span>The month in graphs</span></div>
+    <div class="section-title"><span>The ${what} in graphs</span></div>
     ${sqChart('sqRpDaily', 'Minutes per day', 'stacked per person')}
     ${sqChart('sqRpCum', 'On track vs own usual', 'cumulative minutes · dashed = own usual pace', 220)}
     ${sqChart('sqRpWeeks', 'Points per week', 'relative score', 200)}
-    <div class="section-title"><span>${SQUAD_AI}'s monthly report</span>${ai ? `<span class="tiny muted">${escapeHtml(relativeTime(ai.created_at))}</span>` : ''}</div>
-    ${ai ? `<div class="card sq-recap"><div class="md">${renderMarkdown(ai.body.text)}</div></div>` : `<div class="tiny muted mb-8">${asked ? `${SQUAD_AI} is writing it — it appears here and in the chat.` : `${SQUAD_AI} reads both of your months (and the wellness you share) and writes the report into the chat.`}</div>`}
+    <div class="section-title"><span>${SQUAD_AI}'s ${isArc ? 'arc report & analysis' : 'monthly report'}</span>${ai ? `<span class="tiny muted">${escapeHtml(relativeTime(ai.created_at))}</span>` : ''}</div>
+    ${ai ? `<div class="card sq-recap"><div class="md">${renderMarkdown(ai.body.text)}</div></div>` : `<div class="tiny muted mb-8">${asked ? `${SQUAD_AI} is writing it — it appears here and in the chat.` : `${SQUAD_AI} reads both of your ${what}s (and the wellness you share) and writes the ${isArc ? 'full analysis' : 'report'} into the chat.`}</div>`}
     <div class="btn-row mt-8">
-      <button class="btn btn-primary btn-sm" ${asked || !(S.ch.ai && S.ch.ai.enabled) ? 'disabled' : ''} onclick="squadAskMonthReport('${ym}')">${icon('sparkle')}${ai ? 'Write it again' : 'Write the report'}</button>
-      <button class="btn btn-dark btn-sm" id="sqPdfBtn" onclick="exportSquadMonthPdf('${ym}')">${icon('download')}Export PDF</button>
+      <button class="btn btn-primary btn-sm" ${asked || !(S.ch.ai && S.ch.ai.enabled) ? 'disabled' : ''} onclick="squadAskReport('${key}')">${icon('sparkle')}${ai ? 'Write it again' : 'Write the report'}</button>
+      <button class="btn btn-dark btn-sm" id="sqPdfBtn" onclick="exportSquadMonthPdf('${key}')">${icon('download')}Export PDF</button>
     </div>`;
 }
 
-function squadAskMonthReport(ym) {
-  squadQueue(Squad.cur, 'msg', { text: `📊 Monthly report for ${sqMonthName(ym)}, please`, ai: { mode: 'report', month: ym } });
-  toast(`${SQUAD_AI} is writing the ${sqMonthName(ym)} report`, 'info');
+function squadAskReport(key) {
+  const S = squadState(Squad.cur);
+  if (!S || !S.ch) return;
+  const P = sqPeriod(S, key);
+  if (P.kind === 'arc') squadQueue(Squad.cur, 'msg', { text: `📊 Arc ${P.arc.n} report, please`, ai: { mode: 'arc', from: P.from, to: P.to, arc: P.arc.n } });
+  else squadQueue(Squad.cur, 'msg', { text: `📊 Monthly report for ${P.label}, please`, ai: { mode: 'report', month: key } });
+  toast(`${SQUAD_AI} is writing the ${P.label} report`, 'info');
   renderSquad();
 }
 
 function renderSquadReportCharts(S) {
   if (!plotReady()) return;
-  const ym = Squad.month;
-  const ms = sqMembers(S);
-  const mo = sqMonthData(S, ym);
+  const mo = sqPeriod(S, Squad.month);
+  const isArc = mo.kind === 'arc';
+  const ms = mo.people;
   const today = S.st.today;
   const lastDay = mo.to < today ? mo.to : today;
   const days = [];
-  // From the challenge start (an "own usual pace" line before it would be meaningless)
-  for (let n = sqDayN(mo.from > S.ch.starts ? mo.from : S.ch.starts); n <= sqDayN(lastDay); n++) days.push(sqDate(n));
+  // From the start of the scored period (an "own usual pace" line before it would be meaningless)
+  const first = isArc ? mo.from : mo.from > S.ch.starts ? mo.from : S.ch.starts;
+  for (let n = sqDayN(first); n <= sqDayN(lastDay); n++) days.push(sqDate(n));
   const acts = Array.from(S.folded.activities.values());
   const legend = { showlegend: true, legend: { orientation: 'h', y: 1.02, yanchor: 'bottom', x: 0, font: { size: 11 } }, margin: { l: 38, r: 10, t: 40, b: 30 } };
   const perDay = m => days.map(d => Math.round(sumBy(acts.filter(a => a.author === m.id && a.date === d), a => num(a.dur_s)) / 60));
   drawChart($('#sqRpDaily'), ms.map(m => ({ x: days, y: perDay(m), name: m.name, type: 'bar', marker: { color: m.color }, hovertemplate: `${m.name}: %{y} min<extra></extra>` })),
-    plotLayout(Object.assign({}, legend, { barmode: 'stack', bargap: 0.25, xaxis: { type: 'date', tickformat: '%d' } })));
+    plotLayout(Object.assign({}, legend, { barmode: 'stack', bargap: 0.25, xaxis: { type: 'date', tickformat: isArc ? '%d %b' : '%d' } })));
   const cum = [];
   for (const m of ms) {
     let s = 0;
     cum.push({ x: days, y: perDay(m).map(v => (s += v)), name: m.name, type: 'scatter', mode: 'lines', line: { color: m.color, width: 3 }, fill: 'none', hovertemplate: `${m.name}: %{y} min<extra></extra>` });
-    const usual = S.score.members[m.id] && S.score.members[m.id].weekly_min;
+    const usual = mo.score.members[m.id] && mo.score.members[m.id].weekly_min;
     if (usual) cum.push({ x: days, y: days.map((d, i) => Math.round(usual / 7 * (i + 1))), name: `${m.name} usual`, type: 'scatter', mode: 'lines', line: { color: m.color, dash: 'dash', width: 1.5 }, showlegend: false, hovertemplate: `${m.name} usual pace: %{y} min<extra></extra>` });
   }
   drawChart($('#sqRpCum'), cum, plotLayout(Object.assign({}, legend, { xaxis: { type: 'date', tickformat: '%d %b' }, yaxis: { rangemode: 'tozero' } })));
@@ -272,9 +304,11 @@ function renderSquadReportCharts(S) {
 }
 
 // ---------- PDF ----------
-async function exportSquadMonthPdf(ym) {
+async function exportSquadMonthPdf(key) {
   const S = squadState(Squad.cur);
   if (!S || !window.jspdf) return;
+  const mo = sqPeriod(S, key);
+  const isArc = mo.kind === 'arc';
   const btn = $('#sqPdfBtn');
   setBusy(btn, true, 'Building PDF…');
   try {
@@ -284,18 +318,19 @@ async function exportSquadMonthPdf(ym) {
     const fam = await pdfFonts(doc);
     const font = (style, size, color, numbers = false) => { doc.setFont(numbers && fam.num ? fam.num : fam.text, numbers && fam.num ? 'bold' : style); doc.setFontSize(size); doc.setTextColor(...color); };
     const hex = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
-    const ms = sqMembers(S);
-    const mo = sqMonthData(S, ym);
+    const ms = mo.people;
     let y = 0;
     const ensure = need => { if (y + need > H - 16) { doc.addPage(); y = 18; } };
     // Header band
     doc.setFillColor(252, 82, 0); doc.rect(0, 0, W, 38, 'F');
-    font('bold', 9, [255, 255, 255]); doc.text(`SQUAD MONTHLY REPORT · ${S.ch.name.toUpperCase()}`, M, 13);
-    font('bold', 24, [255, 255, 255], true); doc.text(sqMonthName(ym), M, 26);
-    font('normal', 9, [255, 236, 224]); doc.text(`${ms.map(m => m.name).join(' vs ')} · everyone scored against his own usual numbers`, M, 33);
+    font('bold', 9, [255, 255, 255]); doc.text(`SQUAD ${isArc ? 'ARC' : 'MONTHLY'} REPORT · ${S.ch.name.toUpperCase()}`, M, 13);
+    font('bold', 24, [255, 255, 255], true); doc.text(mo.label, M, 26);
+    font('normal', 9, [255, 236, 224]); doc.text(`${isArc ? `${mo.from} → ${mo.to} · ` : ''}${ms.map(m => m.name).join(' vs ')} · everyone scored against his own usual numbers`, M, 33);
     y = 48;
     // One summary table, a column per person
+    const sc = id => mo.score.members[id];
     const rows = [
+      ...(isArc ? [['Arc points', (x, id) => (sc(id) ? Math.round(sc(id).total) : '–')], ['Weeks won', (x, id) => mo.score.wins[id] || 0]] : []),
       ['Workouts', x => x.sessions], ['Active days', x => x.active_days], ['Time', x => formatHours(x.minutes * 60)],
       ['Distance', x => (x.dist_m ? `${fmtNum(x.dist_m / 1000, 1)} km` : '–')], ['Training load', x => x.load || '–'],
       ['Best streak', x => (x.best_streak ? `${x.best_streak} days` : '–')], ['Avg points / week', x => (x.avg_week_points ?? '–')],
@@ -306,7 +341,7 @@ async function exportSquadMonthPdf(ym) {
     doc.autoTable({
       startY: y, margin: { left: M, right: M }, theme: 'grid',
       head: [['', ...ms.map(m => m.name)]],
-      body: rows.map(([l, f]) => [l, ...ms.map(m => String(mo.members[m.id] ? f(mo.members[m.id]) : '–'))]),
+      body: rows.map(([l, f]) => [l, ...ms.map(m => String(mo.members[m.id] ? f(mo.members[m.id], m.id) : '–'))]),
       styles: { font: fam.text, fontSize: 9, cellPadding: 2.4, lineColor: [227, 232, 240], textColor: [15, 23, 42] },
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
       columnStyles: { 0: { fontStyle: 'bold', textColor: [51, 65, 85], cellWidth: 38 } },
@@ -340,10 +375,10 @@ async function exportSquadMonthPdf(ym) {
       y += 3;
     }
     // Aether's report
-    const ai = sqMonthAiReport(S, ym);
+    const ai = sqPeriodAiReport(S, mo).answer;
     if (ai) {
       ensure(20);
-      font('bold', 11, [252, 82, 0]); doc.text(`${SQUAD_AI}'s monthly report`, M, y); y += 6;
+      font('bold', 11, [252, 82, 0]); doc.text(`${SQUAD_AI}'s ${isArc ? 'arc report & analysis' : 'monthly report'}`, M, y); y += 6;
       font('normal', 9.5, [15, 23, 42]);
       const plain = String(ai.body.text).replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#+\s*/gm, '').replace(/[`_]/g, '');
       for (const line of doc.splitTextToSize(plain, W - 2 * M)) { ensure(5.5); doc.text(line, M, y); y += 4.8; }
@@ -352,11 +387,11 @@ async function exportSquadMonthPdf(ym) {
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
       font('normal', 7.5, [148, 163, 184]);
-      doc.text(`Training Partner · Squad · ${S.ch.name} · ${sqMonthName(ym)}`, M, H - 8);
+      doc.text(`Training Partner · Squad · ${S.ch.name} · ${mo.label}`, M, H - 8);
       doc.text(`${i} / ${pages}`, W - M, H - 8, { align: 'right' });
     }
-    const name = `Squad_${S.ch.name.replace(/\W+/g, '_')}_${ym}.pdf`;
-    const res = await saveOrShareFile(name, doc.output('datauristring').split(',')[1], { base64: true, mime: 'application/pdf', title: 'Squad monthly report' });
+    const name = `Squad_${S.ch.name.replace(/\W+/g, '_')}_${key.replace(':', '')}.pdf`;
+    const res = await saveOrShareFile(name, doc.output('datauristring').split(',')[1], { base64: true, mime: 'application/pdf', title: isArc ? 'Squad arc report' : 'Squad monthly report' });
     if (res && res.ok) toast(`PDF ready → ${res.where}`, 'success');
   } catch (e) {
     console.error(e);
