@@ -43,7 +43,7 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.8</div>
+    <div class="kick">User guide · version 3.9</div>
     <h1>Training Partner</h1>
     <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus the squad, screenshots, web accounts and arcs.</div>
   </div>
@@ -61,7 +61,7 @@
     <div><b>11</b>Backups, privacy, updates</div>
     <div><b>12</b>Squad — training together</div>
     <div><b>13</b>Huawei, introduction, web app</div>
-    <div><b>14</b>Screenshots &amp; logging by hand</div>
+    <div><b>14</b>Screenshots (automatic) &amp; logging</div>
     <div><b>15</b>Web accounts</div>
     <div><b>16</b>Arcs — starting fresh</div>
   </div>
@@ -72,7 +72,7 @@
 <h2><span class="k">Section 1</span>What changed in 3.3</h2>
 <p>Ride Partner became <b>Training Partner</b>: one app for riding, running, swimming and gym work. Everything below was changed in this version.</p>
 
-<div class="new"><b>All your sports</b>Runs from Strava; pool swims, treadmill runs, the gym bike, elliptical, stair stepper, rowing machine and strength sessions straight from the Galaxy Watch through Samsung Health. Each sport has its own colour and icon (<span class="tag ride">Ride</span><span class="tag run">Run</span><span class="tag swim">Swim</span><span class="tag gym">Gym &amp; other</span>), its own numbering (Ride 043, Run 002, Swim 001, Gym 001) and its own units (km/h for rides, pace per km for runs, pace per 100 m for swims).</div>
+<div class="new"><b>All your sports</b>Runs from Strava; pool swims, treadmill runs, the gym bike, elliptical, stair stepper, rowing machine and strength sessions straight from the Galaxy Watch through Samsung Health. Each sport has its own colour and icon (<span class="tag ride">Ride</span><span class="tag run">Run</span><span class="tag swim">Swim</span><span class="tag gym">Gym &amp; other</span>), its own numbering (Ride 42, Run 2, Swim 1 — since 3.9 gym and other sessions per exercise: Strength 3, Elliptical 1) and its own units (km/h for rides, pace per km for runs, pace per 100 m for swims).</div>
 <div class="new"><b>New activity inbox</b>Types the app doesn't import by default — walks, hikes, yoga, football… — wait in an inbox on the Training screen. Include them (walks and hikes count as runs — since 3.5 as Walks — everything else as Gym &amp; other) or skip them, and optionally remember the choice for that type.</div>
 <div class="new"><b>Only 2026 onwards</b>Strava and Samsung Health imports ignore anything before 1 January 2026.</div>
 <div class="new"><b>Mark wrong data</b>The flag on every workout (and on every record) opens a sheet: change the sport, mark it indoor, mark climbing, distance/speed, heart rate or power as a data error, exclude it, or delete it. Original numbers are kept; flagged values are simply left out of records, best efforts, trends, totals and AI context.</div>
@@ -104,7 +104,7 @@
   <li><b>Today's planned session</b>, tap to open the plan.</li>
   <li><b>Sport chips</b> (All · Rides · Runs · Walks · Swims · Gym &amp; other), shown when you have more than one sport. The choice also applies to Trends.</li>
   <li><b>Search</b> across name, date, sport, zone and your notes; <b>filters</b> Training / Play / No intent / Needs review.</li>
-  <li><b>Workout cards</b> grouped by month: distance, time, speed or pace, HR, ascent (or energy for gym), load, and the zone strip. Flagged values are struck through; excluded workouts are faded.</li>
+  <li><b>Workout cards</b> grouped by month, each titled by its number — <b>Ride 42</b>, <b>Run 3</b>, <b>Walk 5</b>, <b>Swim 4</b>; gym and other sessions count per exercise (<b>Strength 3</b>, <b>Padel 1</b>) — with its own name (Strava's, the watch's or yours) beside the date. Numbers follow the date order and update when a sport or exercise is changed. Then distance, time, speed or pace, HR, ascent (or energy for gym), load, and the zone strip. Flagged values are struck through; excluded workouts are faded.</li>
 </ul>
 
 <h3>Trends</h3>
@@ -435,24 +435,25 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
 
 <!-- ============================================================ -->
 <div class="section">
-<h2><span class="k">Section 14 · new in 3.6–3.8</span>Screenshots and logging by hand</h2>
-<p>Huawei Health can't send workouts to the web app on its own, so a session gets in by <b>screenshots</b> (the main way) or the <b>Log</b> form. Both open from Training (camera · Log) and from Squad's quick actions.</p>
+<h2><span class="k">Section 14 · new in 3.6–3.9</span>Screenshots and logging by hand</h2>
+<p>Huawei Health can't send workouts to the web app on its own, so a session gets in by <b>screenshots</b> (the main way) or the <b>Log</b> form. Both open from Training (Screenshot · Log) and from Squad's quick actions.</p>
 
-<h3>Reading screenshots</h3>
+<h3>Screenshots — automatic (3.9)</h3>
 <ol>
-  <li>Pick up to <b>8 screenshots</b> at once — the summary, the heart-rate, pace, elevation and cadence graphs, splits, swim lengths, zone times. They may belong to several workouts.</li>
-  <li>One AI call groups the screens per workout and reads every number, every table row and the shape of every graph. It uses the person's own free Gemini key when set up, otherwise the squad's Aether.</li>
-  <li>The <b>approval screen</b> shows, per workout: the numbers (all editable), the screenshots it used, a preview chart (pace and splits in m:ss), the tables it read, include-toggles for each graph, and <b>checks</b>.</li>
-  <li>Save — or change anything first. Nothing is added without this approval.</li>
+  <li>Tap <b>Screenshot</b> and pick up to <b>8 screenshots</b> at once — the summary, the heart-rate, pace, elevation and cadence graphs, splits, swim lengths, zone times. They may belong to several workouts.</li>
+  <li>One AI call groups the screens per workout, reads every number, every table row and the shape of every graph, and names the exercise (walk, pool swim, treadmill, rowing, padel…). It uses the person's own free Gemini key when set up, otherwise the squad's Aether.</li>
+  <li><b>Every workout that reads cleanly is saved straight away</b> — numbered, charted and shared with the squad — and a message lists what was added (e.g. "Walk 5 (4.50 km · 45:00)"). A graph or table that disagrees with the summary (see the checks below) is simply left out; the summary numbers are what the screen states.</li>
+  <li>Only a workout with <b>no date, no duration or no distance</b>, an average heart rate above the maximum, or a pace that contradicts distance and time opens the <b>check screen</b>: the numbers (all editable), the screenshots, a preview chart, the tables read, include-toggles and the checks. Save, or fix and save.</li>
+  <li>Something wrong anyway? Open the workout in Training → flag → change the sport or exercise, mark a value as a data error, or delete it and log it by hand.</li>
 </ol>
 <table>
-  <tr><th style="width:42%">Check on the approval screen</th><th>What it catches</th></tr>
-  <tr><td>Splits vs duration and distance</td><td>a split row read wrong or missing</td></tr>
-  <tr><td>Pool lengths vs distance</td><td>missing or doubled lengths</td></tr>
-  <tr><td>Graph average vs summary (heart rate, pace)</td><td>a graph misread — leave that graph out</td></tr>
-  <tr><td>Pace vs distance ÷ time</td><td>a misread distance, time or pace</td></tr>
-  <tr><td>Zone times vs duration</td><td>zone minutes that don't add up</td></tr>
-  <tr><td>Date in the future / no date on the screen</td><td>Huawei shows "Oct 28" without a year: the AI is told today's date, a future date is moved back one year and flagged, a missing date must be set</td></tr>
+  <tr><th style="width:42%">Check</th><th>What it catches · what happens automatically</th></tr>
+  <tr><td>Splits vs duration and distance</td><td>a split row read wrong or missing · splits left out</td></tr>
+  <tr><td>Pool lengths vs distance and time</td><td>missing or doubled lengths · lengths left out</td></tr>
+  <tr><td>Heart-rate graph average vs summary</td><td>a graph misread · graph left out (average and max HR kept)</td></tr>
+  <tr><td>Zone times vs duration</td><td>zone minutes that don't add up · zone times left out</td></tr>
+  <tr><td>Pace vs distance ÷ time; average HR above max</td><td>a misread distance, time, pace or heart rate · opens the check screen</td></tr>
+  <tr><td>No date on the screen / date in the future</td><td>Huawei shows "Oct 28" without a year: the AI is told today's date and picks the latest such date that isn't in the future (a future date is moved back a year); a missing date opens the check screen</td></tr>
   <tr><td>Reply cut short</td><td>very long reads: the workouts that came through completely are kept, with a warning</td></tr>
 </table>
 <h3>What a saved screenshot workout contains</h3>
@@ -461,11 +462,21 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
   <li>Pool swims: every length (time, strokes, stroke, SWOLF) in the same per-length model as watch swims — best 50/100/200/400 m, splits, the per-length chart.</li>
   <li>Watch extras kept with the workout: lowest HR, max cadence, stride, descent, VO2max, training effect, recovery time, zone minutes, splits.</li>
   <li><b>Moving time</b>: when the screens show both total and moving time, pace and speed use the moving time (4.5 km in 45:00 moving = 6.0 km/h, even if the total with stops was 50:00); the total is kept as elapsed time.</li>
+  <li><b>Zones without a graph</b>: when there is no usable heart-rate graph but the screen lists time per heart-rate zone, each zone's minutes go into the person's own zone its bpm range falls in.</li>
+  <li>Also kept: the watch's training load, best pace and stroke rate.</li>
 </ul>
 <p class="muted">Screenshots are read at up to 2000 px on the long side so small graph labels stay readable.</p>
 
-<h3>Log a workout by hand</h3>
-<p>The form changes with the sport: <b>swim</b> (pool length × lengths → distance, main stroke, HR, calories, SWOLF, strokes), <b>walk / run</b> (distance, steps, cadence, climbing, HR, calories, treadmill), <b>ride</b> (distance, climbing, power, cadence, HR, calories, indoor), <b>gym</b> (activity, HR, calories, reps). All have effort (RPE 1–10) and a note, and a live pace/speed preview. "Fill from screenshot(s)" fills the same form.</p>
+<h3>Log a workout by hand — no screenshot needed</h3>
+<p>Training → <b>Log</b> starts with <b>What did you do?</b> — pick one exercise:</p>
+<table>
+  <tr><th style="width:24%">Group</th><th>Exercises</th></tr>
+  <tr><td>Walk &amp; run</td><td>Walk, Hike, Treadmill walk, Run, Trail run, Treadmill run</td></tr>
+  <tr><td>Swim</td><td>Pool swim, Open-water swim</td></tr>
+  <tr><td>Ride</td><td>Ride, Mountain bike, Indoor bike</td></tr>
+  <tr><td>Gym &amp; sports</td><td>Strength, Aerobics, Elliptical, Rowing, Stair stepper, HIIT, CrossFit, Yoga, Pilates, Core &amp; stretching, Football, Basketball, Tennis, Padel, Squash, Badminton, Boxing, Martial arts, Dance, Jump rope, Climbing, Workout (anything else)</td></tr>
+</table>
+<p>Then the fields for that sport: <b>swim</b> (pool length × lengths → distance, main stroke, HR, calories, SWOLF, strokes), <b>walk / run</b> (distance, steps, cadence, climbing, HR, calories), <b>ride</b> (distance, climbing, power, cadence, HR, calories), <b>gym &amp; sports</b> (HR, calories, reps, optional distance). All have date, start, duration, effort (RPE 1–10) and a note, with a live pace/speed preview. Indoor follows the exercise (pool, treadmill, indoor bike, gym and court sports). The exercise can be changed any time with <b>Change</b>; "Have screenshots?" switches to the automatic reader.</p>
 </div>
 
 <!-- ============================================================ -->

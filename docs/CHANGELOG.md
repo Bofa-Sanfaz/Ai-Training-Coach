@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.9.1 — 2026-10-30
+- Galaxy Watch gym names recognised: push-ups, arm extensions, pull-downs… count as **Strength**, plus a new **Aerobics** exercise; planks/sit-ups as Core & stretching. Renumbered once on update.
+
+## 3.9.0 — 2026-10-30 · numbered again, screenshots add themselves
+- **Numbering**: every workout is titled by its number (Ride 42, Run 3, Walk 5, Swim 4; no zero padding); gym & other sessions count per exercise (Strength 3, Elliptical 2 — `exerciseOf`, `numberLabel`). The workout's own name (Strava, watch, typed) moves beside the date and is hidden when it only repeats the title. Renumbered once on update.
+- **Exercise catalogue** (`EXERCISES` in `sport.js`): 32 exercises, each with sport, Strava-style type and indoor default; recognised from types/names of watch and Strava sessions.
+- **Screenshots save themselves**: after the read, each workout with date, duration and (except gym & sports) distance and no contradicting numbers is saved at once (`shotAutoPrepare`: a heart-rate graph, splits, lengths or zone times that disagree with the summary are left out); the rest open the check form. The AI also returns `exercise` (prompt updated in the app and `squad/src/ai.js`). Device zone times fill the zones when there is no usable heart-rate graph; training load, best pace and stroke rate are kept.
+- **Log by hand** starts with "What did you do?" — the exercise list grouped Walk & run · Swim · Ride · Gym & sports; indoor follows the exercise (open-water swims are now outdoor).
+- Guide 3.9 (numbering, automatic screenshots, exercise list).
+
 ## 3.8.0 — 2026-10-30 · screenshots in full, accounts, arcs
 - **Screenshot reader v2** (`shots.js`): pick up to 8 screens at once; one AI call groups them per workout (summary, heart-rate / pace / elevation / cadence charts, splits, lengths, zone times) and reads every number, table row and chart curve. The approval screen shows consistency checks (splits vs duration and km, lengths vs distance, chart average vs summary, pace vs distance/time, zone times), the screenshots, a preview chart (pace and split axes in m:ss), include-toggles and the tables read. Saving turns the curves into a 10-s stream (HR, speed scaled to the summary distance, altitude, cadence → zones, load, charts), pool lengths into the per-length swim model, and keeps device extras (min HR, max cadence, stride, descent, VO2max, training effect, recovery, zones, splits). Squad fallback `/ai/extract` takes `images[]`.
 - **Accounts for the web app** (`account.js`, server `src/account.js`, migration 0004): username + password; PBKDF2 (210k) derives an auth key (server stores only its SHA-256) and an encryption key that never leaves the device. The whole app (workouts, streams, chats, settings incl. keys, squad, local prefs) is gzip + AES-GCM encrypted and uploaded in ≤ 900 kB parts with versioned commits (conflict → pull first); 2 min after a change and when the app is hidden. Signing in on another device restores everything. 8 wrong passwords → 15 min lock. Profile → Account card. The Android app is unchanged.

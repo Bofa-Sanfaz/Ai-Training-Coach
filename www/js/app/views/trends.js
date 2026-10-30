@@ -257,7 +257,8 @@ function renderGlobalGraph() {
   if (!plotReady()) return chartEmpty(el, 'Charts unavailable.');
   if (workouts.length < 2) return chartEmpty(el, 'Log at least 2 sessions of this sport to plot progression.');
 
-  const x = workouts.map(w => rideCode(w).replace(/^(\w)\w* 0*/, '$1'));
+  // "R42" per sport; gym & other keep the exercise ("Strength 3"): its numbers repeat across exercises
+  const x = workouts.map(w => (sp === 'other' ? rideCode(w) : rideCode(w).replace(/^(\w)\w* 0*/, '$1')));
   const traces = globalSelectedMetrics.map(m => {
     const cfg = GLOBAL_METRICS[m];
     const vals = workouts.map(cfg.val);

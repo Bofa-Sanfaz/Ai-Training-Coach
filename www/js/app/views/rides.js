@@ -34,17 +34,21 @@ function zoneStripHtml(z) {
 }
 
 function rideCode(w) {
-  return w.exercise_code ? w.exercise_code.split(' - ')[0] : `${sportMeta(w).code} ${String(w.ride_number || '').padStart(3, '0')}`;
+  return w.exercise_code ? w.exercise_code.split(' - ')[0] : `${numberLabel(w)} ${w.ride_number || ''}`.trim();
 }
 
-// Strava activity name when known (filled on the next sync for rides imported by v2), else "Ride 012"
+// Every workout is titled by its number ("Ride 42", "Swim 4", "Strength 3")…
 function rideTitle(w) {
-  return w.name && w.name.trim() ? w.name : rideCode(w);
+  return rideCode(w);
 }
 
+// …with its own name (Strava's, the watch's or the one typed in) beside the date, unless it only repeats the title
 function rideSubtitle(w) {
   const date = formatNiceDate(w.date);
-  return w.name && w.name.trim() ? `${rideCode(w)} · ${date}` : date;
+  const name = String(w.name || '').trim();
+  const plain = s => s.toLowerCase().replace(/[^a-z]/g, '');
+  const same = !name || [numberLabel(w), SPORTS[sportOf(w)].label, rideCode(w)].some(s => plain(s) === plain(name));
+  return same ? date : `${name} · ${date}`;
 }
 
 // One stat in the week card: value, label, optional goal progress, last week's value

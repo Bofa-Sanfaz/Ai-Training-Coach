@@ -10,7 +10,9 @@
 //             altitude, cadence) so zones, load, charts, splits and the coaches work as
 //             for any watch workout (marked as read from a screenshot);
 //   swim    — the length table becomes the per-length swim model (SWOLF, best 100 m…).
-// Nothing is saved until the person approves (and edits) it.
+// A workout that reads cleanly is saved straight away (graphs that disagree with the summary
+// are left out); one with a missing date, duration or distance, or numbers that contradict
+// each other, opens the approval form instead.
 // --------------------------------------------------------
 const SHOT_MAX_IMAGES = 8;
 const SHOT_PROMPT_V2 = `You read screenshots from a fitness app (usually Huawei Health; also Apple Fitness, Samsung Health, Strava, Garmin).
@@ -23,7 +25,9 @@ Rules:
 - Tables: copy every row in order.
 Return JSON only:
 {"workouts":[{"screens":[image numbers used],
-"sport":"walk|run|swim|ride|other","type":"name as shown, e.g. Outdoor walk, Indoor run, Pool swim, Strength","date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
+"sport":"walk|run|swim|ride|other","type":"name as shown, e.g. Outdoor walk, Indoor run, Pool swim, Strength",
+"exercise":"walk|hike|treadmill_walk|run|trail_run|treadmill|pool_swim|open_water|ride|mtb|indoor_ride|strength|aerobics|elliptical|rowing|stairs|hiit|crossfit|yoga|pilates|core|football|basketball|tennis|padel|squash|badminton|boxing|martial_arts|dance|jump_rope|climbing|other",
+"date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
 "dur_s":number,"moving_s":number|null,"dist_m":number|null,"calories":number|null,
 "avg_hr":number|null,"max_hr":number|null,"min_hr":number|null,
 "steps":number|null,"cadence":number|null,"max_cadence":number|null,"stride_cm":number|null,
@@ -112,49 +116,82 @@ async function readShots(images) {
   });
 }
 
-// Cross-checks that point at misread values
-function shotChecks(w) {
+// Cross-checks that point at misread values: [{ k, text }]
+function shotIssues(w) {
   const out = [];
-  if (w.date_missing) out.push('No date was visible — set the date before saving.');
-  if (w.date_fixed) out.push(`The year was a guess — check the date (${w.date}).`);
+  const add = (k, text) => out.push({ k, text });
+  if (w.date_missing) add('date', 'No date was visible — set the date before saving.');
+  if (w.date_fixed) add('year', `The year was a guess — check the date (${w.date}).`);
   const dur = shotNum(w.moving_s) || shotNum(w.dur_s);
   const pct = (a, b) => Math.abs(a - b) / Math.max(1, b);
   const splits = (w.splits || []).filter(s => shotNum(s.sec));
   if (splits.length > 1 && dur) {
     const tot = splits.reduce((s, x) => s + shotNum(x.sec), 0);
-    if (pct(tot, dur) > 0.04) out.push(`Splits add up to ${formatDuration(tot)}, the duration says ${formatDuration(dur)}.`);
+    if (pct(tot, dur) > 0.04) add('splits', `Splits add up to ${formatDuration(tot)}, the duration says ${formatDuration(dur)}.`);
   }
   if (splits.length && shotNum(w.dist_m)) {
     const km = shotNum(w.dist_m) / 1000;
-    if (Math.abs(Math.ceil(km - 0.001) - splits.length) > 1) out.push(`${splits.length} splits for ${fmtNum(km, 2)} km.`);
+    if (Math.abs(Math.ceil(km - 0.001) - splits.length) > 1) add('splits', `${splits.length} splits for ${fmtNum(km, 2)} km.`);
   }
   const laps = (w.laps || []).filter(l => shotNum(l.sec));
   if (laps.length && shotNum(w.pool_m) && shotNum(w.dist_m)) {
     const d = laps.reduce((s, l) => s + (shotNum(l.dist_m) || shotNum(w.pool_m)), 0);
-    if (pct(d, shotNum(w.dist_m)) > 0.05) out.push(`The lengths add up to ${Math.round(d)} m, the distance says ${Math.round(shotNum(w.dist_m))} m.`);
+    if (pct(d, shotNum(w.dist_m)) > 0.05) add('laps', `The lengths add up to ${Math.round(d)} m, the distance says ${Math.round(shotNum(w.dist_m))} m.`);
   }
   if (laps.length && dur) {
     const s = laps.reduce((a, l) => a + shotNum(l.sec), 0);
-    if (s > dur * 1.05) out.push(`The lengths take ${formatDuration(s)} — longer than the session (${formatDuration(dur)}).`);
+    if (s > dur * 1.05) add('laps', `The lengths take ${formatDuration(s)} — longer than the session (${formatDuration(dur)}).`);
   }
   const avg = shotNum(w.avg_hr), max = shotNum(w.max_hr), min = shotNum(w.min_hr);
-  if (avg && max && avg > max) out.push(`Average heart rate ${avg} is above the maximum ${max}.`);
-  if (avg && min && avg < min) out.push(`Average heart rate ${avg} is below the minimum ${min}.`);
+  if (avg && max && avg > max) add('hr', `Average heart rate ${avg} is above the maximum ${max}.`);
+  if (avg && min && avg < min) add('hr', `Average heart rate ${avg} is below the minimum ${min}.`);
   const hr = shotPts(w.hr_curve, 't_s', 'bpm', 30, 240);
   if (hr.length > 4 && avg) {
     const m = mean(hr.map(p => p.v));
-    if (Math.abs(m - avg) > 8) out.push(`The heart-rate graph averages ${Math.round(m)} bpm, the summary says ${avg} — the graph may be misread (you can leave it out).`);
+    if (Math.abs(m - avg) > 8) add('hr_graph', `The heart-rate graph averages ${Math.round(m)} bpm, the summary says ${avg} — the graph may be misread (you can leave it out).`);
   }
   if (shotNum(w.pace_km_s) && shotNum(w.dist_m) && dur && w.sport !== 'swim') {
     const p = dur / (shotNum(w.dist_m) / 1000);
-    if (pct(p, shotNum(w.pace_km_s)) > 0.06) out.push(`Pace ${fmtPace(shotNum(w.pace_km_s))} /km doesn't match ${fmtNum(shotNum(w.dist_m) / 1000, 2)} km in ${formatDuration(dur)} (${fmtPace(p)} /km).`);
+    if (pct(p, shotNum(w.pace_km_s)) > 0.06) add('pace', `Pace ${fmtPace(shotNum(w.pace_km_s))} /km doesn't match ${fmtNum(shotNum(w.dist_m) / 1000, 2)} km in ${formatDuration(dur)} (${fmtPace(p)} /km).`);
   }
   const zones = (w.hr_zones || []).filter(z => shotNum(z.sec));
   if (zones.length && dur) {
     const s = zones.reduce((a, z) => a + shotNum(z.sec), 0);
-    if (s > dur * 1.05) out.push(`Zone times add up to ${formatDuration(s)}, more than the session.`);
+    if (s > dur * 1.05) add('zones', `Zone times add up to ${formatDuration(s)}, more than the session.`);
   }
   return out;
+}
+const shotChecks = w => shotIssues(w).map(i => i.text);
+
+// The exercise a draft is: the AI's pick when it fits the sport, else recognised from the screen's name
+function shotExercise(d) {
+  const sport = SPORTS[d.sport] ? d.sport : null;
+  const ex = EXERCISE[d.exercise];
+  if (ex && (!sport || ex.sport === sport)) return ex;
+  const t = String(d.type || '').toLowerCase();
+  if (sport === 'swim') return /open|sea|lake|river|ocean/.test(t) ? EXERCISE.open_water : EXERCISE.pool_swim;
+  if (sport === 'run') return /treadmill|indoor/.test(t) ? EXERCISE.treadmill : /trail/.test(t) ? EXERCISE.trail_run : EXERCISE.run;
+  if (sport === 'walk') return /treadmill|indoor/.test(t) ? EXERCISE.treadmill_walk : /hike|hiking|mountain|climb/.test(t) ? EXERCISE.hike : EXERCISE.walk;
+  if (sport === 'ride') return /indoor|spin|trainer|stationary/.test(t) ? EXERCISE.indoor_ride : /mountain|mtb/.test(t) ? EXERCISE.mtb : EXERCISE.ride;
+  return exerciseOf({ name: d.type || '' });
+}
+
+// Automatic save: graphs and tables that disagree with the summary are left out (the summary
+// numbers are what the screen states); returns what still needs a person to look at it
+function shotAutoPrepare(d) {
+  const use = d.use || (d.use = shotUseDefaults(d));
+  const issues = shotIssues(d);
+  for (const i of issues) {
+    if (i.k === 'hr_graph') use.hr = false;
+    if (i.k === 'splits') use.splits = false;
+    if (i.k === 'laps') use.laps = false;
+    if (i.k === 'zones') use.zones = false;
+  }
+  const ex = shotExercise(d);
+  const blocking = issues.filter(i => ['date', 'hr', 'pace'].includes(i.k)).map(i => i.text);
+  if (!(shotNum(d.dur_s) > 0)) blocking.push('No duration was read.');
+  if (ex.sport !== 'other' && !(shotNum(d.dist_m) > 0)) blocking.push('No distance was read.');
+  return blocking;
 }
 
 // Linear interpolation of chart points onto a time
@@ -297,6 +334,9 @@ function shotApply(w, d, durSec) {
   if (n('vo2max')) w.vo2max_watch = n('vo2max');
   if (n('training_effect')) w.training_effect_device = n('training_effect');
   if (n('recovery_h')) w.recovery_h_device = n('recovery_h');
+  if (n('training_load')) w.training_load_device = n('training_load');
+  if (n('best_pace_km_s')) w.best_pace_km_s = n('best_pace_km_s');
+  if (n('stroke_rate')) w.stroke_rate_device = n('stroke_rate');
   if (use.zones && (d.hr_zones || []).length) w.zones_device = d.hr_zones.filter(z => shotNum(z.sec)).map(z => ({ name: z.name, from: shotNum(z.from_bpm), to: shotNum(z.to_bpm), sec: shotNum(z.sec) }));
   if (use.splits && (d.splits || []).length) w.splits_device = d.splits.filter(s => shotNum(s.sec)).map(s => ({ km: shotNum(s.km), sec: shotNum(s.sec), avg_hr: shotNum(s.avg_hr) }));
   // Pool lengths → the per-length swim model (a lap longer than the pool is split evenly)

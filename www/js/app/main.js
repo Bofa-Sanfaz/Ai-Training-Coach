@@ -37,6 +37,15 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
+### New in 3.9 — every workout numbered
+- **Every workout has its number again**: Ride 42, Run 3, Walk 5, Swim 4 — gym and other sessions per exercise (Strength 3, Elliptical 2). The name from Strava or the watch stays beside the date
+- **Screenshots add themselves**: pick the screens and every workout that reads cleanly is saved at once (graphs that disagree with the summary are left out); only one with something missing opens for a quick check
+- **Log by hand** starts with a list of 30+ exercises — walk, hike, treadmill, pool or open-water swim, indoor bike, strength, rowing, padel, football, yoga and more
+
+### New in 3.8 — arcs, accounts, screenshots in full
+- **Arcs** (Squad → Crew → Start Arc N): both approve, the challenge starts fresh with a full-screen animation, and from Arc 2 Aether writes an end-of-arc report
+- Screenshots read every number, table and graph; web app accounts keep a friend's app on every device
+
 ### New in 3.6 — Huawei watches, an introduction, a faster squad
 - **Huawei Health import** (Profile → Huawei Health): your whole history from Huawei's own data export — heart rate, GPS route, steps, calories and every pool length with strokes and SWOLF; later imports only add what's new
 - **Introduction** for new users (Profile → Introduction): name, heart rate and weight so zones and load fit your body, where workouts come from, the AI coach and the squad
@@ -116,7 +125,10 @@ async function boot() {
   // Version upgrade: snapshot data before this version touches it
   const seen = await getConfig('app_version_seen');
   if (seen !== APP_VERSION) {
-    if ((await db.workouts.count()) > 0) await createRestorePoint(`Before update to v${APP_VERSION}${seen ? ` (from v${seen})` : ''}`, 'auto');
+    if ((await db.workouts.count()) > 0) {
+      await createRestorePoint(`Before update to v${APP_VERSION}${seen ? ` (from v${seen})` : ''}`, 'auto');
+      try { await renumberRides(); } catch (e) { console.warn('renumber', e); } // numbering rules may have changed
+    }
     await setConfig('app_version_seen', APP_VERSION);
   }
 

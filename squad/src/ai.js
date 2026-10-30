@@ -143,7 +143,9 @@ Rules:
 - Tables: copy every row in order.
 Return JSON only:
 {"workouts":[{"screens":[image numbers used],
-"sport":"walk|run|swim|ride|other","type":"name as shown, e.g. Outdoor walk, Indoor run, Pool swim, Strength","date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
+"sport":"walk|run|swim|ride|other","type":"name as shown, e.g. Outdoor walk, Indoor run, Pool swim, Strength",
+"exercise":"walk|hike|treadmill_walk|run|trail_run|treadmill|pool_swim|open_water|ride|mtb|indoor_ride|strength|aerobics|elliptical|rowing|stairs|hiit|crossfit|yoga|pilates|core|football|basketball|tennis|padel|squash|badminton|boxing|martial_arts|dance|jump_rope|climbing|other",
+"date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
 "dur_s":number,"moving_s":number|null,"dist_m":number|null,"calories":number|null,
 "avg_hr":number|null,"max_hr":number|null,"min_hr":number|null,
 "steps":number|null,"cadence":number|null,"max_cadence":number|null,"stride_cm":number|null,

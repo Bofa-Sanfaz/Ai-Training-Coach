@@ -1215,7 +1215,17 @@ span.agent-chip { cursor: default; }
 .sq-quick button { font-size: 0.66rem; padding: 10px 2px; }
 
 /* Manual log form */
-.sq-sport-pick button { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 2px; font-size: 0.72rem; }
+.sq-ex-title { font-weight: 750; font-size: 0.95rem; margin: 2px 0 4px; }
+.sq-ex-h { font-size: 0.7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 10px 0 6px; }
+.sq-ex-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.sq-ex { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 0.82rem; font-weight: 650; cursor: pointer; }
+.sq-ex:active { transform: scale(.97); }
+.sq-ex.active { background: var(--sc); border-color: var(--sc); color: #fff; }
+.sq-ex-cur { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--border); border-left: 4px solid var(--sc); background: var(--surface-2); color: var(--text); border-radius: 12px; padding: 10px 12px; font: inherit; text-align: left; cursor: pointer; }
+.sq-ex-cur .ic { color: var(--sc); }
+.sq-ex-cur small { display: block; font-size: 0.68rem; color: var(--muted); font-weight: 600; }
+.sq-ex-cur b { font-size: 0.95rem; }
+.sq-ex-cur .tiny { color: var(--brand); font-weight: 700; }
 .sq-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .sq-form-grid .field { margin: 0; }
 .sq-form-grid.three { grid-template-columns: 1fr 1fr; }

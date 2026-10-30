@@ -193,16 +193,16 @@ function buildWorkoutFromActivity(a) {
   };
 }
 
-// Numbered per sport: "Ride 042", "Run 003", "Swim 001"
+// Numbered per sport: "Ride 42", "Run 3", "Swim 1"; gym & other per exercise: "Strength 3"
 async function renumberRides() {
   const all = await db.workouts.toArray();
   all.sort((a, b) => parseSafeDate(a.date) - parseSafeDate(b.date));
   const counters = {};
   for (let i = 0; i < all.length; i++) {
     const w = all[i];
-    const sp = sportOf(w);
-    const seq = counters[sp] = (counters[sp] || 0) + 1;
-    const code = `${SPORTS[sp].code} ${String(seq).padStart(3, '0')} - ${String(w.date).split(' ')[0]}`;
+    const label = numberLabel(w);
+    const seq = counters[label] = (counters[label] || 0) + 1;
+    const code = `${label} ${seq} - ${String(w.date).split(' ')[0]}`;
     if (w.ride_number !== seq || w.exercise_code !== code) {
       w.ride_number = seq;
       w.exercise_code = code;

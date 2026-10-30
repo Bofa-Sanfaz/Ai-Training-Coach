@@ -800,16 +800,12 @@
   <div class="sheet-grip"></div>
   <div class="sheet-title" id="sqi_head">Workout from screenshot</div>
   <div class="sheet-sub mb-12" id="sqi_sub">Aether read these numbers — check them, fix anything wrong, then save. It's added to your own workouts and shared with the squad.</div>
-  <button class="btn btn-secondary mb-12" id="sqiShotBtn" onclick="closeSheet('squadImportSheet'); openSquadImport()"><svg class="ic"><use href="#i-camera"/></svg>Fill from screenshot(s) — the AI reads the numbers</button>
+  <button class="btn btn-secondary mb-12" id="sqiShotBtn" onclick="closeSheet('squadImportSheet'); openSquadImport()"><svg class="ic"><use href="#i-camera"/></svg>Have screenshots? Add them — it fills in by itself</button>
   <img id="sqi_thumb" class="sq-import-thumb hidden" alt="" />
-  <div class="segmented sq-sport-pick" id="sqi_sportSeg">
-    <button data-v="walk" onclick="squadPickSport('walk')"><svg class="ic ic-sm"><use href="#i-walk"/></svg>Walk</button>
-    <button data-v="run" onclick="squadPickSport('run')"><svg class="ic ic-sm"><use href="#i-run"/></svg>Run</button>
-    <button data-v="swim" onclick="squadPickSport('swim')"><svg class="ic ic-sm"><use href="#i-swim"/></svg>Swim</button>
-    <button data-v="ride" onclick="squadPickSport('ride')"><svg class="ic ic-sm"><use href="#i-bike"/></svg>Ride</button>
-    <button data-v="other" onclick="squadPickSport('other')"><svg class="ic ic-sm"><use href="#i-dumbbell"/></svg>Gym</button>
-  </div>
+  <div id="sqi_exPick"></div>
   <input type="hidden" id="sqi_sport" value="walk" />
+  <input type="hidden" id="sqi_ex" value="walk" />
+  <div id="sqi_form">
   <div class="field mt-12"><label for="sqi_title">Name</label><input id="sqi_title" class="input" maxlength="60" /></div>
   <div class="sq-form-grid three mt-8">
     <div class="field"><label for="sqi_date">Date</label><input id="sqi_date" type="date" class="input" /></div>
@@ -822,6 +818,7 @@
   <div class="field mt-8"><label for="sqi_note">Note</label><input id="sqi_note" class="input" maxlength="240" placeholder="How it felt, what you did…" /></div>
   <div class="hint mt-8" id="sqi_extra"></div>
   <button class="btn btn-primary mt-12" onclick="saveSquadImport()"><svg class="ic"><use href="#i-check-circle"/></svg>Save workout</button>
+  </div>
 </div>
 
 <div class="sheet" id="squadRulesSheet" role="dialog" aria-modal="true">

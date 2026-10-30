@@ -33,6 +33,58 @@ function sportOf(w) {
   return 'ride';
 }
 
+// Exercises a person can log (and the screenshot reader can name): each belongs to a sport.
+// "Gym & other" sessions are numbered per exercise ("Strength 3"), the others per sport ("Ride 42").
+const EXERCISES = [
+  { k: 'walk', label: 'Walk', sport: 'walk', type: 'Walk' },
+  { k: 'hike', label: 'Hike', sport: 'walk', type: 'Hike' },
+  { k: 'treadmill_walk', label: 'Treadmill walk', sport: 'walk', type: 'Walk', indoor: true },
+  { k: 'run', label: 'Run', sport: 'run', type: 'Run' },
+  { k: 'trail_run', label: 'Trail run', sport: 'run', type: 'TrailRun' },
+  { k: 'treadmill', label: 'Treadmill run', sport: 'run', type: 'Run', indoor: true },
+  { k: 'pool_swim', label: 'Pool swim', sport: 'swim', type: 'Swim', indoor: true },
+  { k: 'open_water', label: 'Open-water swim', sport: 'swim', type: 'Swim' },
+  { k: 'ride', label: 'Ride', sport: 'ride', type: 'Ride' },
+  { k: 'mtb', label: 'Mountain bike', sport: 'ride', type: 'MountainBikeRide' },
+  { k: 'indoor_ride', label: 'Indoor bike', sport: 'ride', type: 'VirtualRide', indoor: true },
+  { k: 'strength', label: 'Strength', sport: 'other', type: 'WeightTraining', re: /strength|weight|lift|functional|push.?ups?|pull.?ups?|chin.?ups?|squat|lunge|curl|press|extension|dumbbell|barbell|kettlebell|deadlift|dips?\b|raise|pull.?down|bench|shrug/ },
+  { k: 'aerobics', label: 'Aerobics', sport: 'other', type: 'Aerobics', re: /aerobic|step.?class|bodypump/ },
+  { k: 'elliptical', label: 'Elliptical', sport: 'other', type: 'Elliptical', re: /ellip|cross.?trainer/ },
+  { k: 'rowing', label: 'Rowing', sport: 'other', type: 'Rowing', re: /row/ },
+  { k: 'stairs', label: 'Stair stepper', sport: 'other', type: 'StairStepper', re: /stair|stepper/ },
+  { k: 'hiit', label: 'HIIT', sport: 'other', type: 'HighIntensityIntervalTraining', re: /hiit|high.?intensity|interval|circuit/ },
+  { k: 'crossfit', label: 'CrossFit', sport: 'other', type: 'Crossfit', re: /crossfit/ },
+  { k: 'yoga', label: 'Yoga', sport: 'other', type: 'Yoga', re: /yoga/ },
+  { k: 'pilates', label: 'Pilates', sport: 'other', type: 'Pilates', re: /pilates/ },
+  { k: 'core', label: 'Core & stretching', sport: 'other', type: 'Workout', re: /core|stretch|mobility|flexib|plank|crunch|sit.?ups?|abs\b/ },
+  { k: 'football', label: 'Football', sport: 'other', type: 'Soccer', re: /football|soccer|futsal/ },
+  { k: 'basketball', label: 'Basketball', sport: 'other', type: 'Basketball', re: /basket/ },
+  { k: 'tennis', label: 'Tennis', sport: 'other', type: 'Tennis', re: /tennis/ },
+  { k: 'padel', label: 'Padel', sport: 'other', type: 'Padel', re: /padel|paddle/ },
+  { k: 'squash', label: 'Squash', sport: 'other', type: 'Squash', re: /squash/ },
+  { k: 'badminton', label: 'Badminton', sport: 'other', type: 'Badminton', re: /badminton/ },
+  { k: 'boxing', label: 'Boxing', sport: 'other', type: 'Boxing', re: /box/ },
+  { k: 'martial_arts', label: 'Martial arts', sport: 'other', type: 'MartialArts', re: /martial|karate|judo|taekwondo|jiu|mma|kung/ },
+  { k: 'dance', label: 'Dance', sport: 'other', type: 'Dance', re: /danc|zumba/ },
+  { k: 'jump_rope', label: 'Jump rope', sport: 'other', type: 'JumpRope', re: /rope|skipping/ },
+  { k: 'climbing', label: 'Climbing', sport: 'other', type: 'RockClimbing', re: /climb|boulder/ },
+  { k: 'other', label: 'Workout', sport: 'other', type: 'Workout' }
+];
+const EXERCISE = Object.fromEntries(EXERCISES.map(e => [e.k, e]));
+
+// The exercise of a "Gym & other" session: chosen when logged, else recognised from its type or name
+function exerciseOf(w) {
+  if (w && EXERCISE[w.activity] && EXERCISE[w.activity].sport === 'other') return EXERCISE[w.activity];
+  const others = EXERCISES.filter(e => e.sport === 'other' && e.re);
+  const exact = others.find(e => e.type === (w && w.sport_type) && e.type !== 'Workout');
+  if (exact) return exact;
+  const text = `${(w && w.sport_type) || ''} ${(w && w.name) || ''}`.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  return others.find(e => e.re.test(text)) || EXERCISE.other;
+}
+
+// What a workout is numbered as: "Ride", "Swim", … or the exercise for gym & other
+const numberLabel = w => (sportOf(w) === 'other' ? exerciseOf(w).label : SPORTS[sportOf(w)].code);
+
 const sportMeta = w => SPORTS[sportOf(w)];
 const sportIcon = (w, cls = '') => icon(sportMeta(w).icon, cls);
 const bySport = (list, sport) => (sport && sport !== 'all' ? list.filter(w => sportOf(w) === sport) : list);

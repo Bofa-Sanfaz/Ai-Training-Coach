@@ -443,8 +443,9 @@ function squadShrinkImage(file, max = 1400) {
   });
 }
 
-// Picked screenshots (up to ${SHOT_MAX_IMAGES} per go) → one AI call groups them per workout → each
-// workout opens the approval form in turn (saving or closing moves on to the next)
+// Picked screenshots (up to ${SHOT_MAX_IMAGES} per go) → one AI call groups them per workout →
+// every workout that reads cleanly is saved straight away; the rest open the form in turn
+// (saving or closing moves on to the next)
 async function squadImportPicked(ev) {
   const files = Array.from((ev.target.files) || []).filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name));
   if (!files.length) return;
@@ -454,13 +455,35 @@ async function squadImportPicked(ev) {
     const images = [];
     for (const f of files.slice(0, SHOT_MAX_IMAGES)) images.push(await squadShrinkImage(f, SHOT_MAX_SIDE));
     const drafts = await readShots(images);
-    Squad.shotQueue = drafts.map((w, i) => Object.assign(w, { shotN: i + 1, shotTotal: drafts.length }));
-    if (drafts.length > 1) toast(`Found ${drafts.length} workouts — check each one and save.`, 'success', 4000);
-    squadNextShot();
+    const added = [], dupes = [], review = [];
+    for (const d of drafts) {
+      const blocking = shotAutoPrepare(d);
+      if (blocking.length) { review.push(d); continue; }
+      Squad.importDraft = d;
+      squadFillImport();
+      const r = await saveSquadImport({ auto: true });
+      if (r && r.dupe) dupes.push(r.dupe); else if (r) added.push(r); else review.push(d);
+    }
+    Squad.importDraft = null;
+    if (added.length) {
+      haptic('success');
+      toast(`Added ${added.map(w => `${rideTitle(w)} (${squadShotSummary(w)})`).join(', ')} — tap ${added.length > 1 ? 'one' : 'it'} in Training to see everything.`, 'success', 6500);
+      Squad.lastShare = 0;
+      await squadTick(true);
+      if (typeof afterWorkoutsChanged === 'function') afterWorkoutsChanged(null);
+    }
+    if (dupes.length) toast(`Already in your workouts: ${dupes.map(w => rideTitle(w)).join(', ')}`, 'warn', 5000);
+    Squad.shotQueue = review.map((w, i) => Object.assign(w, { shotN: i + 1, shotTotal: review.length }));
+    if (review.length) {
+      toast(`${review.length === 1 ? 'One workout needs' : `${review.length} workouts need`} a quick check before saving.`, 'info', 4500);
+      squadNextShot();
+    }
   } catch (e) {
     toast(`Could not read the screenshots: ${e.message}`, 'error', 6000);
   }
 }
+
+const squadShotSummary = w => [w.distance_km > 0 ? distText(w) : '', formatDuration(num(w.moving_sec))].filter(Boolean).join(' · ');
 
 function squadNextShot() {
   const w = Squad.shotQueue && Squad.shotQueue.shift();
@@ -491,31 +514,50 @@ const MANUAL_FIELD_DEFS = {
   cadence_rpm: { label: 'Cadence', type: 'int', ph: 'rpm' },
   elev: { label: 'Climbing (m)', type: 'int' },
   power: { label: 'Avg power (W)', type: 'int', ph: 'optional' },
-  reps: { label: 'Reps / sets', type: 'int', ph: 'optional' },
-  gym: { label: 'Activity', type: 'select', options: [['WeightTraining', 'Strength'], ['Elliptical', 'Elliptical'], ['Rowing', 'Rowing'], ['StairStepper', 'Stair stepper'], ['HighIntensityIntervalTraining', 'HIIT'], ['Yoga', 'Yoga / Pilates'], ['Workout', 'Other']] },
-  indoor: { label: 'Treadmill', type: 'check' },
-  indoor_ride: { label: 'Indoor / trainer', type: 'check' }
+  reps: { label: 'Reps / sets', type: 'int', ph: 'optional' }
 };
 const MANUAL_FIELDS = {
   swim: ['pool', 'lengths', 'dist_m', 'stroke', 'avg_hr', 'max_hr', 'kcal', 'swolf', 'strokes'],
-  walk: ['dist', 'steps', 'avg_hr', 'max_hr', 'kcal', 'cadence_spm', 'elev', 'indoor'],
-  run: ['dist', 'avg_hr', 'max_hr', 'kcal', 'cadence_spm', 'steps', 'elev', 'indoor'],
-  ride: ['dist', 'avg_hr', 'max_hr', 'kcal', 'elev', 'power', 'cadence_rpm', 'indoor_ride'],
-  other: ['gym', 'avg_hr', 'max_hr', 'kcal', 'reps', 'dist_opt']
+  walk: ['dist', 'steps', 'avg_hr', 'max_hr', 'kcal', 'cadence_spm', 'elev'],
+  run: ['dist', 'avg_hr', 'max_hr', 'kcal', 'cadence_spm', 'steps', 'elev'],
+  ride: ['dist', 'avg_hr', 'max_hr', 'kcal', 'elev', 'power', 'cadence_rpm'],
+  other: ['avg_hr', 'max_hr', 'kcal', 'reps', 'dist_opt']
 };
+const EXERCISE_GROUPS = [
+  ['Walk & run', ['walk', 'hike', 'treadmill_walk', 'run', 'trail_run', 'treadmill']],
+  ['Swim', ['pool_swim', 'open_water']],
+  ['Ride', ['ride', 'mtb', 'indoor_ride']],
+  ['Gym & sports', EXERCISES.filter(e => e.sport === 'other').map(e => e.k)]
+];
 
-function openManualWorkout(sport = 'swim') {
-  Squad.importDraft = { manual: true, sport, date: formatLocalDate(new Date()), start_time: new Date().toTimeString().slice(0, 5) };
+// A new log starts at the exercise list; no screenshot needed
+function openManualWorkout() {
+  Squad.importDraft = { manual: true, exercise: null, date: formatLocalDate(new Date()), start_time: new Date().toTimeString().slice(0, 5) };
   squadFillImport();
   openSheet('squadImportSheet');
 }
 
-function squadPickSport(sport) {
+// The chosen exercise (collapsed), or the whole list to choose from
+function squadRenderExercises(open) {
+  const cur = EXERCISE[$('#sqi_ex').value];
+  if (!open && cur) {
+    $('#sqi_exPick').innerHTML = `<button type="button" class="sq-ex-cur" onclick="squadRenderExercises(true)" style="--sc:${SPORTS[cur.sport].color}">${icon(SPORTS[cur.sport].icon, 'ic-sm')}<span class="grow"><small>Exercise</small><b>${escapeHtml(cur.label)}</b></span><span class="tiny">Change</span></button>`;
+    return;
+  }
+  $('#sqi_exPick').innerHTML = `<div class="sq-ex-title">What did you do?</div>${EXERCISE_GROUPS.map(([h, keys]) => `<div class="sq-ex-h">${h}</div>
+    <div class="sq-ex-grid">${keys.map(k => `<button type="button" class="sq-ex ${cur && cur.k === k ? 'active' : ''}" style="--sc:${SPORTS[EXERCISE[k].sport].color}" onclick="squadPickExercise('${k}')">${escapeHtml(EXERCISE[k].label)}</button>`).join('')}</div>`).join('')}`;
+}
+
+function squadPickExercise(k) {
+  const ex = EXERCISE[k] || EXERCISE.other;
   squadReadManualFields();
-  $('#sqi_sport').value = sport;
-  $$('#sqi_sportSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === sport));
+  const prev = EXERCISE[$('#sqi_ex').value];
+  $('#sqi_ex').value = ex.k;
+  $('#sqi_sport').value = ex.sport;
   const title = $('#sqi_title');
-  if (!title.value || title.dataset.auto === '1') { title.value = SPORTS[sport].label; title.dataset.auto = '1'; }
+  if (!title.value || title.dataset.auto === '1' || (prev && title.value === prev.label)) { title.value = ex.label; title.dataset.auto = '1'; }
+  squadRenderExercises(false);
+  $('#sqi_form').classList.remove('hidden');
   squadRenderManualFields();
 }
 
@@ -566,22 +608,24 @@ function squadFillImport() {
   const manual = !!w.manual;
   $('#sqi_head').textContent = manual ? 'Log a workout' : `Workout from screenshot${w.shotTotal > 1 ? ` (${w.shotN} of ${w.shotTotal})` : ''}`;
   $('#sqiShotBtn').classList.toggle('hidden', !manual);
-  $('#sqi_sub').textContent = manual ? 'For sessions that don\'t sync (e.g. pool swims, gym). It\'s added to your own workouts and shared with the squad.'
+  $('#sqi_sub').textContent = manual ? 'No screenshots? Pick what you did and fill in what you know. It\'s added to your workouts and shared with the squad.'
     : 'Read from your screenshots — check everything below, fix anything wrong, then save. Graphs, splits and lengths become your workout\'s charts.';
   $('#sqi_thumb').classList.add('hidden'); // screenshots are shown in the detail section
-  const sport = SPORTS[w.sport] ? w.sport : 'other';
-  const stroke = { free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY', mixed: 'MIXED' }[String(w.main_stroke || '').toLowerCase()];
+  // A new manual log has no exercise yet (the list shows first); a screenshot has the one it read
+  const ex = manual ? EXERCISE[w.exercise] || null : shotExercise(w);
+  const sport = ex ? ex.sport : 'walk';
+  $('#sqi_ex').value = ex ? ex.k : '';
+  const stroke ={ free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY', mixed: 'MIXED' }[String(w.main_stroke || '').toLowerCase()];
   const pool = w.pool_m > 0 ? Math.round(w.pool_m) : 25;
   // Everything the AI read (or nothing, for a manual log) → the form's values
   Squad.manualVals = {
     pool: String([25, 50, 33, 20].includes(pool) ? pool : 25), lengths: w.pool_m && w.dist_m ? Math.round(w.dist_m / w.pool_m) : '',
     dist_m: sport === 'swim' && w.dist_m ? Math.round(w.dist_m) : '', stroke: stroke || 'FREESTYLE', swolf: w.swolf || '', strokes: w.strokes || '',
     dist: sport !== 'swim' && w.dist_m ? round(w.dist_m / 1000, 2) : '', dist_opt: '', avg_hr: w.avg_hr || '', max_hr: w.max_hr || '', kcal: w.calories || '',
-    steps: w.steps || '', cadence_spm: w.cadence || '', cadence_rpm: w.cadence || '', elev: w.elev_gain_m || w.elev_m || '', power: '', reps: '', gym: 'WeightTraining',
-    indoor: /treadmill|indoor/i.test(w.type || ''), indoor_ride: /indoor|trainer/i.test(w.type || '')
+    steps: w.steps || '', cadence_spm: w.cadence || '', cadence_rpm: w.cadence || '', elev: w.elev_gain_m || w.elev_m || '', power: '', reps: ''
   };
   Squad.manualRpe = null;
-  v('#sqi_title', w.type || SPORTS[sport].label);
+  v('#sqi_title', w.type || (ex ? ex.label : ''));
   $('#sqi_title').dataset.auto = w.type ? '0' : '1';
   v('#sqi_date', w.date || formatLocalDate(new Date()));
   v('#sqi_time', w.start_time || '');
@@ -589,7 +633,8 @@ function squadFillImport() {
   v('#sqi_note', '');
   $('#sqi_dur').oninput = () => squadManualChanged();
   $('#sqi_sport').value = sport;
-  $$('#sqi_sportSeg button').forEach(b => b.classList.toggle('active', b.dataset.v === sport));
+  squadRenderExercises(!ex);
+  $('#sqi_form').classList.toggle('hidden', !ex);
   squadRenderManualFields();
   squadRenderRpe(null);
   // From screenshots: what else was read (checks, graphs, splits, lengths, zones) to approve
@@ -603,38 +648,40 @@ function squadParseDuration(s) {
   return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0] * 60;
 }
 
-async function saveSquadImport() {
+// Saves the form (opts.auto: a clean screenshot read, saved without showing the form — no toasts,
+// the caller reports). Returns the saved workout, { dupe } or null when something is missing.
+async function saveSquadImport(opts = {}) {
   const d = Squad.importDraft || {};
+  const say = (msg, type, ms) => { if (!opts.auto) toast(msg, type, ms); };
   squadReadManualFields();
   const x = Squad.manualVals || {};
   const int = k => parseInt(x[k], 10) || 0;
   const dec = k => parseFloat(String(x[k] || '').replace(',', '.')) || 0;
-  const sport = $('#sqi_sport').value;
+  const ex = EXERCISE[$('#sqi_ex').value];
+  if (!ex) { say('Pick what you did first', 'warn'); return null; }
+  const sport = ex.sport;
   const date = $('#sqi_date').value;
   const time = $('#sqi_time').value || '12:00';
   const dur = squadParseDuration($('#sqi_dur').value);
-  if (!date || !(dur > 0)) { toast('Date and duration are needed', 'warn'); return; }
+  if (!date || !(dur > 0)) { say('Date and duration are needed', 'warn'); return null; }
   const km = sport === 'swim' ? int('dist_m') / 1000 : sport === 'other' ? dec('dist_opt') : dec('dist');
-  if (sport !== 'other' && !(km > 0)) { toast(sport === 'swim' ? 'Enter the lengths (or the distance)' : 'Enter the distance', 'warn'); return; }
+  if (sport !== 'other' && !(km > 0)) { say(sport === 'swim' ? 'Enter the lengths (or the distance)' : 'Enter the distance', 'warn'); return null; }
   const avgHr = int('avg_hr'), maxHr = int('max_hr');
-  if ((avgHr && (avgHr < 30 || avgHr > 230)) || (maxHr && (maxHr < 40 || maxHr > 240))) { toast('Heart rate looks wrong (30–240 bpm)', 'warn'); return; }
+  if ((avgHr && (avgHr < 30 || avgHr > 230)) || (maxHr && (maxHr < 40 || maxHr > 240))) { say('Heart rate looks wrong (30–240 bpm)', 'warn'); return null; }
   const start = new Date(`${date}T${time}:00`);
   const sid = -Math.round(start.getTime() / 1000) - 7; // own id range, never collides with the watch import
   const all = await db.workouts.toArray();
   const same = findSameWorkout(all, +start, dur, () => true);
-  if (same) { toast(`Already in your workouts: ${rideTitle(same)}`, 'warn', 4500); closeSheet('squadImportSheet'); return; }
+  if (same) { say(`Already in your workouts: ${rideTitle(same)}`, 'warn', 4500); if (!opts.auto) closeSheet('squadImportSheet'); return { dupe: same }; }
   // Screens with both total and moving time (stops on a walk): pace and speed use moving time,
   // unless the duration was edited by hand
   const readMoving = !d.manual && typeof shotNum === 'function' ? shotNum(d.moving_s) : null;
   const moving = readMoving && readMoving < dur && Math.abs(dur - num(d.dur_s)) < 2 ? Math.round(readMoving) : dur;
-  const indoor = sport === 'swim' ? true : sport === 'ride' ? !!x.indoor_ride : sport === 'other' ? true : !!x.indoor;
-  const sportType = sport === 'other' ? (x.gym || 'Workout') : sport === 'ride' && indoor ? 'VirtualRide' : SPORTS[sport].code;
-  // A gym session without its own name is called after its activity ("Strength", "Rowing"…)
-  const gymLabel = sport === 'other' ? (MANUAL_FIELD_DEFS.gym.options.find(o => o[0] === x.gym) || [])[1] : null;
-  if (gymLabel && $('#sqi_title').dataset.auto === '1') $('#sqi_title').value = gymLabel;
+  // Indoor follows the exercise (pool, treadmill, indoor bike; gym and court sports count as indoor)
+  const indoor = ex.indoor !== undefined ? ex.indoor : sport === 'other';
   const w = {
-    strava_id: sid, ride_number: 0, exercise_code: '', source: d.manual ? 'manual' : 'screenshot', name: $('#sqi_title').value.trim() || SPORTS[sport].label,
-    sport, sport_type: sportType, indoor,
+    strava_id: sid, ride_number: 0, exercise_code: '', source: d.manual ? 'manual' : 'screenshot', name: $('#sqi_title').value.trim() || ex.label,
+    sport, sport_type: ex.type, activity: ex.k, indoor,
     date: `${date} ${time}`, distance_km: round(km, 3), moving_sec: moving, elapsed_sec: dur, duration_str: formatDuration(moving),
     avg_speed_kmh: km > 0 ? round(km / (moving / 3600), 2) : 0, max_speed_kmh: 0, avg_hr: avgHr, max_hr: maxHr,
     elevation_gain_m: indoor ? 0 : int('elev'), kilojoules: 0, calories: int('kcal'),
@@ -659,14 +706,35 @@ async function saveSquadImport() {
   w.id = await db.workouts.add(w);
   if (stream) await db.streams.put({ strava_id: w.strava_id, stream_data: stream });
   await ensureRideMetrics(w, stream, true);
+  await squadZonesFromDevice(w, stream);
   await renumberRides();
+  const saved = await db.workouts.get(w.id);
+  if (opts.auto) return saved;
   closeSheet('squadImportSheet');
   Squad.importDraft = null;
   haptic('success');
-  toast('Workout added — it is in your Training list and shared with the squad', 'success', 4000);
+  toast(`${rideTitle(saved)} added — it is in your Training list and shared with the squad`, 'success', 4000);
   Squad.lastShare = 0;
   await squadTick(true);
   if (typeof afterWorkoutsChanged === 'function') afterWorkoutsChanged(null);
+  return saved;
+}
+
+// No heart-rate graph, but the screen listed time per heart-rate zone: put each zone's minutes
+// into the person's own zone its bpm range falls in (so zones and the coaches still have them)
+async function squadZonesFromDevice(w, stream) {
+  if ((stream && stream.heartrate) || !Array.isArray(w.zones_device) || !w.zones_device.length) return;
+  if ((w.zone_seconds || []).some(s => num(s) > 0)) return;
+  const zs = [0, 0, 0, 0, 0];
+  let any = false;
+  for (const z of w.zones_device) {
+    const lo = num(z.from), hi = num(z.to), mid = lo && hi ? (lo + hi) / 2 : lo ? lo + 5 : hi ? hi - 5 : 0;
+    if (!(mid > 0) || !(num(z.sec) > 0)) continue;
+    zs[Math.min(4, PHYSIO.bounds.filter(b => mid >= b).length)] += num(z.sec); any = true;
+  }
+  if (!any) return;
+  w.zone_seconds = zs.map(Math.round);
+  await db.workouts.update(w.id, { zone_seconds: w.zone_seconds });
 }
 
 function squadQueueQuiet(cid, kind, body, ref = null) {
