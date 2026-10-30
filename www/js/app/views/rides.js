@@ -60,8 +60,13 @@ async function renderWeekCard(all) {
   const host = $('#weekCard');
   if (!all.length) { host.innerHTML = ''; return; }
   const { cur, prev, streak } = weekSummary(all.filter(w => !isExcluded(w)));
-  const multi = sportsPresent(all).length > 1;
-  const rideKm = s => (s.bySport.ride || { dist: 0 }).dist;
+  const present = sportsPresent(all);
+  const multi = present.length > 1;
+  // Riders keep "ride km" (their km target); people who don't ride see km over all their sports
+  const rides = present.includes('ride');
+  const rideKm = rides ? s => (s.bySport.ride || { dist: 0 }).dist : s => Object.values(s.bySport).reduce((a, e) => a + num(e.dist), 0);
+  const countLabel = multi ? 'sessions' : (SPORTS[present[0]] || SPORTS.ride).plural.toLowerCase();
+  const kmLabel = rides && multi ? 'ride km' : 'km';
   const goals = await getWeeklyGoals(formatLocalDate(startOfWeek(new Date())));
   const todayItem = await todayPlanItem();
   const readiness = await readinessChipHtml();
@@ -78,8 +83,8 @@ async function renderWeekCard(all) {
         ${fs ? `<span class="form-chip" title="${escapeHtml(fs.label)}">${icon('activity', 'ic-sm')}Form ${signed(snap.tsb, 0)}</span>` : ''}
       </div>
       <div class="week-grid">
-        ${weekStatHtml(`<span data-count="${cur.count}">${cur.count}</span>`, multi ? 'sessions' : 'rides', prev.count ? String(prev.count) : '', goals.rides ? (cur.count / goals.rides) * 100 : null, goals.rides ? String(goals.rides) : '')}
-        ${weekStatHtml(`<span data-count="${round(rideKm(cur), 1)}">${fmtNum(rideKm(cur), rideKm(cur) >= 100 ? 0 : 1)}</span>`, multi ? 'ride km' : 'km', prev.dist ? fmtNum(rideKm(prev), 0) : '', goals.km ? (rideKm(cur) / goals.km) * 100 : null, goals.km ? String(goals.km) : '')}
+        ${weekStatHtml(`<span data-count="${cur.count}">${cur.count}</span>`, cur.count === 1 ? countLabel.replace(/s$/, '') : countLabel, prev.count ? String(prev.count) : '', goals.rides ? (cur.count / goals.rides) * 100 : null, goals.rides ? String(goals.rides) : '')}
+        ${weekStatHtml(`<span data-count="${round(rideKm(cur), 1)}">${fmtNum(rideKm(cur), rideKm(cur) >= 100 ? 0 : 1)}</span>`, kmLabel, rideKm(prev) ? fmtNum(rideKm(prev), rideKm(prev) >= 100 ? 0 : 1) : '', rides && goals.km ? (rideKm(cur) / goals.km) * 100 : null, rides && goals.km ? String(goals.km) : '')}
         ${weekStatHtml(formatHours(cur.sec), 'time', prev.sec ? formatHours(prev.sec) : '', goals.hours ? (cur.sec / 3600 / goals.hours) * 100 : null, goals.hours ? `${goals.hours}h` : '')}
         ${weekStatHtml(Math.round(cur.asc), 'climb m', prev.asc ? String(Math.round(prev.asc)) : '', null, '')}
       </div>
@@ -112,6 +117,7 @@ async function renderRides() {
     ? `${all.length} workout${all.length > 1 ? 's' : ''}${lastSync ? ` · synced ${relativeTime(lastSync)}` : ''}`
     : 'Connect Strava to get started';
   $('#inboxCard').innerHTML = inboxCardHtml(await getInbox());
+  if (typeof renderHuaweiReminder === 'function') renderHuaweiReminder();
   await renderWeekCard(all);
   $('#sportSegRides').innerHTML = sportSegHtml(all, 'setSportFilter');
 

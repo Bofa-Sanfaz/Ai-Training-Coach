@@ -389,11 +389,34 @@ async function saveSquadWeight() {
   squadTick(true);
 }
 
-// ---------- add a workout from a screenshot (Huawei Health etc.) ----------
+// ---------- add workouts from screenshots (Huawei Health or any app) ----------
+// The AI reads the numbers off the screen: the person's own AI key (personal coach) when one
+// is set up, otherwise the squad's Aether on the server. Several screenshots can be picked at
+// once; each opens the Log form pre-filled, one after the other, to check and save.
+const SHOT_PROMPT = `Read this screenshot from a fitness app (often Huawei Health; may also be Apple Fitness, Strava, Samsung Health).
+Extract ONE workout. Use only numbers that are visible — never guess; use null when a value is not shown.
+Return JSON:
+{"sport":"walk|swim|run|ride|other","type":"e.g. Outdoor walk, Pool swim, Strength","date":"YYYY-MM-DD or null","start_time":"HH:MM or null",
+"dur_s":number,"dist_m":number,"avg_hr":number,"max_hr":number,"calories":number,"steps":number,"cadence":number,
+"pace_km_s":number,"pace100_s":number,"speed_kmh":number,"swolf":number,"pool_m":number,"strokes":number,
+"main_stroke":"free|breast|back|fly|mixed|null","laps":[{"n":1,"sec":number,"strokes":number,"swolf":number,"stroke":"free"}],
+"elev_m":number,"notes":"anything else useful, short"}
+Durations like 1:02:03 are h:mm:ss; 7'45" pace means 7 min 45 s per km. Distances in km must be converted to metres.`;
+
+function squadPersonalAiReady() {
+  return !!(typeof AI !== 'undefined' && AI && AI.providers.some(p => providerReady(p) && (!geminiOnly() || p.type === 'gemini')));
+}
+
+function squadSquadAiReady() {
+  const S = Squad.cur && squadState(Squad.cur);
+  return !!(S && S.ch && S.ch.ai && S.ch.ai.enabled);
+}
+
 function openSquadImport() {
-  const S = squadState(Squad.cur);
-  if (!S || !S.ch) return;
-  if (!(S.ch.ai && S.ch.ai.enabled)) { toast(`Reading screenshots needs ${SQUAD_AI} switched on for this challenge`, 'warn', 4500); return; }
+  if (!squadPersonalAiReady() && !squadSquadAiReady()) {
+    toast('Reading screenshots needs an AI key: add your free Google Gemini key in Profile → AI providers (aistudio.google.com/apikey).', 'warn', 6000);
+    return;
+  }
   $('#squadImportFile').value = '';
   $('#squadImportFile').click();
 }
@@ -414,19 +437,50 @@ function squadShrinkImage(file, max = 1600) {
   });
 }
 
+function squadParseShotJson(text) {
+  const t = String(text || '').replace(/```(?:json)?/g, '');
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { return null; }
+}
+
+// One screenshot → workout fields (own key first, squad AI as fallback)
+async function squadReadShot(image) {
+  if (squadPersonalAiReady()) {
+    const text = await callAI(SHOT_PROMPT, image, { json: true, maxTokens: 3000 });
+    const w = squadParseShotJson(text);
+    if (w) return w;
+  }
+  if (squadSquadAiReady()) {
+    const r = await squadCall(squadEntry(Squad.cur), 'POST', '/ai/extract', { image }, 120000);
+    return r.workout;
+  }
+  throw new Error('the AI could not read a workout from that image');
+}
+
 async function squadImportPicked(ev) {
-  const file = ev.target.files && ev.target.files[0];
-  if (!file) return;
-  const c = squadEntry(Squad.cur);
-  toast(`${SQUAD_AI} is reading the screenshot…`, 'info', 6000);
+  const files = Array.from((ev.target.files) || []).filter(f => /^image\//.test(f.type) || /\.(jpe?g|png|heic|webp)$/i.test(f.name));
+  if (!files.length) return;
+  Squad.shotQueue = files;
+  Squad.shotTotal = files.length;
+  await squadNextShot();
+}
+
+async function squadNextShot() {
+  const file = Squad.shotQueue && Squad.shotQueue.shift();
+  if (!file) { Squad.shotQueue = null; return; }
+  const n = Squad.shotTotal - Squad.shotQueue.length;
+  toast(`Reading screenshot${Squad.shotTotal > 1 ? ` ${n} of ${Squad.shotTotal}` : ''}…`, 'info', 6000);
   try {
     const image = await squadShrinkImage(file);
-    const r = await squadCall(c, 'POST', '/ai/extract', { image }, 120000);
-    Squad.importDraft = Object.assign({ image }, r.workout);
+    const w = await squadReadShot(image);
+    Squad.importDraft = Object.assign({ image, shotN: n, shotTotal: Squad.shotTotal }, w);
     squadFillImport();
-    openSheet('squadImportSheet');
+    // Saving or closing moves on to the next screenshot
+    openSheet('squadImportSheet', () => { if (Squad.shotQueue && Squad.shotQueue.length) setTimeout(squadNextShot, 350); });
   } catch (e) {
-    toast(`Could not read it: ${e.message}`, 'error', 5000);
+    toast(`Could not read that screenshot: ${e.message}`, 'error', 5000);
+    if (Squad.shotQueue && Squad.shotQueue.length) setTimeout(squadNextShot, 600);
   }
 }
 
@@ -524,7 +578,8 @@ function squadFillImport() {
   const w = Squad.importDraft || {};
   const v = (id, x) => { $(id).value = x === null || x === undefined ? '' : String(x); };
   const manual = !!w.manual;
-  $('#sqi_head').textContent = manual ? 'Log a workout' : 'Workout from screenshot';
+  $('#sqi_head').textContent = manual ? 'Log a workout' : `Workout from screenshot${w.shotTotal > 1 ? ` (${w.shotN} of ${w.shotTotal})` : ''}`;
+  $('#sqiShotBtn').classList.toggle('hidden', !manual);
   $('#sqi_sub').textContent = manual ? 'For sessions that don\'t sync (e.g. pool swims, gym). It\'s added to your own workouts and shared with the squad.'
     : 'Aether read these numbers — check them, fix anything wrong, then save. It\'s added to your own workouts and shared with the squad.';
   $('#sqi_thumb').classList.toggle('hidden', !w.image);
@@ -647,6 +702,19 @@ async function squadBaseline(starts) {
     weekly_min: Math.round(sumBy(ws, w => num(w.moving_sec)) / 60 / 4), target_days: Math.max(2, Math.min(6, Math.round(days / 4) || 3)),
     metrics, from, to: end, sports: Object.keys(SPORTS).filter(s => of(s).length)
   };
+}
+
+// After importing history (e.g. Huawei): measure the person against his real past again
+async function squadRefreshBaselines() {
+  for (const c of Squad.list.filter(x => !x.revoked)) {
+    const st = Squad.data[c.id];
+    if (!st || !st.challenge || !st.me) continue;
+    const b = await squadBaseline(st.challenge.starts);
+    if (!(b.weekly_min > 0)) continue;
+    const mine = (st.members || []).find(m => m.id === st.me);
+    if (mine && mine.baseline && mine.baseline.target_days) b.target_days = mine.baseline.target_days;
+    try { await squadCall(c, 'PATCH', '/me', { sports: b.sports, baseline: b }); } catch (e) { console.warn('baseline', e.message); }
+  }
 }
 
 // ---------- state helpers ----------

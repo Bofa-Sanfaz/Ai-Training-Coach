@@ -262,6 +262,30 @@ async function importHuaweiExport(file, password, onProgress) {
   return res;
 }
 
+// After any import: reminder off, the squad baseline from the real history, everything refreshed
+async function huaweiImportDone(r) {
+  await setConfig('huawei_import_pending', '0');
+  if (r.added) {
+    if (typeof afterWorkoutsChanged === 'function') await afterWorkoutsChanged(null);
+    if (typeof squadRefreshBaselines === 'function') await squadRefreshBaselines();
+    if (typeof Squad !== 'undefined' && Squad.list.length) { Squad.lastShare = 0; squadTick(true); }
+  }
+  renderHuaweiReminder();
+}
+
+// Training screen card while the Huawei history is still to be imported (skipped in the intro)
+async function renderHuaweiReminder() {
+  const host = $('#huaweiReminder');
+  if (!host) return;
+  if ((await getConfig('huawei_import_pending')) !== '1') { host.innerHTML = ''; return; }
+  host.innerHTML = `<div class="card hw-reminder">
+    <div class="row" style="gap:10px; align-items:flex-start">${icon('download')}<div class="grow">
+      <b>Import your Huawei history</b>
+      <div class="small muted">When Huawei's e-mail arrives: download the ZIP, then import it here — your past sessions, heart rate and pool lengths.</div>
+      <div class="btn-row mt-8"><button class="btn btn-primary btn-sm" onclick="openHuaweiImport()">Import now</button><button class="btn btn-ghost btn-sm" onclick="setConfig('huawei_import_pending', '0').then(renderHuaweiReminder)">Not needed</button></div>
+    </div></div></div>`;
+}
+
 // ---------- UI ----------
 async function openHuaweiImport() {
   $('#hw_pw').value = (await getConfig('huawei_zip_pw')) || '';
@@ -288,11 +312,8 @@ async function runHuaweiImport() {
       ? `✓ Added ${r.added} session${r.added === 1 ? '' : 's'} (${parts.join(', ')}). ${r.skipped ? `${r.skipped} already here.` : ''}`
       : `Nothing new: ${r.found} sessions in the export${r.skipped ? `, ${r.skipped} already here` : ''}${r.old ? `, ${r.old} from before ${MIN_WORKOUT_DATE.slice(0, 4)}` : ''}.`;
     haptic(r.added ? 'success' : 'light');
-    if (r.added) {
-      toast(`Huawei: ${r.added} session${r.added === 1 ? '' : 's'} added`, 'success');
-      if (typeof afterWorkoutsChanged === 'function') await afterWorkoutsChanged(null);
-      if (typeof Squad !== 'undefined' && Squad.list.length) { Squad.lastShare = 0; squadTick(true); }
-    }
+    if (r.added) toast(`Huawei: ${r.added} session${r.added === 1 ? '' : 's'} added`, 'success');
+    await huaweiImportDone(r);
   } catch (e) {
     console.error(e);
     status.textContent = `Could not import: ${e.message}`;

@@ -1225,3 +1225,11 @@ span.agent-chip { cursor: default; }
 .sq-check input { width: 20px; height: 20px; accent-color: var(--brand); }
 #sqi_rpe { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
 .nowrap { white-space: nowrap; }
+
+/* Intro: Strava app values, Huawei reminder */
+.intro-kv { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; font-size: 0.8rem; }
+.intro-kv span { color: var(--muted); min-width: 64px; }
+.intro-kv b { word-break: break-all; }
+.intro-kv .btn { margin-left: auto; }
+.hw-reminder { border-left: 4px solid var(--brand); margin-bottom: 10px; }
+.hw-reminder > .row > .ic { color: var(--brand); flex-shrink: 0; margin-top: 2px; }

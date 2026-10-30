@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.7.0 — 2026-10-30 · first-run flow for a Huawei user
+- Introduction on the web app: Welcome → About you → **Huawei history** (request steps, import the export ZIP right there, or "Skip for now" → reminder card on Training until imported) → **Connect Strava** (Huawei Health → Third-party services → Strava; Strava API app values with copy buttons; Client ID/Secret + Connect) → AI coach → Squad → Done. The step is remembered, so Strava's sign-in page returns to the next step; the invite code is kept too.
+- History comes before the squad, so the "own usual" baseline uses the real past; importing later refreshes the squad baseline automatically.
+- Week card follows the person's sports: non-riders see km over all sports and "walk(s)/session(s)" (riders unchanged: "ride km"); singular for one session.
+
+## 3.6.3 — 2026-10-30 · manual + screenshots first
+- Assad's Huawei Health app has no Strava sharing, so the main way in is manual: **Training → camera** (or the Log form's "Fill from screenshot(s)", or Squad → Screenshot) — pick one or several workout screenshots; the AI reads every number into the sport-specific form, one after another ("2 of 5"), to check and save.
+- Screenshots are read with the person's own AI key (free Gemini) when set up, otherwise the squad's Aether; a clear hint when neither exists.
+- Introduction: screenshot and Log first; Strava/Huawei export as optional. Profile's Strava steps folded under "Optional".
+
 ## 3.6.2 — 2026-10-30 · sport-specific manual log, polish
 - **Log a workout** has fields per sport: swim (pool × lengths → distance, main stroke, avg/max HR, calories, SWOLF, total strokes), walk/run (distance, steps, cadence, climbing, HR, calories, treadmill), ride (distance, climbing, power, cadence, HR, calories, indoor), gym (activity: strength/elliptical/rowing/stairs/HIIT/yoga/other, HR, calories, reps, optional distance); all with effort (RPE) and a note; live pace/speed preview; values kept when switching sport; an unnamed gym session is named after its activity. The same form checks screenshot imports. Manual SWOLF/stroke/calories reach the squad summary and the coaches.
 - Polish: Reports daily-load chart always shows at least a week (no full-width wall for one session); week card keeps "N-week streak" together; web app Profile no longer shows a placeholder bike name; Squad quick actions (Log workout · Screenshot · Log weight · Ask Aether); chat row says "invite a friend" until someone joins.
