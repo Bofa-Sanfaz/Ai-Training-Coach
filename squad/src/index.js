@@ -15,6 +15,7 @@ import { accountRoute } from './account.js';
 import { runAI, aiDue, extractWorkout, publicAiConfig, localToday, rid, parse, nowIso, AI_NAME, CH_COLS } from './ai.js';
 
 const MAX_MEMBERS = 6;
+const MAX_CHALLENGES = 40;
 const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2'];
 const SPORTS = ['ride', 'run', 'walk', 'swim', 'other'];
 const KIND_LIMIT = { msg: 6000, activity: 12000, comment: 3000, reaction: 300, delete: 300, daily: 600 };
@@ -181,6 +182,9 @@ async function createChallenge(env, req) {
   const ends = validDate(b.ends);
   if (ends && ends < starts) fail(400, 'the end date is before the start');
   const name = str(b.name, 60) || 'Our challenge';
+  // A private server: strangers can't fill the free database (or the cron's time) with challenges
+  const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM challenges').first();
+  if (count.n >= MAX_CHALLENGES) fail(403, 'this server is not taking new challenges');
   const memberId = rid(12), cid = rid(14), t = token(), now = nowIso();
   for (let attempt = 0; attempt < 4; attempt++) {
     const invite = inviteCode();
@@ -351,7 +355,8 @@ const dayShift = (d, n) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400000)
 async function arcAction(env, req, cid) {
   const { me, ch } = await auth(env, req, cid);
   const b = await readJson(req);
-  const active = (await membersOf(env, cid)).filter(m => m.active);
+  const everyone = await membersOf(env, cid);
+  const active = everyone.filter(m => m.active);
   const next = (ch.arc || 0) + 1;
   let vote = parse(ch.arc_vote, null);
   if (b.action === 'cancel') {
@@ -372,18 +377,20 @@ async function arcAction(env, req, cid) {
   // Everyone approved: archive the arc that ends, start the next one today
   const today = localToday(ch);
   const arcs = parse(ch.arcs, []);
-  const prev = (ch.arc || 0) >= 1 ? { n: ch.arc, from: ch.starts, to: today > ch.starts ? dayShift(today, -1) : today, seq_from: ch.arc_seq || 0, seq_to: ch.seq } : null;
+  // The arc that ends keeps everyone's "own usual" of that time, so its report never re-scores
+  const prev = (ch.arc || 0) >= 1 ? { n: ch.arc, from: ch.starts, to: today > ch.starts ? dayShift(today, -1) : today, seq_from: ch.arc_seq || 0, seq_to: ch.seq, baselines: Object.fromEntries(everyone.map(m => [m.id, m.baseline || {}])) } : null;
   if (prev) arcs.push(prev);
   const len = ch.ends ? Math.round((Date.parse(`${ch.ends}T00:00:00Z`) - Date.parse(`${ch.starts}T00:00:00Z`)) / 86400000) : null;
   const ends = len !== null && len > 0 ? dayShift(today, len) : null;
   const r = await env.DB.prepare('UPDATE challenges SET arc=?, arc_seq=?, arc_vote=NULL, arcs=?, starts=?, ends=? WHERE id=? AND arc=?')
     .bind(next, ch.seq + 1, JSON.stringify(arcs), today, ends, cid, ch.arc || 0).run();
   if (!r.meta.changes) fail(409, 'the arc just changed — refresh');
-  const evs = [systemEvent({ type: 'arc_started', arc: next, prev, by: vote.by })];
+  const brief = prev && Object.assign({}, prev, { baselines: undefined }); // the event stays small
+  const evs = [systemEvent({ type: 'arc_started', arc: next, prev: brief, by: vote.by })];
   // From the second arc on: the thorough report of the arc that just ended
   if (prev && ch.ai_config) evs.push({ id: `arc-${cid.slice(0, 6)}-${prev.n}-${rid(6)}`, kind: 'msg', author: me.id, ref: null, body: { text: `📊 Arc ${prev.n} report, please`, ai: { mode: 'arc', from: prev.from, to: prev.to, arc: prev.n } } });
   await append(env, cid, evs);
-  return json({ started: true, arc: next, prev });
+  return json({ started: true, arc: next, prev: brief });
 }
 
 function poster(env) {
@@ -433,7 +440,7 @@ async function route(req, env, url) {
     const b = await readJson(req, 12000000);
     const images = (Array.isArray(b.images) ? b.images : typeof b.image === 'string' ? [b.image] : []).filter(x => typeof x === 'string' && x.length > 100).slice(0, 8);
     if (!images.length) fail(400, 'images (base64 JPEG) are required');
-    return json({ result: await extractWorkout(env, ch, images) });
+    return json({ result: await extractWorkout(env, ch, images, b.today || localToday(ch)) });
   }
   fail(404, 'not found');
 }

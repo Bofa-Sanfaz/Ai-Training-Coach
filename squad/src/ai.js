@@ -159,11 +159,22 @@ Return JSON only:
 "notes":"anything else useful that is visible, short"}]}`;
 
 // Screenshots (one or several, of one or several workouts) → { workouts: [...] }
-export async function extractWorkout(env, ch, images) {
-  const r = await modelFor(env, ch, SHOT_PROMPT_V2, { image: images, json: true, maxTokens: 16000 });
+export async function extractWorkout(env, ch, images, today) {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10);
+  const prompt = `${SHOT_PROMPT_V2}\nToday is ${day}. When a date shows no year, use the most recent such date that is not in the future.`;
+  const r = await modelFor(env, ch, prompt, { image: images, json: true, maxTokens: 32768 });
   const t = String(r.text || '').replace(/```(?:json)?/g, '');
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
-  const w = a >= 0 && b > a ? parse(t.slice(a, b + 1), null) : null;
+  let w = a >= 0 && b > a ? parse(t.slice(a, b + 1), null) : null;
+  // Cut off at the length limit: keep the workouts that are complete
+  if (!w && a >= 0 && /^\{\s*"workouts"\s*:\s*\[/.test(t.slice(a))) {
+    // Only at workout boundaries (a few parses — the free plan has 10 ms of CPU)
+    const ends = [b].concat(Array.from(t.matchAll(/\}\s*,\s*\{\s*"screens"/g), m => m.index).reverse());
+    for (const end of ends.slice(0, 9)) {
+      const d = end > a ? parse(`${t.slice(a, end + 1)}]}`, null) : null;
+      if (d && Array.isArray(d.workouts) && d.workouts.length) { w = Object.assign(d, { cut: true }); break; }
+    }
+  }
   if (!w) throw Object.assign(new Error('the AI could not read a workout from these images'), { status: 422 });
   return w;
 }
@@ -362,8 +373,12 @@ function requestPrompt(w, req) {
   const text = String(req.body.text || '').slice(0, 2000);
   let task;
   if (ai.mode === 'arc' && ai.from && ai.to) {
-    const people = w.members.filter(m => m.active || w.activities.some(a => a.author === m.id));
-    const score = SquadCore.compute({ starts: ai.from, ends: ai.to, rules: w.rules }, people, w.activities, ai.to);
+    // Everyone measured against the "own usual" he had during that arc (snapshot taken when it ended)
+    const arcs = Array.isArray(w.ch.arcs) ? w.ch.arcs : parse(w.ch.arcs, []);
+    const snap = (arcs.find(x => x && x.n === ai.arc) || {}).baselines || {};
+    const people = w.members.filter(m => m.active || w.activities.some(a => a.author === m.id))
+      .map(m => (snap[m.id] ? Object.assign({}, m, { baseline: snap[m.id] }) : m));
+    const score = SquadCore.compute({ starts: ai.from, ends: ai.to, rules: w.rules }, people, w.activities, w.today);
     const duels = score.duels.map(d => `W${d.week}: ${d.winners.length === 1 ? w.nameOf(d.winners[0]) : 'tie'}`).join(', ');
     const sc = people.map(m => { const x = score.members[m.id]; return x ? `${m.name}: ${x.total} pts over the arc, ${score.wins[m.id] || 0} weeks won, best streak ${x.best_streak} d, ${x.pbs} PBs; weekly points ${x.weeks.map(k => Math.round(k.total)).join('/')}` : ''; }).filter(Boolean).join('\n');
     const acts = w.activities.filter(a => a.date >= ai.from && a.date <= ai.to).sort((a, b) => a.date.localeCompare(b.date));

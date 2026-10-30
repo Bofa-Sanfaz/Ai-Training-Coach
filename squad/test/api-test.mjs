@@ -34,7 +34,9 @@ const mock = http.createServer((req, res) => {
     prompts.push({ text, hasImage, images, auth: req.headers.authorization });
     if (slowMs) await sleep(slowMs);
     let reply;
-    if (hasImage) reply = JSON.stringify({ workouts: [{ screens: [1, 2], sport: 'swim', type: 'Pool swim', date: '2026-10-28', dur_s: 1800, dist_m: 1000, swolf: 41, pool_m: 25, laps: [{ n: 1, dist_m: 25, time_s: 36 }] }, { screens: [3], sport: 'walk', date: '2026-10-27', dur_s: 2400, dist_m: 3100 }] });
+    // Two images: a reply cut off in the middle of the second workout
+    if (images === 2) reply = '{"workouts":[{"screens":[0],"sport":"swim","dur_s":1800,"dist_m":1000},{"screens":[1],"sport":"walk","hr_curve":[{"t_s":0,"bpm":90},{"t_s":60,"bp';
+    else if (hasImage) reply = JSON.stringify({ workouts: [{ screens: [1, 2], sport: 'swim', type: 'Pool swim', date: '2026-10-28', dur_s: 1800, dist_m: 1000, swolf: 41, pool_m: 25, laps: [{ n: 1, dist_m: 25, time_s: 36 }] }, { screens: [3], sport: 'walk', date: '2026-10-27', dur_s: 2400, dist_m: 3100 }] });
     else if (/reply exactly PASS/.test(text)) reply = 'PB alert! Mock interrupt.';
     else if (/DAILY RECAP|final recap/i.test(text)) reply = 'Mock recap of the day.';
     else reply = `Mock answer to: ${(text.match(/TASK: (.{0,40})/) || [])[1]}`;
@@ -265,6 +267,9 @@ try {
   prompts.length = 0;
   r = await call('POST', `/api/c/${cid}/ai/extract`, { images: ['A'.repeat(500), 'B'.repeat(500), 'C'.repeat(500)] }, B);
   ok(r.status === 200 && r.d.result.workouts.length === 2 && r.d.result.workouts[0].swolf === 41 && prompts[0].images === 3, 'screenshots (3) → grouped workouts JSON', { d: r.d, p: prompts.map(p => p.images) });
+  ok(/Today is \d{4}-\d{2}-\d{2}\./.test(prompts[0].text), 'screenshot prompt carries today\'s date', prompts[0].text.slice(-200));
+  r = await call('POST', `/api/c/${cid}/ai/extract`, { images: ['A'.repeat(500), 'B'.repeat(500)] }, B);
+  ok(r.status === 200 && r.d.result.cut === true && r.d.result.workouts.length === 1 && r.d.result.workouts[0].sport === 'swim', 'reply cut at the length limit → complete workouts kept', r.d);
   r = await call('POST', `/api/c/${cid}/ai/extract`, { images: [] }, B);
   ok(r.status === 400, 'extract without images → 400', r.status);
 
@@ -285,6 +290,9 @@ try {
   ok(r.d.started === true && r.d.arc === 2 && r.d.prev && r.d.prev.n === 1 && r.d.prev.from === today, 'Arc 2 starts, Arc 1 archived', r.d);
   r = await call('GET', `/api/c/${cid}/changes?since=0`, null, B);
   ok(r.d.challenge.arcs.length === 1 && r.d.challenge.arcs[0].n === 1, 'past arcs listed on the challenge', r.d.challenge.arcs);
+  ok(r.d.challenge.arcs[0].baselines && r.d.challenge.arcs[0].baselines[aId] && r.d.challenge.arcs[0].baselines[aId].weekly_min === 300, 'ended arc keeps everyone\'s baseline snapshot', r.d.challenge.arcs[0]);
+  const startedEv = r.d.events.filter(e => e.body.type === 'arc_started').pop();
+  ok(startedEv && startedEv.body.prev && !startedEv.body.prev.baselines, 'arc_started event stays small (no baselines)', startedEv && startedEv.body);
   const arcReq = r.d.events.find(e => e.kind === 'msg' && e.body.ai && e.body.ai.mode === 'arc');
   ok(arcReq && arcReq.body.ai.arc === 1 && arcReq.body.ai.from === today, 'Arc 1 report requested automatically', arcReq);
   prompts.length = 0;
@@ -307,19 +315,21 @@ try {
   ok(r.status === 400, 'too short username → 400', r.status);
   r = await call('POST', '/api/account/login', { username: user, auth: badKey });
   ok(r.status === 401, 'wrong password → 401', r.status);
-  const putPart = (tok, i, v, n, bytes) => fetch(`${API}/api/account/vault/${i}?version=${v}&parts=${n}`, { method: 'PUT', headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/octet-stream' }, body: bytes });
+  // Parts are base64 text (the server passes them through untouched)
+  const putPart = (tok, i, v, n, bytes) => fetch(`${API}/api/account/vault/${i}?version=${v}&parts=${n}`, { method: 'PUT', headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'text/plain' }, body: typeof bytes === 'string' ? bytes : Buffer.from(bytes).toString('base64') });
   const blob = n => { const b = new Uint8Array(n); for (let i = 0; i < n; i++) b[i] = (i * 7 + 3) & 255; return b; };
   let vr = await putPart(T1, 0, 1, 2, blob(600000));
   ok(vr.status === 200, 'vault part 1/2 stored', vr.status);
   vr = await putPart(T1, 1, 1, 2, blob(1000));
   const vj = await vr.json();
-  ok(vr.status === 200 && vj.committed === 1 && vj.size === 601000, 'vault v1 committed on last part', vj);
+  const b64len = n => Math.ceil(n / 3) * 4;
+  ok(vr.status === 200 && vj.committed === 1 && vj.size === b64len(600000) + b64len(1000), 'vault v1 committed on last part', vj);
   r = await call('POST', '/api/account/login', { username: user, auth: authKey, device: 'phone 2' });
   ok(r.status === 200 && r.d.vault_version === 1, 'sign in on a second device', r.d);
   const T2 = r.d.token;
   r = await call('GET', '/api/account/vault', null, T2);
-  ok(r.d.version === 1 && r.d.parts === 2 && r.d.size === 601000, 'vault info', r.d);
-  const got = new Uint8Array(await (await fetch(`${API}/api/account/vault/0?version=1`, { headers: { Authorization: `Bearer ${T2}` } })).arrayBuffer());
+  ok(r.d.version === 1 && r.d.parts === 2 && r.d.size === b64len(600000) + b64len(1000), 'vault info', r.d);
+  const got = new Uint8Array(Buffer.from(await (await fetch(`${API}/api/account/vault/0?version=1`, { headers: { Authorization: `Bearer ${T2}` } })).text(), 'base64'));
   const want = blob(600000);
   ok(got.length === 600000 && got.every((x, i) => x === want[i]), 'vault part downloads byte-exact', got.length);
   vr = await putPart(T2, 0, 1, 1, blob(10));
@@ -331,8 +341,10 @@ try {
   r = await call('POST', '/api/account/logout', null, T1);
   r = await call('GET', '/api/account/vault', null, T1);
   ok(r.status === 401, 'signed out token stops working', r.status);
-  vr = await putPart(T2, 0, 3, 1, blob(1048577));
+  vr = await putPart(T2, 0, 3, 1, 'A'.repeat(1400001));
   ok(vr.status === 413, 'oversized part refused', vr.status);
+  vr = await putPart(T2, 0, 3, 1, '<script>');
+  ok(vr.status === 400, 'non-base64 part refused', vr.status);
   for (let i = 0; i < 8; i++) await call('POST', '/api/account/login', { username: user, auth: badKey });
   r = await call('POST', '/api/account/login', { username: user, auth: authKey });
   ok(r.status === 429, '8 wrong passwords → locked for 15 min', r.status);

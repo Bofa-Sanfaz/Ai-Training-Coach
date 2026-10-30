@@ -7,8 +7,9 @@
 // only if nobody else committed in between (409 → the app pulls first).
 // --------------------------------------------------------
 const USER_RE = /^[a-z0-9][a-z0-9_.-]{2,23}$/;
-const PART_MAX = 1048576;
+const PART_MAX = 1400000;   // base64 characters (≈ 1 MB of data)
 const MAX_PARTS = 40;
+const MAX_ACCOUNTS = 30;     // a private app: keeps the free storage from being filled by strangers
 const LOCK_AFTER = 8, LOCK_MS = 15 * 60000;
 
 async function sha256(s) {
@@ -43,6 +44,8 @@ export async function accountRoute(env, req, url, { json, fail, readJson }) {
     if (!/^[0-9a-f]{64}$/.test(String(b.auth || ''))) fail(400, 'bad auth key');
     const exists = await env.DB.prepare('SELECT 1 FROM accounts WHERE username=?').bind(username).first();
     if (exists) fail(409, 'this username is taken');
+    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts').first();
+    if (count.n >= MAX_ACCOUNTS) fail(403, 'this server is not taking new accounts');
     await env.DB.prepare('INSERT INTO accounts (username, auth_hash, created_at) VALUES (?,?,?)').bind(username, await sha256(b.auth), now()).run();
     return json({ username, token: await issue(env, username, b.device), vault_version: 0 }, 201);
   }
@@ -71,21 +74,22 @@ export async function accountRoute(env, req, url, { json, fail, readJson }) {
     return json({ version: a.vault_version, parts: a.vault_parts, size: a.vault_size, at: a.vault_at });
   }
   const part = p.match(/^\/api\/account\/vault\/(\d{1,3})$/);
+  // Parts travel and rest as base64 text: the server only passes them through (no byte
+  // conversion — the free plan has 10 ms of CPU per request)
   if (part && m === 'GET') {
     const u = await session(env, req, fail);
     const v = Number(url.searchParams.get('version'));
     const r = await env.DB.prepare('SELECT data FROM vault_parts WHERE username=? AND version=? AND part=?').bind(u, v, Number(part[1])).first();
-    if (!r) fail(404, 'no such part');
-    // D1 hands BLOBs back as an ArrayBuffer or as a plain array of byte values, depending on the runtime
-    const bytes = r.data instanceof ArrayBuffer || ArrayBuffer.isView(r.data) ? r.data : new Uint8Array(r.data);
-    return new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' } });
+    if (!r || typeof r.data !== 'string') fail(404, 'no such part');
+    return new Response(r.data, { headers: { 'Content-Type': 'text/plain; charset=us-ascii', 'Cache-Control': 'no-store' } });
   }
   if (part && m === 'PUT') {
     const u = await session(env, req, fail);
     const v = Number(url.searchParams.get('version')), n = Number(url.searchParams.get('parts')), i = Number(part[1]);
     if (!(v > 0) || !(n > 0) || n > MAX_PARTS || i >= n) fail(400, 'bad version/part');
-    const data = await req.arrayBuffer();
-    if (!data.byteLength || data.byteLength > PART_MAX) fail(413, 'part too large');
+    const data = await req.text();
+    if (!data.length || data.length > PART_MAX) fail(413, 'part too large');
+    if (!/^[A-Za-z0-9+/]/.test(data) || !/[A-Za-z0-9+/=]$/.test(data)) fail(400, 'part must be base64');
     const a = await env.DB.prepare('SELECT vault_version FROM accounts WHERE username=?').bind(u).first();
     if (v !== a.vault_version + 1) fail(409, 'a newer copy exists — pull first');
     await env.DB.prepare('INSERT OR REPLACE INTO vault_parts (username, version, part, data) VALUES (?,?,?,?)').bind(u, v, i, data).run();

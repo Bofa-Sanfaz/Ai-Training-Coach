@@ -42,7 +42,39 @@ function shotParse(text) {
   const t = String(text || '').replace(/```(?:json)?/g, '');
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a < 0 || b <= a) return null;
-  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { return null; }
+  try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { /* cut off? keep the complete workouts */ }
+  // A reply that hit the length limit: close the list after the last workout that is whole
+  if (!/^\{\s*"workouts"\s*:\s*\[/.test(t.slice(a))) return null;
+  const ends = [b].concat(Array.from(t.matchAll(/\}\s*,\s*\{\s*"screens"/g), m => m.index).reverse());
+  for (const end of ends.slice(0, 9)) {
+    try {
+      const d = JSON.parse(`${t.slice(a, end + 1)}]}`);
+      if (Array.isArray(d.workouts) && d.workouts.length) { d.cut = true; return d; }
+    } catch (e) { /* try the previous workout boundary */ }
+  }
+  return null;
+}
+
+// The model needs today's date for screens that show "28 Oct" without a year
+const shotPrompt = () => `${SHOT_PROMPT_V2}\nToday is ${formatLocalDate(new Date())}. When a date shows no year, use the most recent such date that is not in the future.`;
+
+// Huawei/Apple screenshots are tall (≈1170 × 2530): keep chart labels readable
+const SHOT_MAX_SIDE = 2000;
+// Smaller copies for the squad server (its request has to stay light)
+function shotScale(dataUrl, max) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      if (k >= 1) { resolve(dataUrl); return; }
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      resolve(cv.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 }
 
 const shotNum = v => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() && Number.isFinite(+v) ? +v : null);
@@ -55,23 +87,36 @@ const shotPts = (list, tk, vk, lo, hi) => (Array.isArray(list) ? list : [])
 async function readShots(images) {
   let data = null;
   if (typeof squadPersonalAiReady === 'function' && squadPersonalAiReady()) {
-    data = shotParse(await callAI(SHOT_PROMPT_V2, images, { json: true, maxTokens: 16000 }));
+    // Thinking counts against the output limit: leave room for long curves and several workouts
+    data = shotParse(await callAI(shotPrompt(), images, { json: true, maxTokens: 32768 }));
   }
   if (!data && typeof squadSquadAiReady === 'function' && squadSquadAiReady()) {
-    const r = await squadCall(squadEntry(Squad.cur), 'POST', '/ai/extract', { images }, 180000);
+    const small = [];
+    for (const im of images) small.push(await shotScale(im, 1400));
+    const r = await squadCall(squadEntry(Squad.cur), 'POST', '/ai/extract', { images: small, today: formatLocalDate(new Date()) }, 180000);
     data = r && r.result;
   }
   const list = data && Array.isArray(data.workouts) ? data.workouts : data && data.sport ? [data] : [];
   if (!list.length) throw new Error('the AI could not read a workout from these images');
-  return list.map(w => Object.assign({}, w, {
-    images: (Array.isArray(w.screens) ? w.screens : []).map(i => images[i]).filter(Boolean),
-    image: images[(Array.isArray(w.screens) && w.screens[0]) || 0]
-  }));
+  if (data.cut) toast('The reply was cut short — some screenshots may be missing; add them again if so.', 'warn', 6000);
+  const today = formatLocalDate(new Date());
+  return list.map(w => {
+    const out = Object.assign({}, w, {
+      images: (Array.isArray(w.screens) ? w.screens : []).map(i => images[i]).filter(Boolean),
+      image: images[(Array.isArray(w.screens) && w.screens[0]) || 0]
+    });
+    // A date in the future is a year guessed wrong (screens without a year)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(out.date || '') && out.date > today) { out.date = `${+out.date.slice(0, 4) - 1}${out.date.slice(4)}`; out.date_fixed = true; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(out.date || '')) { out.date = null; out.date_missing = true; }
+    return out;
+  });
 }
 
 // Cross-checks that point at misread values
 function shotChecks(w) {
   const out = [];
+  if (w.date_missing) out.push('No date was visible — set the date before saving.');
+  if (w.date_fixed) out.push(`The year was a guess — check the date (${w.date}).`);
   const dur = shotNum(w.moving_s) || shotNum(w.dur_s);
   const pct = (a, b) => Math.abs(a - b) / Math.max(1, b);
   const splits = (w.splits || []).filter(s => shotNum(s.sec));

@@ -55,7 +55,7 @@ function haptic(kind = 'light') {
   if (kind === 'success' || kind === 'warning' || kind === 'error') {
     H.notification({ type: kind.toUpperCase() }).catch(() => {});
   } else {
-    H.impact({ style: kind === 'medium' ? 'MEDIUM' : 'LIGHT' }).catch(() => {});
+    H.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' }).catch(() => {});
   }
 }
 

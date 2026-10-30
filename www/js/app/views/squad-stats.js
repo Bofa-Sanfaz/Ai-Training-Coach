@@ -184,7 +184,10 @@ function sqPeriod(S, key) {
   const acts = Array.from(S.folded.activities.values());
   const arc = /^arc:\d+$/.test(key || '') ? sqPastArcs(S).find(a => `arc:${a.n}` === key) : null;
   if (arc) {
-    const people = S.members.filter(m => m.active || acts.some(a => a.author === m.id && a.date >= arc.from && a.date <= arc.to));
+    // Scored against the "own usual" each person had during that arc (snapshot from the server)
+    const snap = arc.baselines || {};
+    const people = S.members.filter(m => m.active || acts.some(a => a.author === m.id && a.date >= arc.from && a.date <= arc.to))
+      .map(m => (snap[m.id] ? Object.assign({}, m, { baseline: snap[m.id] }) : m));
     const score = SquadCore.compute({ starts: arc.from, ends: arc.to, rules: S.ch.rules }, people, acts, S.st.today);
     return Object.assign(SquadCore.period(people, acts, S.folded.daily, arc.from, arc.to, score), { key, kind: 'arc', arc, score, people, label: `Arc ${arc.n}` });
   }

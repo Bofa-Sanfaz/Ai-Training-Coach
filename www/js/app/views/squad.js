@@ -151,7 +151,11 @@ async function squadSync(cid) {
     Squad.busy[cid] = false;
     if (changed) squadRenderLive(cid);
     squadBadge();
-    if (arcFx) squadArcCelebrate(cid, arcFx.arc, arcFx.prev);
+    if (arcFx) {
+      squadArcCelebrate(cid, arcFx.arc, arcFx.prev);
+      // The new arc measures everyone against his last 4 weeks (the ended arc keeps its snapshot)
+      squadRefreshBaselines();
+    }
     if (aiDue) squadRunAi(cid);
     if (again) setTimeout(() => squadSync(cid), 50);
   }
@@ -448,7 +452,7 @@ async function squadImportPicked(ev) {
   toast(`Reading ${Math.min(files.length, SHOT_MAX_IMAGES)} screenshot${files.length > 1 ? 's' : ''}… (about ${files.length > 2 ? '30–60' : '15–30'} s)`, 'info', 9000);
   try {
     const images = [];
-    for (const f of files.slice(0, SHOT_MAX_IMAGES)) images.push(await squadShrinkImage(f));
+    for (const f of files.slice(0, SHOT_MAX_IMAGES)) images.push(await squadShrinkImage(f, SHOT_MAX_SIDE));
     const drafts = await readShots(images);
     Squad.shotQueue = drafts.map((w, i) => Object.assign(w, { shotN: i + 1, shotTotal: drafts.length }));
     if (drafts.length > 1) toast(`Found ${drafts.length} workouts — check each one and save.`, 'success', 4000);
@@ -619,6 +623,10 @@ async function saveSquadImport() {
   const all = await db.workouts.toArray();
   const same = findSameWorkout(all, +start, dur, () => true);
   if (same) { toast(`Already in your workouts: ${rideTitle(same)}`, 'warn', 4500); closeSheet('squadImportSheet'); return; }
+  // Screens with both total and moving time (stops on a walk): pace and speed use moving time,
+  // unless the duration was edited by hand
+  const readMoving = !d.manual && typeof shotNum === 'function' ? shotNum(d.moving_s) : null;
+  const moving = readMoving && readMoving < dur && Math.abs(dur - num(d.dur_s)) < 2 ? Math.round(readMoving) : dur;
   const indoor = sport === 'swim' ? true : sport === 'ride' ? !!x.indoor_ride : sport === 'other' ? true : !!x.indoor;
   const sportType = sport === 'other' ? (x.gym || 'Workout') : sport === 'ride' && indoor ? 'VirtualRide' : SPORTS[sport].code;
   // A gym session without its own name is called after its activity ("Strength", "Rowing"…)
@@ -627,8 +635,8 @@ async function saveSquadImport() {
   const w = {
     strava_id: sid, ride_number: 0, exercise_code: '', source: d.manual ? 'manual' : 'screenshot', name: $('#sqi_title').value.trim() || SPORTS[sport].label,
     sport, sport_type: sportType, indoor,
-    date: `${date} ${time}`, distance_km: round(km, 3), moving_sec: dur, elapsed_sec: dur, duration_str: formatDuration(dur),
-    avg_speed_kmh: km > 0 ? round(km / (dur / 3600), 2) : 0, max_speed_kmh: 0, avg_hr: avgHr, max_hr: maxHr,
+    date: `${date} ${time}`, distance_km: round(km, 3), moving_sec: moving, elapsed_sec: dur, duration_str: formatDuration(moving),
+    avg_speed_kmh: km > 0 ? round(km / (moving / 3600), 2) : 0, max_speed_kmh: 0, avg_hr: avgHr, max_hr: maxHr,
     elevation_gain_m: indoor ? 0 : int('elev'), kilojoules: 0, calories: int('kcal'),
     avg_power_w: sport === 'ride' ? int('power') : 0, max_power_w: 0, norm_power_w: 0, device_watts: sport === 'ride' && int('power') > 0, map_polyline: '',
     source_name: d.manual ? 'Logged by hand' : 'Screenshot (read by AI)', debrief_stale: false, intent_type: null, zone_seconds: [0, 0, 0, 0, 0]
@@ -873,32 +881,52 @@ async function squadArc(action) {
   renderSquad();
 }
 
-// Full-screen "ARC N" moment, shown once per device when a new arc starts
+// Full-screen "ARC N" moment, shown once per device when a new arc starts:
+// light streak → the old number shatters → the new one slams in (shake, shockwaves, rays,
+// spark trails) → confetti cannons → the crew flies in → last arc's champion
 function squadArcCelebrate(cid, n, prev) {
   const S = squadState(cid);
   if (!S || !S.ch) return;
   const old = document.getElementById('arcFx');
   if (old) old.remove();
   const ms = S.members.filter(m => m.active);
+  const SLAM = prev ? 1300 : 750; // ms until the new number lands
+  // Who won the arc that just ended (same numbers as its report)
+  let champ = '';
+  if (prev && typeof sqPeriod === 'function') {
+    try {
+      const P = sqPeriod(S, `arc:${prev}`);
+      if (P.kind === 'arc') {
+        const rank = P.people.map(m => ({ m, v: P.score.members[m.id] ? Math.round(P.score.members[m.id].total) : 0 })).sort((a, b) => b.v - a.v);
+        if (rank.length > 1 && rank[0].v > rank[1].v) champ = `<span class="arc-fx-crown">🏆</span><span>Arc ${prev} champion</span><b>${escapeHtml(rank[0].m.name)}</b><small>${rank.map(r => r.v).join(' – ')} pts</small>`;
+        else if (rank.length > 1) champ = `<span class="arc-fx-crown">🤝</span><span>Arc ${prev} ended</span><b>dead level</b><small>${rank[0].v} pts each</small>`;
+      }
+    } catch (e) { console.warn('arc champion', e); }
+  }
   const el = document.createElement('div');
   el.id = 'arcFx';
   el.className = 'arc-fx';
-  el.innerHTML = `<canvas></canvas><div class="arc-fx-flash"></div>
+  el.style.setProperty('--slam', `${SLAM / 1000}s`);
+  el.innerHTML = `<div class="arc-fx-rays"></div><div class="arc-fx-streak"></div><canvas></canvas>
+    <div class="arc-fx-flash"></div><div class="arc-fx-rings"><i></i><i></i><i></i></div>
     <div class="arc-fx-in">
-      <div class="arc-fx-kicker">${escapeHtml(S.ch.name)}${prev ? ` · Arc ${prev} is in the books` : ''}</div>
+      <div class="arc-fx-kicker">${escapeHtml(S.ch.name)}</div>
       <div class="arc-fx-word">ARC</div>
-      <div class="arc-fx-num">${n}</div>
-      <div class="arc-fx-duel">${ms.map((m, i) => `${i ? '<span class="arc-fx-vs">vs</span>' : ''}<div class="arc-fx-p" style="--d:${i}">${squadAvatar(m, 'lg')}<b>${escapeHtml(m.name)}</b><span>0 pts</span></div>`).join('')}</div>
+      <div class="arc-fx-numbox">${prev ? `<div class="arc-fx-old">${prev}</div>` : ''}<div class="arc-fx-num" data-n="${n}">${n}</div></div>
+      ${champ ? `<div class="arc-fx-champ">${champ}</div>` : ''}
+      <div class="arc-fx-duel">${ms.map((m, i) => `${i ? '<span class="arc-fx-vs">VS</span>' : ''}<div class="arc-fx-p ${i === 0 ? 'l' : i === ms.length - 1 ? 'r' : ''}" style="--d:${i}">${squadAvatar(m, 'lg')}<b>${escapeHtml(m.name)}</b><span>0 pts</span></div>`).join('')}</div>
       <div class="arc-fx-sub">${prev ? `Scores, streaks and the chat start fresh. ${S.ch.ai && S.ch.ai.enabled ? `${SQUAD_AI} is writing the full report of Arc ${prev}.` : `Arc ${prev}'s report waits in the Report tab.`}` : 'Scores, streaks and the chat start fresh. Everyone against his own usual. Go.'}</div>
       <div class="arc-fx-btns"><button class="btn btn-primary" data-go>Let's go</button>${prev ? `<button class="btn btn-secondary" data-report>Arc ${prev} report</button>` : ''}</div>
     </div>`;
   document.body.appendChild(el);
-  haptic('heavy');
   const born = Date.now();
+  const timers = [];
+  const later = (ms, f) => timers.push(setTimeout(f, ms));
   let alive = true;
   const close = report => {
     if (!alive) return;
     alive = false;
+    timers.forEach(clearTimeout);
     el.classList.add('out');
     setTimeout(() => el.remove(), 450);
     Squad.cur = cid;
@@ -909,56 +937,99 @@ function squadArcCelebrate(cid, n, prev) {
   el.addEventListener('click', ev => {
     const b = ev.target.closest('button');
     if (b) close(b.hasAttribute('data-report'));
-    else if (Date.now() - born > 2600) close(false);
+    else if (Date.now() - born > SLAM + 1600) close(false);
   });
-  // Particles: a shockwave of sparks in everyone's colours, then confetti rain
+  haptic('light');
+  if (prev) later(SLAM - 200, () => haptic('medium'));
+  later(SLAM, () => haptic('heavy'));
+  later(SLAM + 650, () => haptic('success'));
   const cv = el.querySelector('canvas');
   const ctx = cv.getContext('2d');
   if (!ctx || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const fit = () => { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; };
   fit();
-  const colors = ms.map(m => m.color).concat(['#fc5200', '#ffd166', '#ffffff']);
-  const parts = [];
+  const colors = ms.map(m => m.color).concat(['#fc5200', '#ff9a3c', '#ffd166', '#ffffff']);
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  // Where the number sits on screen (canvas pixels)
+  const centre = () => {
+    const r = el.querySelector('.arc-fx-numbox').getBoundingClientRect();
+    return { x: (r.left + r.width / 2) * dpr, y: (r.top + r.height * 0.5) * dpr };
+  };
+  const sparks = [], shards = [], confetti = [], embers = [];
   const burst = (k, speed) => {
-    const cx = cv.width / 2, cy = cv.height * 0.42;
+    const c = centre();
     for (let i = 0; i < k; i++) {
-      const a = Math.random() * Math.PI * 2, v = (speed * (0.35 + Math.random())) * dpr;
-      parts.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (1.5 + Math.random() * 3.5) * dpr, c: colors[i % colors.length], life: 1, decay: 0.006 + Math.random() * 0.012, spin: Math.random() * 6, rect: Math.random() < 0.55 });
+      const a = Math.random() * Math.PI * 2, v = speed * (0.3 + Math.random()) * dpr;
+      sparks.push({ x: c.x, y: c.y, px: c.x, py: c.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, w: (1 + Math.random() * 2.2) * dpr, c: pick(['#fff', '#ffd166', '#ff9a3c', '#fc5200']), life: 1, decay: 0.012 + Math.random() * 0.02 });
     }
   };
-  const rain = () => {
-    for (let i = 0; i < 2; i++) parts.push({ x: Math.random() * cv.width, y: -10 * dpr, vx: (Math.random() - 0.5) * 1.5 * dpr, vy: (1.5 + Math.random() * 2.5) * dpr, r: (2 + Math.random() * 3) * dpr, c: colors[Math.floor(Math.random() * colors.length)], life: 1, decay: 0.003, spin: Math.random() * 6, rect: true });
+  const shatter = () => {
+    const c = centre();
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * Math.PI * 2, v = (3 + Math.random() * 9) * dpr, s = (6 + Math.random() * 16) * dpr;
+      shards.push({ x: c.x + (Math.random() - 0.5) * 90 * dpr, y: c.y + (Math.random() - 0.5) * 120 * dpr, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2 * dpr, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, s, c: pick(['#ffe2cf', '#ffb38a', '#fc5200', '#ffffff']), life: 1 });
+    }
   };
-  setTimeout(() => burst(160, 14), 650);
-  setTimeout(() => burst(90, 9), 1250);
-  let ring = 0;
+  const cannon = (fromLeft, k) => {
+    for (let i = 0; i < k; i++) {
+      const a = (fromLeft ? -Math.PI / 3 : -2 * Math.PI / 3) + (Math.random() - 0.5) * 0.7, v = (11 + Math.random() * 11) * dpr;
+      confetti.push({ x: fromLeft ? 0 : cv.width, y: cv.height * 0.95, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (3 + Math.random() * 3.5) * dpr, c: pick(colors), rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.35, wob: Math.random() * 6, life: 1 });
+    }
+  };
+  if (prev) later(SLAM - 160, shatter);
+  later(SLAM, () => burst(150, 16));
+  later(SLAM + 140, () => burst(70, 9));
+  later(SLAM + 320, () => { cannon(true, 70); cannon(false, 70); });
+  later(SLAM + 1100, () => { cannon(true, 35); cannon(false, 35); });
   const frame = () => {
     if (!alive || !el.isConnected) return;
     if (cv.width !== innerWidth * dpr) fit();
-    ctx.clearRect(0, 0, cv.width, cv.height);
     const t = Date.now() - born;
-    // Shockwave ring when the number lands
-    if (t > 600 && ring < 1) {
-      ring = Math.min(1, (t - 600) / 900);
-      ctx.beginPath();
-      ctx.arc(cv.width / 2, cv.height * 0.42, ring * Math.max(cv.width, cv.height) * 0.75, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(252,82,0,${0.7 * (1 - ring)})`;
-      ctx.lineWidth = 10 * dpr * (1 - ring) + 1;
-      ctx.stroke();
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    // Embers rising the whole time (additive glow)
+    if (embers.length < 70 && Math.random() < 0.5) embers.push({ x: Math.random() * cv.width, y: cv.height + 10 * dpr, vy: -(0.6 + Math.random() * 1.6) * dpr, sway: Math.random() * 6, r: (0.8 + Math.random() * 2.2) * dpr, life: 1, decay: 0.002 + Math.random() * 0.004 });
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = embers.length - 1; i >= 0; i--) {
+      const p = embers[i];
+      p.sway += 0.03; p.x += Math.sin(p.sway) * 0.4 * dpr; p.y += p.vy; p.life -= p.decay;
+      if (p.life <= 0 || p.y < -10) { embers.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, p.life) * (0.45 + 0.35 * Math.sin(t / 90 + p.sway * 3));
+      ctx.fillStyle = '#ff8a3c';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     }
-    if (t > 1400 && t < 5500 && Math.random() < 0.35) rain();
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const p = parts[i];
-      p.x += p.vx; p.y += p.vy; p.vx *= 0.985; p.vy = p.vy * 0.985 + 0.12 * dpr; p.life -= p.decay; p.spin += 0.15;
-      if (p.life <= 0 || p.y > cv.height + 20) { parts.splice(i, 1); continue; }
-      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.4));
-      ctx.fillStyle = p.c;
-      if (p.rect) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.spin); ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); ctx.restore(); }
-      else { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+    // Spark trails from the slam
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.px = p.x; p.py = p.y;
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy = p.vy * 0.94 + 0.18 * dpr; p.life -= p.decay;
+      if (p.life <= 0) { sparks.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, p.life * 1.5);
+      ctx.strokeStyle = p.c; ctx.lineWidth = p.w; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.px - p.vx * 1.5, p.py - p.vy * 1.5); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    // Shards of the old number
+    for (let i = shards.length - 1; i >= 0; i--) {
+      const p = shards[i];
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.98; p.vy = p.vy * 0.98 + 0.35 * dpr; p.rot += p.vr; p.life -= 0.012;
+      if (p.life <= 0 || p.y > cv.height + 40) { shards.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, p.life * 1.3);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.moveTo(0, -p.s / 2); ctx.lineTo(p.s / 2, p.s / 3); ctx.lineTo(-p.s / 3, p.s / 2); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    // Confetti from the cannons: flutters down after the launch
+    for (let i = confetti.length - 1; i >= 0; i--) {
+      const p = confetti[i];
+      p.wob += 0.12; p.x += p.vx + Math.sin(p.wob) * 0.8 * dpr; p.y += p.vy; p.vx *= 0.965; p.vy = p.vy * 0.965 + 0.2 * dpr; p.rot += p.vr;
+      if (p.vy > 2.2 * dpr) p.vy = 2.2 * dpr; // terminal velocity: it floats
+      if (p.y > cv.height + 20) { confetti.splice(i, 1); continue; }
+      ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.cos(p.wob)); ctx.fillStyle = p.c;
+      ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); ctx.restore();
     }
     ctx.globalAlpha = 1;
-    if (t < 12000 || parts.length) requestAnimationFrame(frame);
+    if (t < 15000 || confetti.length || sparks.length) requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }

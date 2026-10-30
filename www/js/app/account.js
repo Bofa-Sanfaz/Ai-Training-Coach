@@ -24,6 +24,13 @@ const accountServer = () => (typeof squadServerDefault === 'function' && squadSe
 const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const hex = buf => Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+// Big buffers ↔ base64 in slices (a spread of 900 000 arguments would overflow the stack)
+function bytesToB64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return btoa(s);
+}
+const b64ToBytes = s => unb64(s.trim());
 
 async function accountDerive(username, password) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
@@ -42,8 +49,9 @@ async function gz(bytes, mode) {
 }
 
 async function accountApi(method, path, body, token, raw) {
-  const res = await fetch(accountServer() + path, {
-    method, headers: Object.assign(raw ? { 'Content-Type': 'application/octet-stream' } : { 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
+  const a = accountGet();
+  const res = await fetch(((a && a.server) || accountServer()) + path, {
+    method, headers: Object.assign(raw ? { 'Content-Type': 'text/plain' } : { 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
     body: raw || (body ? JSON.stringify(body) : undefined)
   });
   if (!res.ok) {
@@ -76,20 +84,27 @@ async function accountUpload(reason) {
     const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
     const blob = new Uint8Array(12 + sealed.length); blob.set(iv); blob.set(sealed, 12);
     const meta = await (await accountApi('GET', '/api/account/vault', null, a.token)).json();
-    if (meta.version > (a.version || 0)) { await accountPull(); return false; } // another device was first
+    if (meta.version > (a.version || 0)) { await accountCatchUp(); return false; } // another device was first
     const v = meta.version + 1, parts = Math.max(1, Math.ceil(blob.length / ACCT_PART));
     for (let i = 0; i < parts; i++) {
-      await accountApi('PUT', `/api/account/vault/${i}?version=${v}&parts=${parts}`, null, a.token, blob.slice(i * ACCT_PART, (i + 1) * ACCT_PART));
+      await accountApi('PUT', `/api/account/vault/${i}?version=${v}&parts=${parts}`, null, a.token, bytesToB64(blob.subarray(i * ACCT_PART, (i + 1) * ACCT_PART)));
     }
-    accountSet(Object.assign(a, { version: v, dirty: false, at: new Date().toISOString() }));
+    accountSet(Object.assign(accountGet() || a, { version: v, dirty: false, at: new Date().toISOString() }));
     accountRenderCard();
     return true;
   } catch (e) {
     if (e.status === 401) { toast('Signed out of your account — sign in again in Profile', 'warn', 6000); }
-    else if (e.status === 409) await accountPull();
+    else if (e.status === 409) { Account.busy = false; await accountCatchUp(); }
     else console.warn('account upload', reason, e.message);
     return false;
   } finally { Account.busy = false; }
+}
+
+// Another device saved first: take its copy, keep what only this device had, then reload
+async function accountCatchUp() {
+  try {
+    if (await accountPull({ merge: true })) { toast('Synced with your other device', 'success'); setTimeout(() => location.reload(), 900); }
+  } catch (e) { console.warn('account catch-up', e.message); }
 }
 
 // Download the newest copy and restore it (used on a new device and when this one is behind)
@@ -100,17 +115,27 @@ async function accountPull(opts = {}) {
   if (!meta.version) return false;
   if (!opts.force && meta.version <= (a.version || 0)) return false;
   const chunks = [];
-  for (let i = 0; i < meta.parts; i++) chunks.push(new Uint8Array(await (await accountApi('GET', `/api/account/vault/${i}?version=${meta.version}`, null, a.token)).arrayBuffer()));
+  for (let i = 0; i < meta.parts; i++) chunks.push(b64ToBytes(await (await accountApi('GET', `/api/account/vault/${i}?version=${meta.version}`, null, a.token)).text()));
   const all = new Uint8Array(chunks.reduce((s, c) => s + c.length, 0));
   let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
   const key = await accountCryptoKey(a);
   let plain;
   try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.slice(0, 12) }, key, all.slice(12)); } catch (e) { throw new Error('could not unlock your data — wrong password?'); }
   const data = JSON.parse(new TextDecoder().decode(await gz(new Uint8Array(plain), 'unzip')));
+  // Workouts that exist only here (logged on this device since its last backup) survive the restore
+  const theirs = new Set((data.workouts || []).map(w => String(w.strava_id)));
+  const onlyHere = opts.merge ? (await db.workouts.toArray()).filter(w => !theirs.has(String(w.strava_id))) : [];
+  const onlyStreams = onlyHere.length ? (await db.streams.toArray()).filter(s => onlyHere.some(w => w.strava_id === s.strava_id)) : [];
   if ((await db.workouts.count()) > 0) await createRestorePoint('Before loading your account from another device', 'auto');
   await restoreDump(data, { preserveSecrets: false });
+  for (const w of onlyHere) { const c = Object.assign({}, w); delete c.id; await db.workouts.add(c); }
+  for (const s of onlyStreams) await db.streams.put(s);
   for (const [k, v] of Object.entries(data.local_prefs || {})) { try { localStorage.setItem(k, v); } catch (e) {} }
-  accountSet(Object.assign(a, { version: meta.version, dirty: false, at: meta.at }));
+  accountSet(Object.assign(accountGet() || a, { version: meta.version, dirty: onlyHere.length > 0, at: meta.at }));
+  if (onlyHere.length) {
+    if (typeof renumberRides === 'function') await renumberRides();
+    setTimeout(() => accountUpload('merged'), 1500); // send the combined copy back
+  }
   return true;
 }
 
@@ -130,7 +155,7 @@ async function accountSignIn(username, password) {
   const k = await accountDerive(u, password);
   const r = await (await accountApi('POST', '/api/account/login', { username: u, auth: k.auth, device: navigator.platform || '' })).json();
   accountSet({ server: accountServer(), username: r.username, token: r.token, key: k.key, version: 0, dirty: false });
-  const restored = r.vault_version ? await accountPull({ force: true }) : false;
+  const restored = r.vault_version ? await accountPull({ force: true, merge: true }) : false;
   if (!restored) { const a = accountGet(); a.dirty = true; accountSet(a); await accountUpload('first sign-in'); }
   return { restored };
 }
@@ -138,9 +163,19 @@ async function accountSignIn(username, password) {
 async function accountSignOut() {
   const a = accountGet();
   if (!a) return;
-  if (a.dirty) await accountUpload('sign out');
+  if (a.dirty && !(await accountUpload('sign out'))) {
+    if (!(await uiConfirm('Not backed up yet', 'The latest changes on this device could not be backed up (no connection?). Sign out anyway?', { okText: 'Sign out', danger: true }))) return;
+  }
+  // A borrowed or shared device: offer to leave nothing behind
+  const wipe = await uiConfirm('Remove your data from this device?', 'Your account keeps everything; signing in again brings it back. Keep it here if this is your own device.', { okText: 'Remove from this device', cancelText: 'Keep it here', danger: true });
   try { await accountApi('POST', '/api/account/logout', null, a.token); } catch (e) {}
   accountSet(null);
+  if (wipe) {
+    try { db.close(); await Dexie.delete(db.name); } catch (e) { console.warn('wipe', e); }
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    location.reload();
+    return;
+  }
   accountRenderCard();
   toast('Signed out — your data stays on this device', 'info');
 }
