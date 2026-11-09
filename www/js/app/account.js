@@ -70,6 +70,7 @@ async function accountVaultBytes() {
   dump.config = (dump.config || []).filter(c => !/^squad_data_|^intro_step$/.test(c.key));
   // His streams come from Huawei exports and screenshots — they can't be downloaded again, so they travel too
   dump.streams = await db.streams.toArray();
+  if (typeof photoDumpForVault === 'function') dump.photos = await photoDumpForVault(); // progress photos, encrypted like the rest
   const prefs = {};
   for (const k of ['rp_theme', 'rp_squad_view', 'rp_haptics']) { try { const v = localStorage.getItem(k); if (v !== null) prefs[k] = v; } catch (e) {} }
   dump.local_prefs = prefs;
@@ -147,7 +148,8 @@ async function accountPull(opts = {}) {
     await setJsonConfig('deleted_workouts', Array.from(new Set([...goneThere, ...goneHere])));
     mergedDeletes = back.length > 0;
   }
-  const merged = onlyHere.length > 0 || onlyCfg.length > 0 || mergedDeletes;
+  const photosOnlyHere = typeof photoRestoreFromVault === 'function' ? await photoRestoreFromVault(data.photos, !!opts.merge) : false;
+  const merged = onlyHere.length > 0 || onlyCfg.length > 0 || mergedDeletes || photosOnlyHere;
   for (const [k, v] of Object.entries(data.local_prefs || {})) { try { localStorage.setItem(k, v); } catch (e) {} }
   accountSet(Object.assign(accountGet() || a, { version: meta.version, dirty: merged, at: meta.at }));
   if (merged) {
@@ -195,6 +197,7 @@ async function accountSignOut() {
   if (wipe) {
     try { db.close(); await Dexie.delete(db.name); } catch (e) { console.warn('wipe', e); }
     try { restoreDb.close(); await Dexie.delete(restoreDb.name); } catch (e) { console.warn('wipe restore points', e); } // full copies of the data
+    try { if (typeof photoDb !== 'undefined') { photoDb.close(); await Dexie.delete(photoDb.name); } } catch (e) { console.warn('wipe photos', e); }
     try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
     location.reload();
     return;
@@ -221,6 +224,7 @@ function accountWatch() {
     table.hook('updating', function (mods, pk) { if (own(t, pk)) mark(); });
     table.hook('deleting', function (pk) { if (own(t, pk)) mark(); });
   }
+  if (typeof photoDb !== 'undefined') for (const h of ['creating', 'updating', 'deleting']) photoDb.mine.hook(h, () => { mark(); });
   document.addEventListener('visibilitychange', () => { const a = accountGet(); if (document.hidden && a && a.dirty) accountUpload('app hidden'); });
 }
 

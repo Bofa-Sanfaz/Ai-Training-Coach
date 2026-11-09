@@ -37,6 +37,11 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
+### New in 3.11 — progress photos, a simpler app
+- **📸 Progress photos** (Squad → Photos, or Profile → You): private on your phone; share one with your friend only if you want. **Compare** any two with a slider (days apart, weight change, workouts in between) and ask the **AI for a review — or a roast** 🔥 (about the photos and the effort, never mean about bodies). Post the verdict to the squad chat
+- **Profile in four short groups** — You · Connections · AI coach · App & backup — instead of one long scroll
+- Every workout page has **Fix sport or data** and **Delete workout** buttons; Squad → Crew has one **Challenges** card (switch, join, new); remembered activity choices can be changed in Profile → Connections
+
 ### New in 3.10 — Battles
 - **⚔️ Battles** on Squad → Home: a weekly tug-of-war on active days, minutes, improvement and points — each against his own usual — and challenges you send your friend: "first to 20 km", "most minutes this week", a swim race… He accepts, both progress bars race, the winner gets confetti. Optional stake ("loser buys coffee")
 - A full check-up: safer squad data, notes that are never lost, the right units on share cards, numbers that always stay in order, sturdier account backups, and many small fixes

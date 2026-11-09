@@ -43,7 +43,7 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.10</div>
+    <div class="kick">User guide · version 3.11</div>
     <h1>Training Partner</h1>
     <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus the squad, screenshots, web accounts and arcs.</div>
   </div>
@@ -65,6 +65,7 @@
     <div><b>15</b>Web accounts</div>
     <div><b>16</b>Arcs — starting fresh</div>
     <div><b>17</b>Battles — progress races</div>
+    <div><b>18</b>Progress photos</div>
   </div>
 </div>
 
@@ -139,12 +140,15 @@
   <li>Sport tiles with change vs the previous period, load/efficiency/intensity panel, zone bars, all-time records per sport (each with a flag to mark it as a data error), the AI period review and the PDF (section 10).</li>
 </ul>
 
-<h3>Profile</h3>
-<ul>
-  <li>Athlete (name, height, bike), default weekly targets, weight log, training phase, max/resting HR and zones, FTP.</li>
-  <li>Strava connection; <b>AI providers</b> (add free or paid ones, keys, models), automatic fallback, <b>model per coach</b>; <b>coach memory</b>; coach skills (import from GitHub); Samsung Health; AI spending cap.</li>
-  <li>Appearance (light/dark/system), auto-sync, haptics; backups, restore points, Classic rollback; diagnostics.</li>
-</ul>
+<h3>Profile — four short groups (since 3.11)</h3>
+<table>
+  <tr><th style="width:22%">Group</th><th>What's in it</th></tr>
+  <tr><td><b>You</b></td><td>Progress photos, athlete (name, height, bike), weight log, default weekly targets, training phase, heart rate &amp; zones</td></tr>
+  <tr><td><b>Connections</b></td><td>Strava, Samsung Health, the web app's account, Huawei Health import, new activity types (the remembered include/skip choices)</td></tr>
+  <tr><td><b>AI coach</b></td><td>AI providers and keys, model per coach, coach memory, coach skills, AI spending cap</td></tr>
+  <tr><td><b>App &amp; backup</b></td><td>Appearance, auto-sync, haptics, export/restore, restore points, Classic rollback, diagnostics, version and What's new</td></tr>
+</table>
+<p class="muted">The last group you opened is remembered; links elsewhere ("set up a provider", "connect Strava") open the right group. Every workout page also has <b>Fix sport or data</b> and <b>Delete workout</b> buttons.</p>
 </div>
 
 <!-- ============================================================ -->
@@ -543,6 +547,27 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
   <tr><td>Winner: first to reach the target</td><td>decided by the date and start time of the workout that crossed 100 %</td></tr>
   <tr><td>Winner: best at the end</td><td>the highest % on the last day; equal % is a draw</td></tr>
 </table>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 18 · new in 3.11</span>Progress photos</h2>
+<p>Open them from <b>Squad → Home → Photos</b> or <b>Profile → You → Progress photos</b>. Three tabs: <b>Mine</b>, your friend's shared ones (with his name) and <b>Compare</b>.</p>
+<h3>Private first</h3>
+<ul>
+  <li>A photo is kept <b>only on your phone</b> (its own storage, about 1280 px). On the iPhone web app it is also in your encrypted account backup, so your other devices get it; nobody else can open that backup.</li>
+  <li><b>Share with your friend</b> — when adding, or later from the photo — uploads a smaller copy to the squad server, visible only to the members of your challenge, and shows it in the chat. <b>Unshare</b> deletes it from the server again; leaving the challenge deletes all photos you shared there. Up to 60 shared photos each.</li>
+  <li>On the Android phone, photos are not part of the exported JSON backup or restore points — keep the originals in your gallery if they matter.</li>
+</ul>
+<h3>Taking them</h3>
+<p>Pick the pose (front, side, back, other), the date and an optional note. Same place, same light, same distance and pose every time make the comparison honest; after 3 weeks without a photo the screen reminds you.</p>
+<h3>Compare</h3>
+<ul>
+  <li>Choose <b>Before</b> and <b>After</b> (default: your latest photo against your first one of the same pose) and drag the slider across the picture.</li>
+  <li>Below: days apart, the weight change (from your weight log, within a week of each photo) and the workouts and hours in between.</li>
+  <li><b>AI review</b>: a supportive coach describes the visible changes (posture, shoulders, arms, back, waist, legs, definition), says when light or angle make it unreliable, and gives 2 tips for the next photo and 1 training focus. <b>🔥 Roast</b>: a friendly gym-buddy roast of the photos themselves — the pose, the mirror, the lighting, the effort — ending with a real compliment.</li>
+  <li>Both never comment on attractiveness, never guess body fat, health or medical issues and never shame weight or size. They run on your phone with your own AI key — a model that reads images is needed (Google Gemini is free and used first). <b>Post to the squad chat</b> shares the verdict text.</li>
+</ul>
 </div>
 
 </body>

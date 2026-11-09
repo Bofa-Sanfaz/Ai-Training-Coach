@@ -3,8 +3,28 @@
 // PROFILE: athlete, weight, phases, zones, connections,
 // appearance, backup & rollback, diagnostics
 // --------------------------------------------------------
+// Profile is four short groups instead of one long scroll: You · Connections · AI coach · App & backup
+const PROFILE_GROUPS = ['you', 'connect', 'coach', 'app'];
+function profileGroup(g) {
+  if (!PROFILE_GROUPS.includes(g)) { try { g = localStorage.getItem('rp_profile_group'); } catch (e) {} }
+  if (!PROFILE_GROUPS.includes(g)) g = 'you';
+  try { localStorage.setItem('rp_profile_group', g); } catch (e) {}
+  $$('#profileGroups button').forEach(b => b.classList.toggle('active', b.dataset.g === g));
+  $$('#screen-profile [data-pgroup]').forEach(el => { el.style.display = el.dataset.pgroup === g ? '' : 'none'; });
+  window.scrollTo({ top: 0 });
+}
+
+// From elsewhere in the app ("set up a provider", "connect Strava"…): straight to that group
+function openProfileGroup(g) {
+  switchTab('profile');
+  setTimeout(() => profileGroup(g), 60);
+}
+
 async function renderProfile() {
+  profileGroup();
+  renderActivityRules();
   if (typeof accountRenderCard === 'function') accountRenderCard();
+  if (typeof photoDb !== 'undefined') photoDb.mine.count().then(n => { if (n && $('#profilePhotosSub')) $('#profilePhotosSub').textContent = `${n} photo${n === 1 ? '' : 's'} — private unless you share one. Compare any two with a slider and an AI review.`; }).catch(() => {});
   $('#cfg_name').value = ATHLETE.name || '';
   $('#cfg_height').value = (await getConfig('athlete_height')) || '';
   $('#cfg_bike').value = (await getConfig('bike_name')) || (isNative() ? ATHLETE.bike || '' : '');

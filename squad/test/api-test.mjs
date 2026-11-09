@@ -339,6 +339,42 @@ try {
     ok(!p2.live && !p2.done && p2.people.length === 1 && p2.people[0].target >= 20, 'own-usual battle waits for the accept; own minute target', p2);
   }
 
+  // ---------- progress photos ----------
+  const rawCall = (tok, method, path, body) => fetch(API + path, { method, headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'text/plain' }, body });
+  const img = 'A'.repeat(5000) + '==';
+  const pid = `ph${Math.random().toString(36).slice(2, 12)}`;
+  r = await call('POST', `/api/c/${cid}/events`, { events: [{ id: id('pho'), kind: 'photo', body: { pid, date: today, pose: 'front' } }] }, B);
+  ok(r.d.rejected.length === 1, 'photo event before the upload is rejected', r.d);
+  pr = await rawCall(B, 'PUT', `/api/c/${cid}/photos/${pid}`, img);
+  ok(pr.status === 200, 'friend uploads a shared photo', pr.status);
+  pr = await rawCall(A, 'PUT', `/api/c/${cid}/photos/${pid}`, img);
+  ok(pr.status === 403, "can't overwrite someone else's photo", pr.status);
+  r = await call('POST', `/api/c/${cid}/events`, { events: [{ id: id('pho'), kind: 'photo', body: { pid, date: today, pose: 'front', note: 'Week 1' } }] }, A);
+  ok(r.d.rejected.length === 1, "can't announce someone else's photo", r.d);
+  const phEv = id('pho');
+  r = await call('POST', `/api/c/${cid}/events`, { events: [{ id: phEv, kind: 'photo', body: { pid, date: today, pose: 'sideways', note: 'Week 1', extra: 'x' } }] }, B);
+  ok(r.d.acks.length === 1, 'friend announces his photo', r.d);
+  pr = await rawCall(A, 'GET', `/api/c/${cid}/photos/${pid}`);
+  ok(pr.status === 200 && (await pr.text()) === img, 'member downloads the shared photo', pr.status);
+  pr = await rawCall('nope-not-a-token-at-all-xx', 'GET', `/api/c/${cid}/photos/${pid}`);
+  ok(pr.status === 401 || pr.status === 403, 'strangers can\'t download it', pr.status);
+  pr = await rawCall(B, 'PUT', `/api/c/${cid}/photos/${pid}x`, 'A'.repeat(700001));
+  ok(pr.status === 413, 'oversize photo → 413', pr.status);
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  {
+    const f = SquadCore.fold(r.d.events);
+    const p = f.photos.get(pid);
+    ok(p && p.author === bId && p.pose === 'other' && p.note === 'Week 1' && !('extra' in p), 'photo folded (unknown pose → other, extra fields dropped)', p);
+  }
+  await rawCall(A, 'DELETE', `/api/c/${cid}/photos/${pid}`);
+  pr = await rawCall(A, 'GET', `/api/c/${cid}/photos/${pid}`);
+  ok(pr.status === 200, "a member can't delete someone else's photo", pr.status);
+  await rawCall(B, 'DELETE', `/api/c/${cid}/photos/${pid}`);
+  pr = await rawCall(A, 'GET', `/api/c/${cid}/photos/${pid}`);
+  ok(pr.status === 404, 'unshared photo is gone from the server', pr.status);
+  const pid2 = `ph${Math.random().toString(36).slice(2, 12)}`;
+  await rawCall(B, 'PUT', `/api/c/${cid}/photos/${pid2}`, img); // stays until he leaves (checked below)
+
   // ---------- input hardening (fields drawn into the other member's screen) ----------
   r = await call('POST', `/api/c/${cid}/events`, { events: [
     { id: id('act'), kind: 'activity', body: { key: "x'onclick", sport: 'walk', date: today, dur_s: 60 } },
@@ -419,6 +455,8 @@ try {
   ok(r.status === 403, 'token stops working after leaving');
   r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
   ok(r.d.members.find(m => m.id === bId).active === false && r.d.events.some(e => e.body.type === 'left'), 'others see that he left');
+  pr = await rawCall(A, 'GET', `/api/c/${cid}/photos/${pid2}`);
+  ok(pr.status === 404, 'his shared photos are deleted when he leaves', pr.status);
 
   // ---------- member cap ----------
   r = await call('POST', '/api/challenges', { name: 'Big', member: { name: 'P1' } });

@@ -1123,6 +1123,7 @@ function squadHomeHtml(S) {
       <button onclick="openManualWorkout()">${icon('plus')}<span>Log workout</span></button>
       <button onclick="openSquadImport()">${icon('camera')}<span>Screenshot</span></button>
       <button onclick="openSquadWeight()">${icon('scale')}<span>Log weight</span></button>
+      <button onclick="openPhotos()">${icon('user')}<span>Photos</span></button>
       <button onclick="squadAskQuick()">${icon('sparkle')}<span>Ask ${SQUAD_AI}</span></button>
     </div>
     ${squadBattlesHtml(S)}
@@ -1493,7 +1494,12 @@ function squadCrewHtml(S) {
       <div class="card-title">${icon('link')}Invite</div>
       <div class="card-sub">Send this code (or the link) to your friend — a challenge is for two people.</div>
       <div class="sq-code">${escapeHtml(S.ch.invite.slice(0, 4))}-${escapeHtml(S.ch.invite.slice(4))}</div>
-      <div class="btn-row"><button class="btn btn-secondary btn-sm" onclick="squadShareInvite()">${icon('share')}Share invite</button><button class="btn btn-secondary btn-sm" onclick="openSquadStart()">${icon('plus')}New challenge</button></div>
+      <div class="btn-row"><button class="btn btn-secondary btn-sm" onclick="squadShareInvite()">${icon('share')}Share invite</button></div>
+    </div>
+    <div class="card mt-12">
+      <div class="card-title">${icon('multi')}Challenges</div>
+      <div class="card-sub">${(() => { const n = Squad.list.filter(c => !c.revoked).length; return n > 1 ? `You're in ${n} challenges — switch between them here or by tapping the name at the top.` : 'Start another one or join a friend\'s with his code.'; })()}</div>
+      <div class="btn-row mt-8">${Squad.list.filter(c => !c.revoked).length > 1 ? `<button class="btn btn-secondary btn-sm" onclick="openSquadSwitcher()">${icon('swap', 'ic-sm')}Switch</button>` : ''}<button class="btn btn-secondary btn-sm" onclick="openSquadJoin()">${icon('link', 'ic-sm')}Join with a code</button><button class="btn btn-secondary btn-sm" onclick="openSquadStart()">${icon('plus', 'ic-sm')}New challenge</button></div>
     </div>
     <div class="tiny muted center mt-8">${Squad.offline ? 'Offline — your posts are kept and sent when the connection is back.' : 'Up to date'}</div>`;
 }
@@ -1553,7 +1559,7 @@ function squadRenderChat(forceBottom) {
   $('#squadChatSub').textContent = others.length ? others.map(m => `${m.name}${m.last_seen ? ` · seen ${relativeTime(m.last_seen)}` : ''}`).join(' · ') : 'Share the invite code to bring a friend in';
   // Chat timeline: messages, system notes and shared workouts, in server order
   const timeline = S.st.events.concat(Squad.outbox.filter(o => o.cid === Squad.cur).map((o, i) => Object.assign({ seq: 1e12 + i, pending: true }, o.ev)))
-    .filter(e => e.kind === 'msg' || e.kind === 'system' || e.kind === 'activity' || (e.kind === 'battle' && e.body && e.body.op !== 'decline'))
+    .filter(e => e.kind === 'msg' || e.kind === 'system' || e.kind === 'activity' || e.kind === 'photo' || (e.kind === 'battle' && e.body && e.body.op !== 'decline'))
     .sort((a, b) => a.seq - b.seq);
   // A new arc starts with a clean chat; earlier arcs stay one tap away
   const items = Squad.chatAll ? timeline : timeline.filter(e => squadArcEvent(S, e));
@@ -1571,12 +1577,14 @@ function squadRenderChat(forceBottom) {
       shownActs.add(ref);
       html += `<div class="sq-msg act-msg">${squadActCardHtml(S, a, true)}</div>`;
     } else if (e.kind === 'battle') html += squadBattleMsgHtml(S, e);
+    else if (e.kind === 'photo') html += photoMsgHtml(S, e);
     else html += squadMsgHtml(S, e);
   }
   if (!items.length) html = `<div class="empty">${icon('chat')}<div><b>Start the banter</b></div><div class="small mt-8">Mention @${SQUAD_AI} to ask the AI anything. Tap a message or a workout to react, reply, or ask for a review or a roast.</div></div>`;
   const typing = Squad.aiBusy[Squad.cur] || (S.ch.ai && S.ch.ai.busy);
   if (typing) html += `<div class="sq-msg ai">${squadAvatar(null, 'sm')}${typingHtml(`${SQUAD_AI} is typing`)}</div>`;
   $('#squadChatList').innerHTML = html;
+  photoHydrateChat($('#squadChatList'));
   $('#squadReplyBar').classList.toggle('hidden', !Squad.replyTo);
   if (Squad.replyTo) {
     const r = S.folded.messages.find(x => x.id === Squad.replyTo);

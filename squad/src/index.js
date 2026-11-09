@@ -19,7 +19,10 @@ const MAX_MEMBERS = 2;
 const maxChallenges = env => int(env.SQUAD_MAX_CHALLENGES, 1, 1000, 3);
 const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2'];
 const SPORTS = ['ride', 'run', 'walk', 'swim', 'other'];
-const KIND_LIMIT = { msg: 6000, activity: 12000, comment: 3000, reaction: 300, delete: 300, daily: 600, battle: 1200 };
+const KIND_LIMIT = { msg: 6000, activity: 12000, comment: 3000, reaction: 300, delete: 300, daily: 600, battle: 1200, photo: 600 };
+const PHOTO_MAX = 700000;          // base64 characters (≈ 500 kB JPEG)
+const PHOTOS_PER_MEMBER = 60;
+const PHOTO_POSES = ['front', 'side', 'back', 'other'];
 const BATTLE_OPS = ['create', 'accept', 'decline', 'cancel'];
 const ACT_NUMBERS = ['dur_s', 'dist_m', 'pace_km', 'pace100', 'speed_kmh', 'swolf', 'pool_m', 'strokes', 'best100', 'reps', 'avg_hr', 'max_hr', 'load', 'steps', 'cadence', 'elev_m', 'rpe', 'calories'];
 const AI_MODES = ['ask', 'review', 'roast', 'report', 'arc'];
@@ -165,6 +168,13 @@ async function checkEvent(env, ch, me, e) {
     body.emoji = str(body.emoji, 16);
     body.on = body.on !== false;
     if (!ref || !body.emoji) fail(400, 'reaction needs ref and emoji');
+  } else if (e.kind === 'photo') {
+    // Announces a photo he uploaded (PUT /photos/:pid) — only his own
+    const pid = str(body.pid, 40);
+    if (!/^[A-Za-z0-9_-]{8,40}$/.test(pid) || !validDate(body.date)) fail(400, 'photo needs pid and date');
+    const row = await env.DB.prepare('SELECT author FROM photos WHERE id=? AND challenge_id=?').bind(pid, ch.id).first();
+    if (!row || row.author !== me.id) fail(403, 'upload the photo first');
+    out.body = { pid, date: body.date, pose: PHOTO_POSES.includes(body.pose) ? body.pose : 'other', note: str(body.note, 140) };
   } else if (e.kind === 'battle') {
     // Shape only; who may accept or cancel is decided when the log is folded (SquadCore.fold)
     const bid = str(body.bid, 40);
@@ -308,6 +318,8 @@ async function leave(env, req, cid) {
   }
   // An open arc vote was counting him: it starts over (otherwise it waits for nobody, forever)
   if (ch.arc_vote) await env.DB.prepare('UPDATE challenges SET arc_vote=NULL WHERE id=?').bind(cid).run();
+  // His shared progress photos leave with him
+  await env.DB.prepare('DELETE FROM photos WHERE challenge_id=? AND author=?').bind(cid, me.id).run();
   await append(env, cid, [systemEvent({ type: 'left', member: me.id, name: me.name })]);
   return json({ ok: true });
 }
@@ -423,6 +435,32 @@ async function arcAction(env, req, cid) {
   return json({ started: true, arc: next, prev: brief });
 }
 
+// Shared progress photos: members of the challenge only; the image is base64 text, passed through
+async function photoRoute(env, req, cid, pid) {
+  const { me } = await auth(env, req, cid);
+  if (req.method === 'GET') {
+    const r = await env.DB.prepare('SELECT data FROM photos WHERE id=? AND challenge_id=?').bind(pid, cid).first();
+    if (!r) fail(404, 'no such photo');
+    return new Response(r.data, { headers: { 'Content-Type': 'text/plain; charset=us-ascii', 'Cache-Control': 'private, max-age=86400' } });
+  }
+  if (req.method === 'PUT') {
+    const data = await req.text();
+    if (!data.length || data.length > PHOTO_MAX) fail(413, 'photo too large');
+    if (!/^[A-Za-z0-9+/]{100}/.test(data) || !/[A-Za-z0-9+/=]$/.test(data)) fail(400, 'photo must be base64 JPEG');
+    const n = await env.DB.prepare('SELECT COUNT(*) AS c FROM photos WHERE challenge_id=? AND author=?').bind(cid, me.id).first();
+    const own = await env.DB.prepare('SELECT author FROM photos WHERE id=?').bind(pid).first();
+    if (own && (own.author !== me.id)) fail(403, 'not your photo');
+    if (!own && n.c >= PHOTOS_PER_MEMBER) fail(403, `up to ${PHOTOS_PER_MEMBER} shared photos — unshare older ones first`);
+    await env.DB.prepare('INSERT OR REPLACE INTO photos (id, challenge_id, author, created_at, size, data) VALUES (?,?,?,?,?,?)').bind(pid, cid, me.id, nowIso(), data.length, data).run();
+    return json({ stored: pid });
+  }
+  if (req.method === 'DELETE') {
+    await env.DB.prepare('DELETE FROM photos WHERE id=? AND challenge_id=? AND author=?').bind(pid, cid, me.id).run();
+    return json({ deleted: pid });
+  }
+  fail(405, 'method not allowed');
+}
+
 function poster(env) {
   return async (ch, e) => {
     const ev = Object.assign({ id: `ai-${rid(14)}`, author: e.kind === 'system' ? 'system' : 'ai' }, e);
@@ -461,6 +499,8 @@ async function route(req, env, url) {
     const r = await env.DB.prepare("UPDATE challenges SET ai_digest=? WHERE id=? AND (ai_digest IS NULL OR json_extract(ai_digest,'$.seq') <= ?)").bind(text, cid, Number(s)).run();
     return json({ stored: !!r.meta.changes });
   }
+  const ph = sub.match(/^\/photos\/([A-Za-z0-9_-]{8,40})$/);
+  if (ph) return photoRoute(env, req, cid, ph[1]);
   if (sub === '/ai/run' && m === 'POST') {
     await auth(env, req, cid);
     return json(await runAI(env, cid, poster(env)));

@@ -73,7 +73,7 @@ async function processIncomingUrl(urlStr) {
   if (!clientSecret && !(await stravaViaSquad())) {
     isOauthExchanging = false;
     toast('Save your Strava Client Secret in Profile first, then sign in again.', 'warn', 5000);
-    switchTab('profile');
+    openProfileGroup('connect');
     return;
   }
 

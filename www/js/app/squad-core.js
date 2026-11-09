@@ -16,7 +16,8 @@ const SquadCore = (() => {
   function fold(events) {
     // daily: { memberId: { 'YYYY-MM-DD': { weight_kg, rhr, sleep_min, steps, hrv } } } — shared by choice only
     // battles: id → { metric, sport, from, to, mode, target, finish, title, stake, by, accepted[], declined[], status }
-    const st = { messages: [], activities: new Map(), comments: {}, reactions: {}, system: [], daily: {}, deleted: new Set(), battles: new Map() };
+    // photos: pid → { pid, date, pose, note, author, id (event id: delete it to unshare) } — shared by choice only
+    const st = { messages: [], activities: new Map(), comments: {}, reactions: {}, system: [], daily: {}, deleted: new Set(), battles: new Map(), photos: new Map() };
     const ordered = events.slice().sort((a, b) => a.seq - b.seq);
     for (const e of ordered) if (e.kind === 'delete' && e.ref) st.deleted.add(e.ref);
     for (const e of ordered) {
@@ -36,6 +37,8 @@ const SquadCore = (() => {
         const who = r[b.emoji] = r[b.emoji] || new Set();
         if (b.on === false) who.delete(e.author); else who.add(e.author);
         if (!who.size) delete r[b.emoji];
+      } else if (e.kind === 'photo' && b.pid) {
+        st.photos.set(b.pid, Object.assign({}, b, { author: e.author, id: e.id, seq: e.seq, created_at: e.created_at }));
       } else if (e.kind === 'battle' && b.bid) {
         // A challenge between members: the creator proposes, the others accept or decline;
         // only the creator can call it off (the server only checks the shape, this decides who may)

@@ -319,12 +319,27 @@
     <div class="screen-head">
       <div>
         <div class="screen-title">Profile</div>
-        <div class="screen-sub">Athlete, zones, connections and safety</div>
+        <div class="screen-sub">You, connections, AI coach and backup</div>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="openIntro()"><svg class="ic"><use href="#i-play"/></svg><span>Introduction</span></button>
     </div>
 
-    <div class="card">
+    <div class="segmented profile-groups" id="profileGroups">
+      <button data-g="you" onclick="profileGroup('you')">You</button>
+      <button data-g="connect" onclick="profileGroup('connect')">Connections</button>
+      <button data-g="coach" onclick="profileGroup('coach')">AI coach</button>
+      <button data-g="app" onclick="profileGroup('app')">App &amp; backup</button>
+    </div>
+
+    <div class="card" data-pgroup="you">
+      <div class="row between">
+        <div class="card-title"><svg class="ic"><use href="#i-camera"/></svg>Progress photos</div>
+        <button class="btn btn-secondary btn-sm" onclick="openPhotos()">Open</button>
+      </div>
+      <div class="card-sub" id="profilePhotosSub">Private photos to see your progress — compare any two with a slider and an AI review.</div>
+    </div>
+
+    <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-user"/></svg>Athlete</div>
       <div class="input-row mt-12">
         <div class="field"><label>Name</label><input id="cfg_name" class="input" placeholder="Your name" /></div>
@@ -334,7 +349,7 @@
       <button class="btn btn-secondary" onclick="saveAthleteProfile()">Save athlete</button>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-scale"/></svg>Weight log (kg)</div>
       <div class="card-sub">Dated entries are used for W/kg and coach context on each ride date.</div>
       <div class="input-row mt-12">
@@ -345,7 +360,7 @@
       <div id="weightHistoryList" class="list list-scroll mt-8"></div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-flame"/></svg>Default weekly targets</div>
       <div class="card-sub">Your standing targets. Change a single week (or let Aether do it) from the training plan in Coach. Leave blank for none.</div>
       <div class="input-row mt-12">
@@ -356,7 +371,7 @@
       <button class="btn btn-secondary" onclick="saveWeeklyGoals()">Save goals</button>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-target"/></svg>Training phase</div>
       <div class="card-sub">Your broad focus. Each change is saved as a dated phase for coach prompts.</div>
       <div class="field mt-12"><input type="text" id="cfg_goal_input" class="input" placeholder="e.g. Aerobic base, Gran Fondo prep, Intervals" /></div>
@@ -367,7 +382,7 @@
       <div id="goalHistoryList" class="list list-scroll mt-8"></div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-heart"/></svg>Heart rate &amp; zones</div>
       <div class="card-sub">Used for zone time, training load, the intent picker, charts and every AI prompt.</div>
       <div class="field mt-12"><label>FTP (W, optional)</label><input id="cfg_ftp" class="input" type="number" min="0" inputmode="numeric" placeholder="Only if you ride with a power meter" /><span class="hint">Used for IF / TSS on power-meter rides. Leave blank to estimate it from your best measured 20-minute power.</span></div>
@@ -392,16 +407,9 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="connect">
       <div class="card-title"><svg class="ic"><use href="#i-link"/></svg>Connections</div>
-      <details id="stravaWebSteps" class="hidden mt-8">
-        <summary class="small" style="cursor:pointer"><b>Automatic via Huawei Health → Strava:</b> link Strava in Huawei Health (Me → Third-party services), join the challenge, then tap <b>Sign in with Strava</b> below with the fields empty — no Strava app needed. Only if you have your own Strava API app:</summary>
-        <ol class="hw-steps mt-8">
-          <li><b>Huawei Health</b> app → <b>Me</b> → <b>Data sharing and authorization</b> (or Third-party services) → <b>Strava</b> → sign in / create a free Strava account → allow.</li>
-          <li>Open <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> (signed in to that Strava account) and create an app: name <b>Training Partner</b>, category <b>Training</b>, website <b id="stravaSite"></b>, <b>Authorization Callback Domain</b>: <b id="stravaHost"></b>. Upload any picture as icon if asked.</li>
-          <li>Copy its <b>Client ID</b> and <b>Client Secret</b> below and tap <b>Sign in with Strava</b> → Authorize.</li>
-        </ol>
-      </details>
+      
       <div class="field mt-12"><label>Strava Client ID</label><input type="text" id="cfg_client_id" class="input" /></div>
       <div class="field"><label>Strava Client Secret</label><input type="password" id="cfg_client_secret" class="input" autocomplete="off" /></div>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()">
@@ -419,7 +427,7 @@
       <button class="btn btn-secondary mt-12" onclick="saveConnections()">Save Strava settings</button>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="coach">
       <div class="row between">
         <div class="card-title"><svg class="ic"><use href="#i-sparkle"/></svg>AI providers</div>
         <button class="btn btn-secondary btn-xs" id="btnAddProvider" onclick="openAddProvider()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Add</button>
@@ -431,7 +439,7 @@
       <div id="agentModelList" class="list"></div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="coach">
       <div class="card-title"><svg class="ic"><use href="#i-history"/></svg>Coach memory</div>
       <div class="card-sub">Facts every coach keeps in mind — corrections you gave (e.g. "Ride 34 was a stationary gym bike"), equipment, injuries, goals. Coaches add to it when you correct them; you can add or delete here.</div>
       <div id="memoryList" class="list mt-8"></div>
@@ -441,7 +449,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="coach">
       <div class="card-title"><svg class="ic"><use href="#i-star"/></svg>Coach skills</div>
       <div class="card-sub">Coaching methods each AI follows (SKILL.md format). Built-in skills are written from open coaching protocols on GitHub. Import more from any GitHub link — only import skills you trust.</div>
       <div id="skillList" class="mt-8"></div>
@@ -451,7 +459,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="connect">
       <div class="card-title"><svg class="ic"><use href="#i-heart"/></svg>Samsung Health</div>
       <div class="card-sub">Watch workouts (treadmill, gym bike, elliptical, strength…), sleep, heart rate, weight, steps and VO2max, read through Android Health Connect. In Samsung Health: Settings → Health Connect → allow sharing.</div>
       <div id="healthState" class="small mt-8"></div>
@@ -482,18 +490,24 @@
       </div>
     </div>
 
-    <div class="card hidden" id="accountCard">
+    <div class="card hidden" data-pgroup="connect" id="accountCard">
       <div class="card-title"><svg class="ic"><use href="#i-user"/></svg>Account</div>
       <div id="accountBody" class="mt-8"></div>
     </div>
 
-    <div class="card" id="huaweiCard">
+    <div class="card hidden" data-pgroup="connect" id="activityRulesCard">
+      <div class="card-title"><svg class="ic"><use href="#i-repeat"/></svg>New activity types</div>
+      <div class="card-sub">What happens to walks, hikes and other types the app doesn't import on its own.</div>
+      <div id="activityRulesList" class="mt-8"></div>
+    </div>
+
+    <div class="card" data-pgroup="connect" id="huaweiCard">
       <div class="card-title"><svg class="ic"><use href="#i-activity"/></svg>Huawei Health</div>
       <div class="card-sub">For Huawei watches and bands (e.g. Watch Fit): imports every session from Huawei's own data export — heart rate, GPS route, steps, calories and every pool length with strokes and SWOLF. Your whole history at once; later imports only add what's new.</div>
       <button class="btn btn-primary btn-sm mt-12" onclick="openHuaweiImport()"><svg class="ic"><use href="#i-download"/></svg>Import Huawei Health export</button>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="coach">
       <div class="card-title"><svg class="ic"><use href="#i-gauge"/></svg>AI spending</div>
       <div class="card-sub">Paid providers stop being used once this month's spend reaches the cap. Free providers are never counted.</div>
       <div class="input-row mt-12" style="align-items:flex-end">
@@ -504,7 +518,7 @@
       <div id="spendBreakdown" class="list mt-8"></div>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="app">
       <div class="card-title"><svg class="ic"><use href="#i-sun"/></svg>Appearance</div>
       <div class="segmented mt-12" id="themeSeg">
         <button data-theme-choice="system">System</button>
@@ -515,7 +529,7 @@
       <label class="switch-row"><span><b>Haptic feedback</b><br><span class="hint">Light vibration on taps and confirmations.</span></span><input type="checkbox" id="cfg_haptics" onchange="setHaptics(this.checked)" /></label>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="app">
       <div class="card-title"><svg class="ic"><use href="#i-shield"/></svg>Backup &amp; rollback</div>
       <div class="card-sub">Restore points are created automatically before updates, syncs, imports and recalculations. Roll back here if something goes wrong.</div>
       <div class="btn-row mt-12">
@@ -533,7 +547,7 @@
       <button class="btn btn-secondary mt-8" onclick="switchToClassic()"><svg class="ic"><use href="#i-history"/></svg>Open Classic version (v2)</button>
     </div>
 
-    <div class="card">
+    <div class="card" data-pgroup="app">
       <div class="card-title"><svg class="ic"><use href="#i-terminal"/></svg>Diagnostics</div>
       <div class="btn-row mt-12">
         <button class="btn btn-secondary btn-sm" onclick="testStravaConnection()">Test Strava</button>
@@ -546,8 +560,8 @@
       <div id="stravaDiagBox" class="diag-box hidden"></div>
     </div>
 
-    <div class="version-tag" id="versionTag"></div>
-    <div class="center mb-12"><button class="btn btn-ghost btn-xs" onclick="showWhatsNew()">What's new</button></div>
+    <div data-pgroup="app"><div class="version-tag" id="versionTag"></div>
+    <div class="center mb-12"><button class="btn btn-secondary btn-sm" onclick="showWhatsNew()">What's new in this version</button></div></div>
   </section>
 </main>
 
@@ -604,6 +618,10 @@
       <div class="readout">
         <div class="row between"><span id="banner_line1_l">⏱ --</span><span id="banner_line1_r">📏 --</span></div>
         <div class="row between sub"><span id="banner_line2_l">⚡ --</span><span id="banner_line2_r">❤️ --</span></div>
+      </div>
+      <div class="detail-manage">
+        <button class="btn btn-secondary btn-sm" onclick="currentWorkout && openQualitySheet(currentWorkout.id)"><svg class="ic ic-sm"><use href="#i-flag"/></svg>Fix sport or data</button>
+        <button class="btn btn-secondary btn-sm danger" onclick="currentWorkout && deleteWorkout(currentWorkout.id)"><svg class="ic ic-sm"><use href="#i-trash"/></svg>Delete workout</button>
       </div>
       <div class="section-title" id="coachSection"><span>AI coach</span><span class="row" style="gap:6px"><span id="det_status_badge"></span><button class="btn btn-ghost btn-xs" onclick="resetActiveRideThread()" aria-label="Reset coach thread"><svg class="ic ic-sm"><use href="#i-trash"/></svg></button></span></div>
       <button class="model-chip" data-agent="ride" onclick="openModelPicker('ride')"></button>
@@ -782,6 +800,38 @@
   <div class="sheet-title">Your challenges</div>
   <div class="pick-list mt-8" id="squadSwitchList"></div>
   <div class="btn-row mt-12"><button class="btn btn-secondary btn-sm" onclick="closeSheet('squadSwitchSheet'); openSquadJoin()"><svg class="ic"><use href="#i-link"/></svg>Join with a code</button><button class="btn btn-primary btn-sm" onclick="closeSheet('squadSwitchSheet'); openSquadStart()"><svg class="ic"><use href="#i-plus"/></svg>New challenge</button></div>
+</div>
+
+<div class="panel" id="photosPanel">
+  <div class="panel-head">
+    <button class="icon-btn" onclick="closePanel('photosPanel')" aria-label="Back"><svg class="ic"><use href="#i-back"/></svg></button>
+    <div class="panel-title"><div class="t">Progress photos</div><div class="s" id="ph_sub"></div></div>
+    <button class="icon-btn" onclick="photoAdd()" aria-label="Add a photo"><svg class="ic"><use href="#i-camera"/></svg></button>
+  </div>
+  <div class="panel-body"><div class="inner" id="ph_body"></div></div>
+</div>
+<input type="file" id="ph_file" accept="image/*" class="hidden" onchange="photoPicked(event)" />
+
+<div class="sheet" id="photoAddSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title">New progress photo</div>
+  <img id="pha_img" class="ph-preview" alt="" />
+  <div class="segmented mt-8" id="pha_pose"></div>
+  <div class="sq-form-grid mt-8">
+    <div class="field"><label for="pha_date">Date</label><input id="pha_date" type="date" class="input" /></div>
+    <div class="field"><label for="pha_note">Note</label><input id="pha_note" class="input" maxlength="140" placeholder="e.g. morning, fasted" /></div>
+  </div>
+  <label class="check-row mt-8 hidden" id="pha_shareRow"><input type="checkbox" id="pha_share" /><span id="pha_shareTxt">Share with your friend</span></label>
+  <div class="hint mt-8">Stays on this phone unless you share it. Same spot, light and pose each time makes the comparison honest.</div>
+  <button class="btn btn-primary mt-12" onclick="savePhoto()"><svg class="ic"><use href="#i-check-circle"/></svg>Save photo</button>
+</div>
+
+<div class="sheet" id="photoViewSheet" role="dialog" aria-modal="true">
+  <div class="sheet-grip"></div>
+  <div class="sheet-title" id="phv_title"></div>
+  <div class="tiny muted" id="phv_meta"></div>
+  <img id="phv_img" class="ph-full mt-8" alt="" />
+  <div class="btn-row mt-12" id="phv_actions"></div>
 </div>
 
 <div class="sheet" id="squadBattleSheet" role="dialog" aria-modal="true">
@@ -1100,6 +1150,7 @@
 <script src="js/app/views/squad.js"></script>
 <script src="js/app/views/squad-stats.js"></script>
 <script src="js/app/shots.js"></script>
+<script src="js/app/photos.js"></script>
 <script src="js/app/views/reports.js"></script>
 <script src="js/app/views/profile.js"></script>
 <script src="js/app/views/intro.js"></script>

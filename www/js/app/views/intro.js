@@ -107,7 +107,7 @@ async function renderIntro() {
     html = `<h2 class="intro-title">Where do your workouts come from?</h2>
       <p class="intro-lead">Pick what you use — you can add more later in Profile.</p>
       <div class="intro-cards">
-        <button class="intro-card" onclick="closePanel('introPanel'); switchTab('profile')">${icon('heart')}<span><b>Samsung Health / Galaxy Watch</b><small>Swims, treadmill, gym, sleep and heart rate, automatic.</small></span></button>
+        <button class="intro-card" onclick="closePanel('introPanel'); openProfileGroup('connect')">${icon('heart')}<span><b>Samsung Health / Galaxy Watch</b><small>Swims, treadmill, gym, sleep and heart rate, automatic.</small></span></button>
         <div class="intro-card static">${icon('link')}<span><b>Strava</b><small>Profile → Connections.</small></span></div>
         <div class="intro-card static">${icon('camera')}<span><b>From a screenshot</b><small>Training → camera button: the AI reads every number; you check and save.</small></span></div>
         <div class="intro-card static">${icon('plus')}<span><b>Log by hand</b><small>Training → Log.</small></span></div>

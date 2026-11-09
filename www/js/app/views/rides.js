@@ -127,8 +127,8 @@ async function renderRides() {
 
   if (!all.length) {
     list.innerHTML = `<div class="empty mt-16">${icon('bike')}<div><b>No rides stored yet</b></div>
-      <div class="small mt-8">Sign in to Strava in <b>Profile</b>, then tap <b>Sync Strava</b>.<br/>Want to look around first? Load demo rides in Profile → Diagnostics.</div>
-      <button class="btn btn-primary btn-sm mt-12" onclick="switchTab('profile')">Open Profile</button></div>`;
+      <div class="small mt-8">${isNative() ? 'Sign in to Strava in <b>Profile → Connections</b>, then tap <b>Sync</b>.' : 'Tap <b>Screenshot</b> or <b>Log</b> above to add your first workout.'}<br/>Want to look around first? Load demo rides in Profile → App &amp; backup.</div>
+      ${isNative() ? `<button class="btn btn-primary btn-sm mt-12" onclick="openProfileGroup('connect')">Open Connections</button>` : ''}</div>`;
     return;
   }
 

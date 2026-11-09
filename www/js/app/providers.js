@@ -198,7 +198,7 @@ function renderPickProviders() {
     const ready = providerReady(p);
     const sel = pick.pid === p.id;
     const count = (p.models || []).length;
-    html += `<button class="prov-card ${sel ? 'active' : ''} ${ready ? '' : 'disabled'}" onclick="${ready ? `pickProvider('${escapeHtml(p.id)}')` : "closeSheet('modelPickSheet'); switchTab('profile')"}">
+    html += `<button class="prov-card ${sel ? 'active' : ''} ${ready ? '' : 'disabled'}" onclick="${ready ? `pickProvider('${escapeHtml(p.id)}')` : "closeSheet('modelPickSheet'); openProfileGroup('coach')"}">
       ${providerBadge(p)}
       <span class="grow"><b>${escapeHtml(p.name)}</b><span class="tiny muted">${ready ? `${escapeHtml(sel ? shortModelName(pick.model || p.model) : shortModelName(p.model))}${count ? ` · ${count} models` : ''} · ${p.paid ? 'paid' : 'free'}` : 'needs an API key — set up in Profile'}</span></span>
       ${icon('chevron', 'ic-sm muted')}</button>`;

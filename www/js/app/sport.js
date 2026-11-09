@@ -282,7 +282,7 @@ async function deleteWorkout(id) {
   await renumberRides();
   if (currentWorkout && currentWorkout.id === id) closePanel('rideDetail');
   haptic('success');
-  toast(`${rideTitle(w)} deleted · undo with Profile → Restore points`, 'success', 4200);
+  toast(`${rideTitle(w)} deleted · undo with Profile → App & backup → Restore points`, 'success', 4200);
   await afterWorkoutsChanged(null);
 }
 
@@ -377,6 +377,26 @@ async function openInbox() {
       <select class="input input-sm" data-rule="${escapeHtml(k)}"><option value="">Ask me</option><option value="include">Include as ${SPORTS[inboxSport(t)].label.toLowerCase()}</option><option value="skip">Skip</option></select></div>`;
   }).join('');
   openSheet('inboxSheet');
+}
+
+// Profile → Connections: the remembered "every walk → include/skip" choices, changeable any time
+async function renderActivityRules() {
+  const host = $('#activityRulesCard');
+  if (!host) return;
+  const rules = Object.entries(await activityRules());
+  host.classList.toggle('hidden', !isNative() || !rules.length);
+  $('#activityRulesList').innerHTML = rules.map(([k, v]) => {
+    const t = k.split(':')[1] || k;
+    return `<div class="rule-row"><span class="grow">Every <b>${escapeHtml(prettyType(t).toLowerCase())}</b> <span class="tiny muted">(${k.startsWith('health') ? 'watch' : 'Strava'})</span></span>
+      <select class="input input-sm" onchange="setActivityRule(${squadArg(k)}, this.value)"><option value="">Ask me</option><option value="include" ${v === 'include' ? 'selected' : ''}>Include as ${SPORTS[inboxSport(t)].label.toLowerCase()}</option><option value="skip" ${v === 'skip' ? 'selected' : ''}>Skip</option></select></div>`;
+  }).join('');
+}
+
+async function setActivityRule(k, v) {
+  const rules = await activityRules();
+  if (v) rules[k] = v; else delete rules[k];
+  await setJsonConfig('activity_rules', rules);
+  toast(v ? 'Saved' : 'You\'ll be asked next time', 'success');
 }
 
 async function applyInbox() {
