@@ -39,10 +39,10 @@ async function renderCoachList() {
   for (const w of workouts.slice(0, 300)) {
     const e = byRide.get(Number(w.strava_id));
     const badge = !e || !e.coach ? '<span class="badge badge-new">New</span>' : (w.debrief_stale ? '<span class="badge badge-stale">Update</span>' : '');
-    const snippet = e && e.last ? String(e.last.message).slice(0, 70) : `${fmtNum(w.distance_km, 1)} km · ${fmtNum(w.avg_speed_kmh, 1)} km/h · ${w.avg_hr || '--'} bpm`;
+    const snippet = e && e.last ? String(e.last.message).slice(0, 70) : [sportOf(w) === 'other' ? '' : distText(w), sportOf(w) === 'other' ? rideDuration(w) : speedText(w), `${w.avg_hr || '--'} bpm`].filter(Boolean).join(' · ');
     html += `
       <div class="thread-row" onclick="openRide(${w.id}, { scrollToCoach: true })">
-        <div class="avatar" style="color:${intentAccent(w) === 'var(--border)' ? 'var(--muted)' : intentAccent(w)}">${icon('bike')}</div>
+        <div class="avatar" style="color:${intentAccent(w) === 'var(--border)' ? 'var(--muted)' : intentAccent(w)}">${icon(sportMeta(w).icon)}</div>
         <div class="thread-body">
           <div class="thread-top"><span class="thread-name">${escapeHtml(rideTitle(w))}</span><span class="row" style="gap:6px">${badge}<span class="thread-time">${escapeHtml(formatNiceDate(w.date, false))}</span></span></div>
           <div class="thread-snippet">${escapeHtml(snippet)}</div>

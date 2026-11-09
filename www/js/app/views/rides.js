@@ -267,7 +267,7 @@ function selectRideFormat(fmt) {
 function fillIntentSheet(w, title) {
   populateZoneSelect();
   $('#intentModalTitle').textContent = title;
-  $('#intentModalSub').textContent = `${rideTitle(w)} · ${distText(w)} · ${rideDuration(w)} · ${speedText(w)}${w.avg_hr ? ` · ${w.avg_hr} bpm` : ''}`;
+  $('#intentModalSub').textContent = [rideTitle(w), sportOf(w) === 'other' ? '' : distText(w), rideDuration(w), sportOf(w) === 'other' ? '' : speedText(w), w.avg_hr ? `${w.avg_hr} bpm` : ''].filter(Boolean).join(' · ');
   $('#intentQueueCount').textContent = intentModalQueue.length ? `+${intentModalQueue.length} more` : '';
   const it = parseIntent(w);
   if (w.intent_type === 'PLAY') {

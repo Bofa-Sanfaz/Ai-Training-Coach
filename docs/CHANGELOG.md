@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.10.0 — 2026-11-09 · Battles, full review
+- **Battles** (Squad → Home): weekly tug-of-war bars from the scoreboard (active days vs own target, minutes vs own usual, improvement, points) and custom battles — event kind `battle` (`create/accept/decline/cancel`, validated by the server, permissions decided in `SquadCore.fold`), progress by `SquadCore.battle` (metrics minutes · days · sessions · km · swim_m; target "own usual" or "same number"; winner "first to 100 %" or "best at the end"). New battle sheet with templates and a stake; battles in the chat timeline; confetti for a win, once per device.
+- **Security**: activity bodies from the other member are sanitised on the server (key charset, numbers must be numbers, start time format); the client escapes load and reaction emoji and passes event values to inline handlers as JSON strings (`squadArg`).
+- **Data fixes**: "Remove demo rides" only removes demo rides (real Strava ids are above the old id cutoff) and makes a restore point first; a typed note is saved even when leaving the screen right away or tapping feel/RPE; numbering repairs itself at start (after Classic, or when a watch sync changes a sport); share card uses the sport's units and the workout's name; plan "done" ignores excluded sessions; coach list and intent sheet use per-sport units and icons; exercise names: step machine → stairs, tighter rowing/boxing matching.
+- **Account (web app)**: squad cache writes no longer mark the backup dirty; a merge keeps settings only set on this device, respects deletions from both devices; another person's data on a shared device is never merged into a new sign-in; "Remove from this device" also removes the restore points; the server clears an interrupted upload when a new one starts (no stuck backups); the intro offers "continue without an account" when sign-up fails.
+- **Squad**: every arc gets its own final recap; a month report in the month an arc starts counts from the arc's first day (app and AI), and an earlier arc's report of that month isn't shown; leaving clears an open arc vote; the challenge cap counts only challenges someone is still in; screenshots without a start time or with a guessed year open the check form instead of saving; an unusual pool length is kept; images are labelled "Image N" for the AI.
+- Tests: 113 passing (battles, input hardening).
+
 ## 3.9.1 — 2026-10-30
 - Galaxy Watch gym names recognised: push-ups, arm extensions, pull-downs… count as **Strength**, plus a new **Aerobics** exercise; planks/sit-ups as Core & stretching. Renumbered once on update.
 

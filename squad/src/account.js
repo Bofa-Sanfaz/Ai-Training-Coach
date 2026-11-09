@@ -93,10 +93,12 @@ export async function accountRoute(env, req, url, { json, fail, readJson }) {
     if (!/^[A-Za-z0-9+/]/.test(data) || !/[A-Za-z0-9+/=]$/.test(data)) fail(400, 'part must be base64');
     const a = await env.DB.prepare('SELECT vault_version FROM accounts WHERE username=?').bind(u).first();
     if (v !== a.vault_version + 1) fail(409, 'a newer copy exists — pull first');
+    // Part 0 starts an upload: leftovers of an interrupted one (maybe with more parts) go first
+    if (i === 0) await env.DB.prepare('DELETE FROM vault_parts WHERE username=? AND version=?').bind(u, v).run();
     await env.DB.prepare('INSERT OR REPLACE INTO vault_parts (username, version, part, data) VALUES (?,?,?,?)').bind(u, v, i, data).run();
     if (i < n - 1) return json({ stored: i });
     // Last part: commit if every part is there and nobody committed meanwhile
-    const have = await env.DB.prepare('SELECT COUNT(*) AS c, SUM(LENGTH(data)) AS s FROM vault_parts WHERE username=? AND version=?').bind(u, v).first();
+    const have = await env.DB.prepare('SELECT COUNT(*) AS c, SUM(LENGTH(data)) AS s FROM vault_parts WHERE username=? AND version=? AND part < ?').bind(u, v, n).first();
     if (have.c !== n) fail(400, `missing parts (${have.c}/${n})`);
     const r = await env.DB.prepare('UPDATE accounts SET vault_version=?, vault_parts=?, vault_size=?, vault_at=? WHERE username=? AND vault_version=?').bind(v, n, have.s, now(), u, v - 1).run();
     if (!r.meta.changes) fail(409, 'a newer copy exists — pull first');

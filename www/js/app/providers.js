@@ -379,7 +379,8 @@ function buildRequest(p, prompt, imageB64, opts, stream) {
 
   if (p.type === 'gemini') {
     const parts = [{ text: prompt }];
-    for (const im of imgs) parts.push({ inlineData: { mimeType: 'image/jpeg', data: im } });
+    // Several images: each is labelled, so "image 2" in a reply means the same one here
+    imgs.forEach((im, i) => { if (imgs.length > 1) parts.push({ text: `Image ${i}:` }); parts.push({ inlineData: { mimeType: 'image/jpeg', data: im } }); });
     const generationConfig = { maxOutputTokens: opts.maxTokens || 8192 };
     if (opts.json) generationConfig.responseMimeType = 'application/json';
     const textOf = d => {
@@ -441,7 +442,7 @@ function buildRequest(p, prompt, imageB64, opts, stream) {
   // OpenAI-compatible chat completions
   const official = /api\.openai\.com/.test(p.baseUrl);
   const msg = img
-    ? { role: 'user', content: [{ type: 'text', text: prompt }].concat(imgs.map(im => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${im}` } }))) }
+    ? { role: 'user', content: [{ type: 'text', text: prompt }].concat(imgs.flatMap((im, i) => (imgs.length > 1 ? [{ type: 'text', text: `Image ${i}:` }] : []).concat([{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${im}` } }]))) }
     : { role: 'user', content: opts.json ? `${prompt}\n\nReply with JSON only.` : prompt };
   const req = { model: p.model, messages: [msg] };
   req[official ? 'max_completion_tokens' : 'max_tokens'] = opts.maxTokens || 8192;

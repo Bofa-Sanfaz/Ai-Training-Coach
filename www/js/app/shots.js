@@ -188,8 +188,10 @@ function shotAutoPrepare(d) {
     if (i.k === 'zones') use.zones = false;
   }
   const ex = shotExercise(d);
-  const blocking = issues.filter(i => ['date', 'hr', 'pace'].includes(i.k)).map(i => i.text);
+  const blocking = issues.filter(i => ['date', 'year', 'hr', 'pace'].includes(i.k)).map(i => i.text);
   if (!(shotNum(d.dur_s) > 0)) blocking.push('No duration was read.');
+  // Without a start time two workouts of one day would look like the same one
+  if (!/^\d{1,2}:\d{2}$/.test(String(d.start_time || ''))) blocking.push('No start time was visible — set it before saving.');
   if (ex.sport !== 'other' && !(shotNum(d.dist_m) > 0)) blocking.push('No distance was read.');
   return blocking;
 }

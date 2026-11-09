@@ -57,7 +57,7 @@ export async function callModel(cfg, prompt, opts = {}) {
   let url, headers = { 'Content-Type': 'application/json' }, body, read;
   if (cfg.type === 'gemini') {
     const parts = [{ text: prompt }];
-    for (const im of imgs) parts.push({ inlineData: { mimeType: 'image/jpeg', data: im } });
+    imgs.forEach((im, i) => { if (imgs.length > 1) parts.push({ text: `Image ${i}:` }); parts.push({ inlineData: { mimeType: 'image/jpeg', data: im } }); });
     const generationConfig = { maxOutputTokens: maxTokens };
     if (opts.json) generationConfig.responseMimeType = 'application/json';
     url = `${base}/models/${encodeURIComponent(cfg.model)}:generateContent`;
@@ -82,7 +82,7 @@ export async function callModel(cfg, prompt, opts = {}) {
   } else {
     const official = /api\.openai\.com/.test(base);
     const msg = img
-      ? { role: 'user', content: [{ type: 'text', text: prompt }].concat(imgs.map(im => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${im}` } }))) }
+      ? { role: 'user', content: [{ type: 'text', text: prompt }].concat(imgs.flatMap((im, i) => (imgs.length > 1 ? [{ type: 'text', text: `Image ${i}:` }] : []).concat([{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${im}` } }]))) }
       : { role: 'user', content: opts.json ? `${prompt}\n\nReply with JSON only.` : prompt };
     url = `${base}/chat/completions`;
     if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`;
@@ -305,7 +305,7 @@ function wellnessLines(w, days = 14) {
 
 function monthLines(w, ym, range) {
   const people = w.members.filter(m => m.active || w.activities.some(a => a.author === m.id));
-  const mo = range ? SquadCore.period(people, w.activities, w.st.daily, range.from, range.to, range.score) : SquadCore.month(people, w.activities, w.st.daily, ym, w.score);
+  const mo = range ? SquadCore.period(people, w.activities, w.st.daily, range.from, range.to, range.score) : SquadCore.month(people, w.activities, w.st.daily, ym, w.score, w.ch.arc ? w.ch.starts : null);
   return Object.values(mo.members).map(x => {
     const sports = Object.entries(x.by_sport).map(([s, v]) => `${s} ${v.n}× ${v.minutes} min${v.dist_m ? ` ${(v.dist_m / 1000).toFixed(1)} km` : ''}`).join(', ');
     return `${x.name}: ${x.sessions} sessions on ${x.active_days} days, ${x.minutes} min, load ${x.load}; ${sports || 'no sports'}; best streak ${x.best_streak} d; PBs: ${x.pbs.join('; ') || 'none'}; avg weekly score ${x.avg_week_points ?? '–'}${x.longest ? `; longest: ${x.longest.title} ${Math.round(x.longest.dur_s / 60)} min on ${x.longest.date}` : ''}${x.weight_start && x.weight_end !== x.weight_start ? `; weight ${x.weight_end - x.weight_start > 0 ? '+' : ''}${(x.weight_end - x.weight_start).toFixed(1)} kg this month` : ''}${x.avg_sleep_min ? `; sleep ${(x.avg_sleep_min / 60).toFixed(1)} h` : ''}${x.avg_rhr ? `; resting HR ${x.avg_rhr}` : ''}${x.avg_steps ? `; ${x.avg_steps} steps/day` : ''}`;

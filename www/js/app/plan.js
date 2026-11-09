@@ -70,7 +70,7 @@ async function migrateWeekPlan() {
 
 async function planContext() {
   const [template, overrides, done] = await Promise.all([getPlanTemplate(), getPlanOverrides(), getPlanDone()]);
-  const rideDates = new Set((await db.workouts.toArray()).map(w => String(w.date).slice(0, 10)));
+  const rideDates = new Set((await db.workouts.toArray()).filter(w => !isExcluded(w)).map(w => String(w.date).slice(0, 10)));
   return { template, overrides, done, rideDates };
 }
 

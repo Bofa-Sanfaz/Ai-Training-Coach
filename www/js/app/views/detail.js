@@ -115,8 +115,16 @@ function renderFeel(w) {
   $('#det_rpe_label').textContent = w.rpe ? `RPE ${w.rpe} · ${RPE_LABELS[w.rpe]}` : 'not rated yet';
   const note = $('#det_note');
   note.value = w.note || '';
-  note.oninput = debounce(() => saveRideField('note', note.value.trim().slice(0, 1000)), 600);
+  // The note is kept on the workout at once (a feel/RPE tap re-renders from it) and written for
+  // that workout's id shortly after — so leaving the screen right after typing loses nothing
+  note.oninput = () => {
+    const text = note.value.trim().slice(0, 1000);
+    w.note = text;
+    clearTimeout(detNoteTimer);
+    detNoteTimer = setTimeout(() => db.workouts.update(w.id, { note: text }), 400);
+  };
 }
+let detNoteTimer = null;
 
 async function saveRideField(field, value) {
   if (!currentWorkout) return;
@@ -298,7 +306,7 @@ function renderStreamPlot() {
     const i = pt.pointIndex;
     $('#banner_line1_l').textContent = `⏱ ${times[i]} min`;
     $('#banner_line1_r').textContent = `📏 ${dists[i] !== undefined ? dists[i] + ' km' : '--'}`;
-    $('#banner_line2_l').textContent = `⚡ ${speeds[i] !== undefined ? speeds[i] + ' km/h' : '--'}${watts[i] !== undefined ? ` · ${Math.round(watts[i])} W` : ''}`;
+    $('#banner_line2_l').textContent = `⚡ ${speeds[i] !== undefined ? speedText(w, speeds[i]) : '--'}${watts[i] !== undefined ? ` · ${Math.round(watts[i])} W` : ''}`;
     $('#banner_line2_r').textContent = `❤️ ${hrs[i] || '--'} bpm · ⛰ ${alts[i] !== undefined ? Math.round(alts[i]) + ' m' : '--'}`;
   });
 }

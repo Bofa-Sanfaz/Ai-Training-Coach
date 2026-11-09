@@ -140,9 +140,11 @@ async function loadDemoData() {
 }
 
 async function removeDemoData() {
-  const demo = (await db.workouts.toArray()).filter(w => w.demo || Number(w.strava_id) >= DEMO_ID_BASE);
+  // Only rides this file made (real Strava ids passed DEMO_ID_BASE long ago — never match on the id alone)
+  const demo = (await db.workouts.toArray()).filter(w => w.demo === true);
   if (!demo.length) { toast('No demo rides to remove.', 'info'); return; }
   if (!(await uiConfirm('Remove demo rides?', `${demo.length} demo rides and their chats will be deleted.`, { okText: 'Remove', danger: true }))) return;
+  await createRestorePoint('Before removing demo rides', 'auto');
   for (const w of demo) {
     await db.workouts.delete(w.id);
     await db.streams.delete(Number(w.strava_id));

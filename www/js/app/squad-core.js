@@ -15,7 +15,8 @@ const SquadCore = (() => {
 
   function fold(events) {
     // daily: { memberId: { 'YYYY-MM-DD': { weight_kg, rhr, sleep_min, steps, hrv } } } — shared by choice only
-    const st = { messages: [], activities: new Map(), comments: {}, reactions: {}, system: [], daily: {}, deleted: new Set() };
+    // battles: id → { metric, sport, from, to, mode, target, finish, title, stake, by, accepted[], declined[], status }
+    const st = { messages: [], activities: new Map(), comments: {}, reactions: {}, system: [], daily: {}, deleted: new Set(), battles: new Map() };
     const ordered = events.slice().sort((a, b) => a.seq - b.seq);
     for (const e of ordered) if (e.kind === 'delete' && e.ref) st.deleted.add(e.ref);
     for (const e of ordered) {
@@ -35,9 +36,67 @@ const SquadCore = (() => {
         const who = r[b.emoji] = r[b.emoji] || new Set();
         if (b.on === false) who.delete(e.author); else who.add(e.author);
         if (!who.size) delete r[b.emoji];
+      } else if (e.kind === 'battle' && b.bid) {
+        // A challenge between members: the creator proposes, the others accept or decline;
+        // only the creator can call it off (the server only checks the shape, this decides who may)
+        const cur = st.battles.get(b.bid);
+        if (b.op === 'create' && !cur) {
+          const { op, ...rest } = b;
+          st.battles.set(b.bid, Object.assign(rest, { id: b.bid, by: e.author, seq: e.seq, created_at: e.created_at, accepted: [], declined: [], status: 'open' }));
+        } else if (cur && cur.status === 'open') {
+          if (b.op === 'accept' && e.author !== cur.by && !cur.accepted.includes(e.author)) { cur.accepted.push(e.author); cur.declined = cur.declined.filter(x => x !== e.author); }
+          else if (b.op === 'decline' && e.author !== cur.by && !cur.accepted.includes(e.author) && !cur.declined.includes(e.author)) cur.declined.push(e.author);
+          else if (b.op === 'cancel' && e.author === cur.by) cur.status = 'cancelled';
+        }
       }
     }
     return st;
+  }
+
+  /**
+   * Battle progress. Metrics: minutes · days (active days) · sessions · km (not swims) · swim_m.
+   * mode 'own': each person's target is his own usual for the battle's length (minutes: usual
+   * weekly minutes; days and sessions: his target days) — fair between different people;
+   * mode 'same': one target for everyone. finish 'first': the first to 100 % wins (by workout
+   * date and time); 'end': the highest % on the last day. score: compute() (own usuals).
+   */
+  const BATTLE_METRICS = ['minutes', 'days', 'sessions', 'km', 'swim_m'];
+  function battle(b, members, activities, today, score) {
+    const fromN = dayNum(b.from), toN = dayNum(b.to), todayN = dayNum(today);
+    const len = Math.max(1, toN - fromN + 1);
+    const ids = [b.by].concat(b.accepted || []).filter((id, i, a) => a.indexOf(id) === i && members.some(m => m.id === id));
+    const people = ids.map(id => {
+      const own = score && score.members[id];
+      let target = num(b.target);
+      if (b.mode === 'own') {
+        if (b.metric === 'minutes') target = Math.max(20, Math.round(num(own && own.weekly_min) * len / 7) || 60);
+        else target = Math.max(1, Math.round(num(own && own.target) * len / 7) || Math.round(3 * len / 7) || 1);
+      }
+      target = Math.max(b.metric === 'km' ? 0.5 : 1, target);
+      const acts = activities.filter(a => a.author === id && a.date && dayNum(a.date) >= fromN && dayNum(a.date) <= toN
+        && (b.metric === 'swim_m' ? a.sport === 'swim' : b.metric === 'km' ? a.sport !== 'swim' : true)
+        && (!b.sport || b.sport === 'any' || a.sport === b.sport))
+        .sort((x, y) => `${x.date} ${x.start || '23:59'}`.localeCompare(`${y.date} ${y.start || '23:59'}`) || num(x.seq) - num(y.seq));
+      let value = 0, reachedAt = null;
+      const days = new Set();
+      for (const a of acts) {
+        if (b.metric === 'days') days.add(a.date);
+        value = b.metric === 'minutes' ? value + num(a.dur_s) / 60 : b.metric === 'days' ? days.size : b.metric === 'sessions' ? value + 1
+          : b.metric === 'km' ? value + num(a.dist_m) / 1000 : value + num(a.dist_m);
+        if (!reachedAt && value >= target) reachedAt = `${a.date} ${a.start || '23:59'}`;
+      }
+      return { id, value: round1(value), target: round1(target), pct: Math.round(value / target * 100), reachedAt };
+    });
+    const live = ids.length > 1;
+    const first = people.filter(p => p.reachedAt).sort((x, y) => x.reachedAt.localeCompare(y.reachedAt));
+    let done = false, winners = [];
+    if (live && b.finish === 'first' && first.length) { done = true; winners = first.filter(p => p.reachedAt === first[0].reachedAt).map(p => p.id); }
+    else if (live && todayN > toN) {
+      done = true;
+      const top = Math.max(...people.map(p => p.pct));
+      winners = top > 0 ? people.filter(p => p.pct === top).map(p => p.id) : [];
+    }
+    return { people, live, done, winners, days_left: Math.max(0, toN - todayN + 1), started: todayN >= fromN };
   }
 
   const DAY = 86400000;
@@ -177,10 +236,13 @@ const SquadCore = (() => {
   /**
    * Month in numbers per member (the squad's monthly report — app and AI use the same numbers).
    * month: 'YYYY-MM'. daily: fold().daily. score: compute() result (for weekly points in the month).
+   * notBefore: the running arc's first day — a month an arc starts in only counts from that day.
    */
-  function month(members, activities, daily, ym, score) {
+  function month(members, activities, daily, ym, score, notBefore) {
     const last = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
-    return Object.assign(period(members, activities, daily, `${ym}-01`, `${ym}-${String(last).padStart(2, '0')}`, score), { month: ym });
+    const first = `${ym}-01`, end = `${ym}-${String(last).padStart(2, '0')}`;
+    const from = notBefore && notBefore > first && notBefore <= end ? notBefore : first;
+    return Object.assign(period(members, activities, daily, from, end, score), { month: ym });
   }
 
   // Any date range (a month, an arc…) in numbers per member
@@ -244,6 +306,6 @@ const SquadCore = (() => {
     return { v: 1, seq, today, score, recent, daily, last_dates: last };
   }
 
-  return { fold, actRef, compute, month, period, digest, METRIC, WEIGHTS: W };
+  return { fold, actRef, compute, month, period, digest, battle, BATTLE_METRICS, METRIC, WEIGHTS: W };
 })();
 if (typeof globalThis !== 'undefined') globalThis.SquadCore = SquadCore;

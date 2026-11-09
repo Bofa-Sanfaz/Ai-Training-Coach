@@ -59,6 +59,7 @@ try {
   const tz = 240; // UTC+4
   const today = new Date(Date.now() + tz * 60000).toISOString().slice(0, 10);
   const minus = n => new Date(Date.parse(`${today}T00:00:00Z`) - n * 86400000).toISOString().slice(0, 10);
+  const plus = n => minus(-n);
   r = await call('POST', '/api/challenges', { name: 'Test duel', starts: minus(9), tz_offset: tz, rules: { days_per_week: 4, recap: false, roast: 'spicy' }, member: { name: 'Mustafa', sports: ['ride', 'run', 'swim'], baseline: { weekly_min: 300, metrics: { swim: 150, run: 330 } } } });
   ok(r.status === 201 && r.d.token && r.d.challenge.invite.length === 8, 'create challenge', r.d);
   const cid = r.d.challenge.id, invite = r.d.challenge.invite, A = r.d.token, aId = r.d.member_id;
@@ -302,6 +303,53 @@ try {
   ok(r.d.events.some(e => e.author === 'ai' && e.body.mode === 'arc' && e.body.reply_to === arcReq.id), 'arc report posted as a reply', r.d.events.filter(e => e.author === 'ai').slice(-2));
   r = await call('POST', `/api/c/${cid}/arc`, { action: 'dance' }, A);
   ok(r.status === 400, 'unknown arc action → 400', r.status);
+
+  // ---------- battles ----------
+  const bid = `bt${Math.random().toString(36).slice(2, 12)}`, bid2 = `bt${Math.random().toString(36).slice(2, 12)}`;
+  r = await call('POST', `/api/c/${cid}/events`, { events: [
+    { id: id('bat'), kind: 'battle', body: { op: 'create', bid, title: 'First to 10 km', metric: 'km', mode: 'same', target: 10, finish: 'first', from: today, to: plus(6), sport: 'any', evil: '<script>' } },
+    { id: id('bat'), kind: 'battle', body: { op: 'create', bid: 'bt-bad1', metric: 'km', mode: 'own', from: today, to: plus(6) } },
+    { id: id('bat'), kind: 'battle', body: { op: 'create', bid: 'bt-bad2', metric: 'calories', mode: 'same', target: 5, from: today, to: plus(6) } },
+    { id: id('bat'), kind: 'battle', body: { op: 'create', bid: 'bt-bad3', metric: 'minutes', mode: 'own', from: today, to: plus(200) } },
+    { id: id('bat'), kind: 'battle', body: { op: 'explode', bid } }
+  ] }, A);
+  ok(r.d.acks.length === 1 && r.d.rejected.length === 4, 'battle: valid one stored; own-usual km, unknown metric, >3 months and bad op rejected', r.d);
+  r = await call('POST', `/api/c/${cid}/events`, { events: [
+    { id: id('bat'), kind: 'battle', body: { op: 'accept', bid } },
+    { id: id('bat'), kind: 'battle', body: { op: 'create', bid: bid2, title: 'Minutes', metric: 'minutes', mode: 'own', finish: 'end', from: today, to: plus(6) } },
+    { id: id('bat'), kind: 'battle', body: { op: 'cancel', bid } } // not his battle: ignored by the fold
+  ] }, B);
+  await call('POST', `/api/c/${cid}/events`, { events: [
+    { id: id('bat'), kind: 'battle', body: { op: 'accept', bid } }, // creator can't accept his own
+    { id: id('act'), kind: 'activity', body: { key: 'bt1', sport: 'run', date: today, start: '07:00', dur_s: 3000, dist_m: 10400 } }
+  ] }, A);
+  await call('POST', `/api/c/${cid}/events`, { events: [{ id: id('act'), kind: 'activity', body: { key: 'bt2', sport: 'walk', date: today, start: '06:00', dur_s: 5400, dist_m: 9000 } }] }, B);
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  {
+    const f = SquadCore.fold(r.d.events);
+    const bt = f.battles.get(bid);
+    ok(bt && bt.status === 'open' && bt.accepted.length === 1 && bt.accepted[0] === bId && !('evil' in bt), 'battle folded: accepted by the friend only, cancel by non-creator ignored, unknown fields dropped', bt);
+    const members = r.d.members;
+    const score = SquadCore.compute({ starts: r.d.challenge.starts, rules: r.d.challenge.rules }, members, Array.from(f.activities.values()), today);
+    const p = SquadCore.battle(bt, members, Array.from(f.activities.values()), today, score);
+    const pa = p.people.find(x => x.id === aId), pb = p.people.find(x => x.id === bId);
+    // Both pass 10 km today (Assad's earlier walk counts too); the run at 07:00 got there first
+    ok(p.live && p.done && p.winners.length === 1 && p.winners[0] === aId && pa.pct === 104 && pb.pct > 100 && pb.reachedAt > pa.reachedAt, 'first to 10 km: the earlier finisher wins', p);
+    const p2 = SquadCore.battle(f.battles.get(bid2), members, Array.from(f.activities.values()), today, score);
+    ok(!p2.live && !p2.done && p2.people.length === 1 && p2.people[0].target >= 20, 'own-usual battle waits for the accept; own minute target', p2);
+  }
+
+  // ---------- input hardening (fields drawn into the other member's screen) ----------
+  r = await call('POST', `/api/c/${cid}/events`, { events: [
+    { id: id('act'), kind: 'activity', body: { key: "x'onclick", sport: 'walk', date: today, dur_s: 60 } },
+    { id: id('act'), kind: 'activity', body: { key: 'hard1', sport: 'walk', date: today, start: '<b>', dur_s: 600, load: '<img src=x onerror=alert(1)>', avg_hr: '120' } }
+  ] }, B);
+  ok(r.d.acks.length === 1 && r.d.rejected.length === 1, 'activity key with a quote rejected', r.d);
+  r = await call('GET', `/api/c/${cid}/changes?since=0`, null, A);
+  {
+    const h = r.d.events.find(e => e.kind === 'activity' && e.body.key === 'hard1');
+    ok(h && h.body.load === undefined && h.body.avg_hr === undefined && h.body.start === undefined && h.body.dur_s === 600, 'non-numeric numbers and a bad start time are dropped', h && h.body);
+  }
 
   // ---------- accounts (multi-device sign-in, encrypted vault) ----------
   const user = `t_${Math.random().toString(36).slice(2, 10)}`;

@@ -100,7 +100,8 @@ async function renderIntro() {
       <p class="intro-lead">A username and password let you open the app on <b>any device</b> — your training is backed up <b>encrypted</b>: only your password opens it.</p>
       ${acc ? `<div class="intro-ok">${icon('check-circle')}<span>Signed in as <b>${escapeHtml(acc.username)}</b>.</span></div>`
         : `<div class="btn-row"><button class="btn btn-primary" onclick="openAccountSheet('signup')">${icon('user')}Create account</button><button class="btn btn-secondary" onclick="openAccountSheet('signin')">I have one — sign in</button></div>`}
-      <div class="hint mt-8">Signing in on a new device brings back everything: workouts, charts, chats, settings and the squad.</div>`;
+      <div class="hint mt-8">Signing in on a new device brings back everything: workouts, charts, chats, settings and the squad.</div>
+      ${!acc && Intro.accountFailed ? `<button class="btn btn-ghost btn-sm mt-12" onclick="Intro.noAccount = true; introNext()">Continue without an account for now</button><div class="tiny muted">Your data then stays only on this phone until you create one in Profile → Account.</div>` : ''}`;
     nextLabel = acc ? 'Next' : 'Create an account first';
   } else if (step === 'workouts') {
     html = `<h2 class="intro-title">Where do your workouts come from?</h2>
@@ -218,7 +219,7 @@ async function introSaveCoach() {
 async function introNext() {
   const steps = introSteps();
   const step = steps[Intro.step];
-  if (step === 'account' && !(typeof accountGet === 'function' && accountGet())) { openAccountSheet('signup'); return; }
+  if (step === 'account' && !Intro.noAccount && !(typeof accountGet === 'function' && accountGet())) { openAccountSheet('signup'); return; }
   if (step === 'you' && !(await introSaveYou())) return;
   if (step === 'coach' && !(await introSaveCoach())) return;
   // Skipped the history: keep a reminder on the Training screen until it's imported

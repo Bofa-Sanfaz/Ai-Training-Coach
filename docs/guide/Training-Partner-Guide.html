@@ -43,7 +43,7 @@
 
 <div class="cover">
   <div>
-    <div class="kick">User guide · version 3.9</div>
+    <div class="kick">User guide · version 3.10</div>
     <h1>Training Partner</h1>
     <div class="lead">How every screen works, where the data comes from, how each number is calculated, and exactly what each AI coach is told — plus the squad, screenshots, web accounts and arcs.</div>
   </div>
@@ -64,6 +64,7 @@
     <div><b>14</b>Screenshots (automatic) &amp; logging</div>
     <div><b>15</b>Web accounts</div>
     <div><b>16</b>Arcs — starting fresh</div>
+    <div><b>17</b>Battles — progress races</div>
   </div>
 </div>
 
@@ -443,7 +444,7 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
   <li>Tap <b>Screenshot</b> and pick up to <b>8 screenshots</b> at once — the summary, the heart-rate, pace, elevation and cadence graphs, splits, swim lengths, zone times. They may belong to several workouts.</li>
   <li>One AI call groups the screens per workout, reads every number, every table row and the shape of every graph, and names the exercise (walk, pool swim, treadmill, rowing, padel…). It uses the person's own free Gemini key when set up, otherwise the squad's Aether.</li>
   <li><b>Every workout that reads cleanly is saved straight away</b> — numbered, charted and shared with the squad — and a message lists what was added (e.g. "Walk 5 (4.50 km · 45:00)"). A graph or table that disagrees with the summary (see the checks below) is simply left out; the summary numbers are what the screen states.</li>
-  <li>Only a workout with <b>no date, no duration or no distance</b>, an average heart rate above the maximum, or a pace that contradicts distance and time opens the <b>check screen</b>: the numbers (all editable), the screenshots, a preview chart, the tables read, include-toggles and the checks. Save, or fix and save.</li>
+  <li>Only a workout with <b>no date, no start time, no duration or no distance</b>, a guessed year, an average heart rate above the maximum, or a pace that contradicts distance and time opens the <b>check screen</b>: the numbers (all editable), the screenshots, a preview chart, the tables read, include-toggles and the checks. Save, or fix and save.</li>
   <li>Something wrong anyway? Open the workout in Training → flag → change the sport or exercise, mark a value as a data error, or delete it and log it by hand.</li>
 </ol>
 <table>
@@ -511,7 +512,37 @@ Best 50/100/200/400 m = fastest run of consecutive lengths covering that distanc
   <li>The new arc measures everyone against his <b>last 4 weeks</b> (the baselines refresh).</li>
   <li>Aether writes a thorough <b>end-of-arc report and analysis</b> in the squad chat: the winner on relative points, and for each person volume, consistency against his own target, improvement against his own usual, personal bests, streaks, best and weakest sessions, patterns (days, times, sports) and — supportively — shared wellness; the story of the weekly duels; one funny award each; 3 concrete goals per person for the next arc.</li>
   <li>Squad → Report gets a 🏁 chip per finished arc: the arc's own points, weeks won, graphs, the AI analysis and a <b>PDF</b>. Workouts from earlier arcs stay shared so those reports keep working.</li>
+  <li>Each arc gets its own final recap at its end, and a monthly report in the month an arc starts counts only from the arc's first day.</li>
 </ul>
+</div>
+
+<!-- ============================================================ -->
+<div class="section">
+<h2><span class="k">Section 17 · new in 3.10</span>Battles — progress races</h2>
+<p>Squad → Home → <b>⚔️ Battles</b>. Two kinds, both live as soon as workouts are shared.</p>
+<h3>This week (automatic)</h3>
+<p>A tug-of-war bar per number — whoever is further along pulls the bar his way, and a 👑 marks the leader. Everyone is measured against <b>his own</b> usual, so different bodies and sports battle fairly:</p>
+<table>
+  <tr><th style="width:26%">Bar</th><th>Each person's number</th></tr>
+  <tr><td>Active days</td><td>days with a workout ÷ his own target days (e.g. 3/4 = 75 %)</td></tr>
+  <tr><td>Minutes</td><td>minutes this week ÷ his usual weekly minutes</td></tr>
+  <tr><td>Improvement</td><td>improvement points (pace/speed vs his own usual, out of 30)</td></tr>
+  <tr><td>Points</td><td>this week's total points (section 12)</td></tr>
+</table>
+<h3>Challenges (you start them)</h3>
+<ol>
+  <li><b>New battle</b> → pick a template (most minutes this week, most active days, first to 20 km, first to 2 km swimming, most workouts in 2 weeks) or set your own: what counts, the sport, the target, how the winner is decided, when it ends and an optional <b>stake</b> ("loser buys coffee").</li>
+  <li>Your friend sees "<b>… challenged you</b>" with <b>Accept</b> / <b>Not this one</b>, and the chat shows it. Workouts from the battle's first day count, even if he accepts later.</li>
+  <li>Both progress bars race toward the target (🏁 when someone gets there). The winner gets confetti; finished battles stay on Home for two weeks. Only the one who started a battle can call it off.</li>
+</ol>
+<table>
+  <tr><th style="width:30%">Setting</th><th>Meaning</th></tr>
+  <tr><td>What counts</td><td>minutes · active days · workouts · distance in km (not swims) · swim distance in m — optionally one sport only</td></tr>
+  <tr><td>Target: each vs his own usual</td><td>for minutes, days and workouts: each person's target is his own usual for the battle's length (usual weekly minutes or target days × days ÷ 7) — the fair default</td></tr>
+  <tr><td>Target: same number for both</td><td>one number for everyone (needed for km and swim metres)</td></tr>
+  <tr><td>Winner: first to reach the target</td><td>decided by the date and start time of the workout that crossed 100 %</td></tr>
+  <tr><td>Winner: best at the end</td><td>the highest % on the last day; equal % is a draw</td></tr>
+</table>
 </div>
 
 </body>

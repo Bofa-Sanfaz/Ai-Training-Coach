@@ -18,7 +18,10 @@ function accountGet() {
   try { return JSON.parse(localStorage.getItem(ACCT_KEY) || 'null'); } catch (e) { return null; }
 }
 function accountSet(a) {
-  try { a ? localStorage.setItem(ACCT_KEY, JSON.stringify(a)) : localStorage.removeItem(ACCT_KEY); } catch (e) { /* private mode */ }
+  try {
+    a ? localStorage.setItem(ACCT_KEY, JSON.stringify(a)) : localStorage.removeItem(ACCT_KEY);
+    if (a && a.username) localStorage.setItem('rp_account_last', a.username); // whose data this device holds
+  } catch (e) { /* private mode */ }
 }
 const accountServer = () => (typeof squadServerDefault === 'function' && squadServerDefault()) || (typeof SQUAD_DEFAULT_SERVER !== 'undefined' ? SQUAD_DEFAULT_SERVER : '');
 const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -122,17 +125,32 @@ async function accountPull(opts = {}) {
   let plain;
   try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.slice(0, 12) }, key, all.slice(12)); } catch (e) { throw new Error('could not unlock your data — wrong password?'); }
   const data = JSON.parse(new TextDecoder().decode(await gz(new Uint8Array(plain), 'unzip')));
-  // Workouts that exist only here (logged on this device since its last backup) survive the restore
+  // Merge (both devices changed): workouts that exist only here survive the restore — unless the
+  // other device deleted them; workouts deleted here stay deleted; settings only set here are kept
+  const theirCfg = new Map((data.config || []).map(c => [c.key, c.val]));
+  const jsonList = v => { try { const x = JSON.parse(v || '[]'); return Array.isArray(x) ? x.map(Number) : []; } catch (e) { return []; } };
+  const goneThere = new Set(jsonList(theirCfg.get('deleted_workouts')));
+  const goneHere = opts.merge ? await deletedWorkoutIds() : new Set();
   const theirs = new Set((data.workouts || []).map(w => String(w.strava_id)));
-  const onlyHere = opts.merge ? (await db.workouts.toArray()).filter(w => !theirs.has(String(w.strava_id))) : [];
+  const onlyHere = opts.merge ? (await db.workouts.toArray()).filter(w => !theirs.has(String(w.strava_id)) && !goneThere.has(Number(w.strava_id))) : [];
   const onlyStreams = onlyHere.length ? (await db.streams.toArray()).filter(s => onlyHere.some(w => w.strava_id === s.strava_id)) : [];
+  const onlyCfg = opts.merge ? (await db.config.toArray()).filter(c => !theirCfg.has(c.key) && !/^squad_data_|^intro_step$/.test(c.key)) : [];
   if ((await db.workouts.count()) > 0) await createRestorePoint('Before loading your account from another device', 'auto');
   await restoreDump(data, { preserveSecrets: false });
   for (const w of onlyHere) { const c = Object.assign({}, w); delete c.id; await db.workouts.add(c); }
   for (const s of onlyStreams) await db.streams.put(s);
+  for (const c of onlyCfg) await db.config.put(c);
+  let mergedDeletes = false;
+  if (goneHere.size) {
+    const back = (await db.workouts.toArray()).filter(w => goneHere.has(Number(w.strava_id)));
+    for (const w of back) { await db.workouts.delete(w.id); await db.streams.delete(Number(w.strava_id)); }
+    await setJsonConfig('deleted_workouts', Array.from(new Set([...goneThere, ...goneHere])));
+    mergedDeletes = back.length > 0;
+  }
+  const merged = onlyHere.length > 0 || onlyCfg.length > 0 || mergedDeletes;
   for (const [k, v] of Object.entries(data.local_prefs || {})) { try { localStorage.setItem(k, v); } catch (e) {} }
-  accountSet(Object.assign(accountGet() || a, { version: meta.version, dirty: onlyHere.length > 0, at: meta.at }));
-  if (onlyHere.length) {
+  accountSet(Object.assign(accountGet() || a, { version: meta.version, dirty: merged, at: meta.at }));
+  if (merged) {
     if (typeof renumberRides === 'function') await renumberRides();
     setTimeout(() => accountUpload('merged'), 1500); // send the combined copy back
   }
@@ -154,8 +172,12 @@ async function accountSignIn(username, password) {
   const u = String(username || '').trim().toLowerCase();
   const k = await accountDerive(u, password);
   const r = await (await accountApi('POST', '/api/account/login', { username: u, auth: k.auth, device: navigator.platform || '' })).json();
+  // Data left on this device by someone else's account is never merged into this one
+  let last = null;
+  try { last = localStorage.getItem('rp_account_last'); } catch (e) {}
+  const mine = !last || last === r.username;
   accountSet({ server: accountServer(), username: r.username, token: r.token, key: k.key, version: 0, dirty: false });
-  const restored = r.vault_version ? await accountPull({ force: true, merge: true }) : false;
+  const restored = r.vault_version ? await accountPull({ force: true, merge: mine }) : false;
   if (!restored) { const a = accountGet(); a.dirty = true; accountSet(a); await accountUpload('first sign-in'); }
   return { restored };
 }
@@ -172,6 +194,7 @@ async function accountSignOut() {
   accountSet(null);
   if (wipe) {
     try { db.close(); await Dexie.delete(db.name); } catch (e) { console.warn('wipe', e); }
+    try { restoreDb.close(); await Dexie.delete(restoreDb.name); } catch (e) { console.warn('wipe restore points', e); } // full copies of the data
     try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
     location.reload();
     return;
@@ -189,12 +212,14 @@ function accountWatch() {
     clearTimeout(Account.timer);
     Account.timer = setTimeout(() => accountUpload('changes'), 120000);
   };
+  // The squad's event cache and outbox change on every sync and aren't his data — they don't count
+  const own = (t, key) => t !== 'config' || !/^squad_data_|^squad_outbox$|^intro_step$/.test(String(key || ''));
   for (const t of ['workouts', 'streams', 'threads', 'master_chat', 'graph_threads', 'reports', 'config']) {
     const table = db[t];
     if (!table) continue;
-    table.hook('creating', function (pk, obj) { if (t !== 'config' || !/^squad_data_/.test(obj && obj.key)) mark(); });
-    table.hook('updating', function () { mark(); });
-    table.hook('deleting', function () { mark(); });
+    table.hook('creating', function (pk, obj) { if (own(t, obj && obj.key)) mark(); });
+    table.hook('updating', function (mods, pk) { if (own(t, pk)) mark(); });
+    table.hook('deleting', function (pk) { if (own(t, pk)) mark(); });
   }
   document.addEventListener('visibilitychange', () => { const a = accountGet(); if (document.hidden && a && a.dirty) accountUpload('app hidden'); });
 }
@@ -271,5 +296,7 @@ async function accountSubmit(fromIntro) {
     }
   } catch (e) {
     $('#acc_status').textContent = e.message;
+    // The introduction offers a way on (server unreachable or full) — the account can follow from Profile
+    if (typeof Intro !== 'undefined' && !Intro.accountFailed && $('#introPanel').classList.contains('open')) { Intro.accountFailed = true; renderIntro(); }
   } finally { setBusy(btn, false); }
 }

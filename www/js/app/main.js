@@ -37,6 +37,10 @@ function checkNetwork() {
 }
 
 const WHATS_NEW = `
+### New in 3.10 — Battles
+- **⚔️ Battles** on Squad → Home: a weekly tug-of-war on active days, minutes, improvement and points — each against his own usual — and challenges you send your friend: "first to 20 km", "most minutes this week", a swim race… He accepts, both progress bars race, the winner gets confetti. Optional stake ("loser buys coffee")
+- A full check-up: safer squad data, notes that are never lost, the right units on share cards, numbers that always stay in order, sturdier account backups, and many small fixes
+
 ### New in 3.9 — every workout numbered
 - **Every workout has its number again**: Ride 42, Run 3, Walk 5, Swim 4 — gym and other sessions per exercise (Strength 3, Elliptical 2). The name from Strava or the watch stays beside the date
 - **Screenshots add themselves**: pick the screens and every workout that reads cleanly is saved at once (graphs that disagree with the summary are left out); only one with something missing opens for a quick check
@@ -75,7 +79,7 @@ const WHATS_NEW = `
 - **Reports per sport**: choose All, Rides, Runs, Swims or Gym; the PDF is now a full report (week-by-week table, a page per sport, highlights, plan adherence, recovery log)
 - **The full guide** to every function, coach context and calculation is in the project docs (Training-Partner-Guide.pdf)
 - **Mark wrong data**: tap the flag on any workout (or on a record) to mark climbing, distance/speed, heart rate or power as a data error, set the sport, mark it indoor — or delete it (sync never brings it back)
-- **Compare really compares**: same-sport sessions, \
+- **Compare really compares**: same-sport sessions, "latest vs most similar" by default, a one-line verdict, efficiency, paired bars, zones side by side and an overlay chart
 - Redesigned app with bottom navigation, dark mode, new logo and race-number typography
 - Ride detail opens as a full screen with a chat composer that stays at the bottom
 - Toasts and in-app dialogs instead of pop-up alerts; Android **Back** button now works everywhere
@@ -127,10 +131,15 @@ async function boot() {
   if (seen !== APP_VERSION) {
     if ((await db.workouts.count()) > 0) {
       await createRestorePoint(`Before update to v${APP_VERSION}${seen ? ` (from v${seen})` : ''}`, 'auto');
-      try { await renumberRides(); } catch (e) { console.warn('renumber', e); } // numbering rules may have changed
     }
     await setConfig('app_version_seen', APP_VERSION);
   }
+  // Numbers out of step (new rules after an update, the Classic UI's global "Ride 042", a sport
+  // changed by a sync): renumber once — cheap, it only writes the workouts that change
+  try {
+    const ws = await db.workouts.toArray();
+    if (ws.some(w => !w.exercise_code || !w.exercise_code.startsWith(`${numberLabel(w)} `) || /^\D+ 0\d/.test(w.exercise_code))) await renumberRides();
+  } catch (e) { console.warn('renumber', e); }
 
   await loadPhysioConfig();
   await loadAiSettings();

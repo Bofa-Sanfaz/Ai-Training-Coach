@@ -191,13 +191,14 @@ function sqPeriod(S, key) {
     const score = SquadCore.compute({ starts: arc.from, ends: arc.to, rules: S.ch.rules }, people, acts, S.st.today);
     return Object.assign(SquadCore.period(people, acts, S.folded.daily, arc.from, arc.to, score), { key, kind: 'arc', arc, score, people, label: `Arc ${arc.n}` });
   }
-  return Object.assign(SquadCore.month(ms, acts, S.folded.daily, key, S.score), { key, kind: 'month', score: S.score, people: ms, label: sqMonthName(key) });
+  return Object.assign(SquadCore.month(ms, acts, S.folded.daily, key, S.score, S.ch.arc ? S.ch.starts : null), { key, kind: 'month', score: S.score, people: ms, label: sqMonthName(key) });
 }
 
 // The AI's latest report for this period (answer to a 'report' or 'arc' request)
 function sqPeriodAiReport(S, P) {
   const mode = P.kind === 'arc' ? 'arc' : 'report';
-  const fits = q => (P.kind === 'arc' ? q.body.ai.arc === P.arc.n : (q.body.ai.month || P.key) === P.key);
+  // A month's report from an earlier arc isn't this arc's report of the same month
+  const fits = q => (P.kind === 'arc' ? q.body.ai.arc === P.arc.n : (q.body.ai.month || P.key) === P.key && !(S.ch.arc && q.seq < (S.ch.arc_seq || 0)));
   const reqs = new Map(S.folded.messages.filter(m => m.body.ai && m.body.ai.mode === mode && fits(m)).map(m => [m.id, m]));
   const answer = S.folded.messages.filter(m => m.author === 'ai' && m.body.mode === mode && reqs.has(m.body.reply_to)).pop() || null;
   const asked = Array.from(reqs.values()).some(q => !S.folded.messages.some(r => r.body.reply_to === q.id));

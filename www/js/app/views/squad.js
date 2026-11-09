@@ -56,6 +56,10 @@ function squadServerDefault() {
   return SQUAD_DEFAULT_SERVER;
 }
 
+// A value from the event log as an inline-handler argument: a JSON string, then HTML-escaped,
+// so quotes in it can't end the string (escapeHtml alone is undone by the HTML parser)
+const squadArg = v => escapeHtml(JSON.stringify(String(v)));
+
 function squadId(prefix = 'e') {
   const a = crypto.getRandomValues(new Uint8Array(9));
   return `${prefix}${Date.now().toString(36)}${Array.from(a, b => (b % 36).toString(36)).join('')}`;
@@ -253,6 +257,7 @@ async function squadSummary(w, history, c) {
   const sw = swimOf(w);
   const s = {
     key: String(w.strava_id), sport: sp, type: w.sport_type || SPORTS[sp].label, title: rideTitle(w),
+    name: String(w.name || '').trim().slice(0, 60) || undefined,
     date: String(w.date).slice(0, 10), start: String(w.date).slice(11, 16), dur_s: Math.round(num(w.moving_sec)),
     indoor: isIndoor(w) || undefined
   };
@@ -461,7 +466,8 @@ async function squadImportPicked(ev) {
       if (blocking.length) { review.push(d); continue; }
       Squad.importDraft = d;
       squadFillImport();
-      const r = await saveSquadImport({ auto: true });
+      let r = null;
+      try { r = await saveSquadImport({ auto: true }); } catch (e) { console.warn('auto import', e); } // one bad read never stops the rest
       if (r && r.dupe) dupes.push(r.dupe); else if (r) added.push(r); else review.push(d);
     }
     Squad.importDraft = null;
@@ -616,10 +622,14 @@ function squadFillImport() {
   const sport = ex ? ex.sport : 'walk';
   $('#sqi_ex').value = ex ? ex.k : '';
   const stroke ={ free: 'FREESTYLE', breast: 'BREASTSTROKE', back: 'BACKSTROKE', fly: 'BUTTERFLY', mixed: 'MIXED' }[String(w.main_stroke || '').toLowerCase()];
-  const pool = w.pool_m > 0 ? Math.round(w.pool_m) : 25;
+  const pool = w.pool_m >= 10 && w.pool_m <= 100 ? Math.round(w.pool_m) : 25;
+  // An unusual pool (15 m, 25 yd ≈ 23 m) the screen showed becomes a choice, so distance stays right
+  const pools = [['25', '25 m'], ['50', '50 m'], ['33', '33 m'], ['20', '20 m']];
+  if (!pools.some(p => p[0] === String(pool))) pools.unshift([String(pool), `${pool} m (from the screen)`]);
+  MANUAL_FIELD_DEFS.pool.options = pools;
   // Everything the AI read (or nothing, for a manual log) → the form's values
   Squad.manualVals = {
-    pool: String([25, 50, 33, 20].includes(pool) ? pool : 25), lengths: w.pool_m && w.dist_m ? Math.round(w.dist_m / w.pool_m) : '',
+    pool: String(pool), lengths: w.pool_m && w.dist_m ? Math.round(w.dist_m / w.pool_m) : '',
     dist_m: sport === 'swim' && w.dist_m ? Math.round(w.dist_m) : '', stroke: stroke || 'FREESTYLE', swolf: w.swolf || '', strokes: w.strokes || '',
     dist: sport !== 'swim' && w.dist_m ? round(w.dist_m / 1000, 2) : '', dist_opt: '', avg_hr: w.avg_hr || '', max_hr: w.max_hr || '', kcal: w.calories || '',
     steps: w.steps || '', cadence_spm: w.cadence || '', cadence_rpm: w.cadence || '', elev: w.elev_gain_m || w.elev_m || '', power: '', reps: ''
@@ -1115,6 +1125,7 @@ function squadHomeHtml(S) {
       <button onclick="openSquadWeight()">${icon('scale')}<span>Log weight</span></button>
       <button onclick="squadAskQuick()">${icon('sparkle')}<span>Ask ${SQUAD_AI}</span></button>
     </div>
+    ${squadBattlesHtml(S)}
     ${squadBoardHtml(S)}
     ${recap ? `<div class="section-title"><span>${SQUAD_AI}'s latest ${recap.body.mode === 'report' ? 'monthly report' : recap.body.mode === 'arc' ? 'arc report' : 'recap'}</span><span class="tiny muted">${escapeHtml(relativeTime(recap.created_at))}</span></div><div class="card sq-recap" onclick="openSquadChat()"><div class="md">${renderMarkdown(recap.body.text)}</div></div>` : ''}
     <div class="section-title"><span>Latest workouts</span>${acts.length > 3 ? `<button class="btn btn-ghost btn-xs" onclick="squadView('feed')">See all ${acts.length}</button>` : ''}</div>
@@ -1191,6 +1202,196 @@ function squadBoardHtml(S) {
     <div class="sq-score-grid">${cards}</div>`;
 }
 
+// ---------- BATTLES ----------
+// Weekly battles come straight from the scoreboard (each against his own usual); custom battles
+// are challenges one member sends and the other accepts (SquadCore.fold / SquadCore.battle).
+const BATTLE_UNITS = { minutes: 'min', days: 'days', sessions: 'sessions', km: 'km', swim_m: 'm' };
+const BATTLE_WHAT = { minutes: 'Minutes', days: 'Active days', sessions: 'Workouts', km: 'Distance (km)', swim_m: 'Swim distance (m)' };
+const BATTLE_TEMPLATES = [
+  { k: 'minutes', label: '⏱ Most minutes this week', metric: 'minutes', mode: 'own', finish: 'end', ends: 'week' },
+  { k: 'days', label: '📅 Most active days', metric: 'days', mode: 'own', finish: 'end', ends: 'week' },
+  { k: 'km20', label: '🚶 First to 20 km', metric: 'km', mode: 'same', target: 20, finish: 'first', ends: '7', sport: 'any' },
+  { k: 'swim', label: '🏊 First to 2 km swimming', metric: 'swim_m', mode: 'same', target: 2000, finish: 'first', ends: '14' },
+  { k: 'sessions', label: '💪 Most workouts in 2 weeks', metric: 'sessions', mode: 'own', finish: 'end', ends: '14' }
+];
+
+function squadBattles(S) {
+  const list = [];
+  for (const b of S.folded.battles.values()) {
+    if (b.status === 'cancelled' || b.to < S.ch.starts) continue;
+    const p = SquadCore.battle(b, S.members, Array.from(S.folded.activities.values()), S.st.today, S.score);
+    const others = S.members.filter(m => m.active && m.id !== b.by).map(m => m.id);
+    const declined = !p.live && others.length && others.every(id => b.declined.includes(id));
+    if (declined && b.by !== S.me) continue;
+    // Finished ones stay two weeks
+    if (p.done && b.to < formatLocalDate(addDays(parseSafeDate(S.st.today), -14))) continue;
+    list.push(Object.assign({ b, declined }, p));
+  }
+  return list.sort((x, y) => (x.done - y.done) || String(y.b.created_at).localeCompare(String(x.b.created_at)));
+}
+
+const squadBattleTarget = (b, p) => (b.metric === 'km' ? fmtNum(p.target, 1) : Math.round(p.target));
+const squadBattleValue = (b, v) => (b.metric === 'km' ? fmtNum(v, 1) : Math.round(v));
+
+function squadBattleDesc(b) {
+  const sport = b.sport && b.sport !== 'any' && SPORTS[b.sport] ? ` · ${SPORTS[b.sport].plural.toLowerCase()} only` : '';
+  const goal = b.mode === 'own' ? `${BATTLE_WHAT[b.metric]} vs each one's own usual` : `${BATTLE_WHAT[b.metric]}: ${b.metric === 'km' ? fmtNum(b.target, 1) : b.target} ${BATTLE_UNITS[b.metric]}`;
+  return `${goal}${sport} · ${b.finish === 'first' ? 'first to 100 % wins' : 'best at the end wins'} · ${formatNiceDate(b.from, false)} → ${formatNiceDate(b.to, false)}`;
+}
+
+// One tug-of-war row: who is further along, each measured as % of his own target
+function squadTugHtml(S, ms, label, vals, texts) {
+  const sum = vals[0] + vals[1];
+  const share = sum > 0 ? Math.round(vals[0] / sum * 100) : 50;
+  const lead = sum > 0 && vals[0] !== vals[1] ? (vals[0] > vals[1] ? 0 : 1) : -1;
+  return `<div class="sq-tug">
+    <div class="sq-tug-top"><span class="${lead === 0 ? 'lead' : ''}">${lead === 0 ? '👑 ' : ''}${escapeHtml(texts[0])}</span><b>${label}</b><span class="${lead === 1 ? 'lead' : ''}">${escapeHtml(texts[1])}${lead === 1 ? ' 👑' : ''}</span></div>
+    <div class="sq-tug-bar ${sum ? '' : 'empty'}"><i style="width:${share}%;background:${escapeHtml(ms[0].color)}"></i><i style="width:${100 - share}%;background:${escapeHtml(ms[1].color)}"></i><em style="left:${share}%"></em></div>
+  </div>`;
+}
+
+function squadBattlesHtml(S) {
+  const ms = S.members.filter(m => m.active && S.score.members[m.id]);
+  const head = `<div class="section-title"><span>⚔️ Battles</span>${ms.length > 1 ? `<button class="btn btn-ghost btn-xs" onclick="openSquadBattle()">${icon('plus', 'ic-sm')}New battle</button>` : ''}</div>`;
+  if (ms.length < 2) return `${head}<div class="card sq-battle-empty">${icon('multi')}<div><b>Battles start when your friend joins</b><div class="tiny muted">Weekly tug-of-war on days, minutes and improvement — and challenges like “first to 20 km”. Crew → Invite.</div></div></div>`;
+  const pair = ms.slice(0, 2);
+  const w = pair.map(m => S.score.members[m.id].this_week);
+  const pct = (a, b) => (b > 0 ? Math.round(a / b * 100) : 0);
+  const weekly = `<div class="card sq-battle sq-weekly">
+    <div class="row between"><b>This week</b><span class="tiny muted">each vs his own usual</span></div>
+    <div class="sq-tug-names"><span style="color:${escapeHtml(pair[0].color)}">${escapeHtml(pair[0].name)}</span><span style="color:${escapeHtml(pair[1].color)}">${escapeHtml(pair[1].name)}</span></div>
+    ${squadTugHtml(S, pair, 'Active days', w.map(x => pct(x.days, x.target)), w.map(x => `${x.days}/${x.target}`))}
+    ${squadTugHtml(S, pair, 'Minutes', w.map(x => x.volume_pct), w.map(x => `${x.volume_pct}%`))}
+    ${squadTugHtml(S, pair, 'Improvement', w.map(x => x.points.improvement), w.map(x => `${Math.round(x.points.improvement)}/30`))}
+    ${squadTugHtml(S, pair, 'Points', w.map(x => x.total), w.map(x => `${Math.round(x.total)}`))}
+  </div>`;
+  const cards = squadBattles(S).map(x => squadBattleCardHtml(S, x)).join('');
+  setTimeout(() => squadBattleCheer(S), 400);
+  return `${head}${weekly}${cards || `<button class="card sq-battle-new" onclick="openSquadBattle()">${icon('plus')}<span><b>Challenge ${escapeHtml(pair.find(m => m.id !== S.me) ? pair.find(m => m.id !== S.me).name : 'your friend')}</b><small>First to 20 km, most minutes this week, a swim race…</small></span></button>`}`;
+}
+
+function squadBattleCardHtml(S, x) {
+  const { b } = x;
+  const mine = b.by === S.me;
+  const invited = !mine && !b.accepted.includes(S.me) && !b.declined.includes(S.me) && !x.live;
+  const waitingFor = S.members.filter(m => m.active && m.id !== b.by && !b.accepted.includes(m.id)).map(m => m.name);
+  const status = x.done ? (x.winners.length === 1 ? `🏆 ${escapeHtml(squadName(S, x.winners[0]))} won` : x.winners.length ? '🤝 Draw' : 'Nobody scored')
+    : !x.live ? (x.declined ? 'Declined' : `Waiting for ${escapeHtml(waitingFor.join(', ') || 'a reply')}`)
+    : !x.started ? `Starts ${escapeHtml(formatNiceDate(b.from, false))}` : `${x.days_left} day${x.days_left === 1 ? '' : 's'} left`;
+  const rows = x.people.map(p => {
+    const m = S.member(p.id);
+    const won = x.done && x.winners.includes(p.id);
+    return `<div class="sq-race ${won ? 'won' : ''}">
+      <div class="sq-race-top">${squadAvatar(m, 'xs')}<b>${escapeHtml(m ? m.name : '')}${won ? ' 👑' : ''}</b><span class="grow"></span><span>${squadBattleValue(b, p.value)} / ${squadBattleTarget(b, p)} ${BATTLE_UNITS[b.metric]}</span><b class="sq-race-pct">${p.pct}%</b></div>
+      <div class="sq-race-bar"><i style="width:${Math.min(100, p.pct)}%;background:${escapeHtml(m ? m.color : 'var(--brand)')}"></i>${p.reachedAt ? '<span class="flag">🏁</span>' : ''}</div>
+    </div>`;
+  }).join('');
+  const actions = invited ? `<div class="btn-row mt-8"><button class="btn btn-primary btn-sm" onclick="squadBattleOp('${escapeHtml(b.id)}','accept')">${icon('check-circle', 'ic-sm')}Accept</button><button class="btn btn-secondary btn-sm" onclick="squadBattleOp('${escapeHtml(b.id)}','decline')">Not this one</button></div>`
+    : mine && !x.done ? `<div class="row mt-8" style="justify-content:flex-end"><button class="btn btn-ghost btn-xs" onclick="squadBattleOp('${escapeHtml(b.id)}','cancel')">Call it off</button></div>` : '';
+  return `<div class="card sq-battle ${x.done ? 'done' : ''} ${x.live ? '' : 'pending'}">
+    <div class="row between"><b>⚔️ ${escapeHtml(b.title || 'Battle')}</b><span class="sq-battle-st">${status}</span></div>
+    <div class="tiny muted mt-4">${escapeHtml(squadBattleDesc(b))}${b.stake ? ` · stake: ${escapeHtml(b.stake)}` : ''}</div>
+    ${x.live || mine ? `<div class="mt-8">${rows}</div>` : `<div class="tiny mt-8"><b>${escapeHtml(squadName(S, b.by))}</b> challenged you.</div>`}
+    ${actions}
+  </div>`;
+}
+
+// A battle I was in just finished: confetti once per device
+function squadBattleCheer(S) {
+  if (Router.current !== 'squad' || Squad.view !== 'home' || !S || !S.st) return;
+  const seen = S.st.battles_seen || (S.st.battles_seen = []);
+  for (const x of squadBattles(S)) {
+    if (!x.done || seen.includes(x.b.id) || !x.people.some(p => p.id === S.me)) continue;
+    seen.push(x.b.id);
+    squadPersist(Squad.cur);
+    const won = x.winners.length === 1 && x.winners[0] === S.me;
+    if (won) { celebrate(); haptic('success'); }
+    toast(won ? `🏆 You won “${x.b.title}”!` : x.winners.length === 1 ? `${squadName(S, x.winners[0])} won “${x.b.title}” — rematch?` : `“${x.b.title}” ended in a draw`, won ? 'success' : 'info', 5000);
+    break;
+  }
+}
+
+function squadBattleEnds(v) {
+  const today = parseSafeDate(squadState(Squad.cur).st.today);
+  if (v === 'week') return formatLocalDate(addDays(startOfWeek(today), 6));
+  if (v === 'month') return formatLocalDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+  return formatLocalDate(addDays(today, Number(v) - 1));
+}
+
+function openSquadBattle() {
+  const S = squadState(Squad.cur);
+  if (!S || S.members.filter(m => m.active).length < 2) { toast('Battles need your friend in the challenge first (Crew → Invite)', 'warn'); return; }
+  $('#sqb_templates').innerHTML = BATTLE_TEMPLATES.map(t => `<button type="button" class="sq-ex" style="--sc:var(--brand)" onclick="squadBattleTemplate('${t.k}')">${t.label}</button>`).join('');
+  squadBattleTemplate('minutes');
+  openSheet('squadBattleSheet');
+}
+
+function squadBattleTemplate(k) {
+  const t = BATTLE_TEMPLATES.find(x => x.k === k) || BATTLE_TEMPLATES[0];
+  $$('#sqb_templates .sq-ex').forEach((el, i) => el.classList.toggle('active', BATTLE_TEMPLATES[i].k === t.k));
+  $('#sqb_metric').value = t.metric;
+  $('#sqb_sport').value = t.sport || 'any';
+  $('#sqb_mode').value = t.mode;
+  $('#sqb_target').value = t.target || '';
+  $('#sqb_finish').value = t.finish;
+  $('#sqb_ends').value = t.ends;
+  $('#sqb_title').value = t.label.replace(/^\S+\s/, '');
+  $('#sqb_title').dataset.auto = '1';
+  squadBattleForm();
+}
+
+// Own-usual targets only for time, days and workouts; distance races use one target for both
+function squadBattleForm() {
+  const metric = $('#sqb_metric').value;
+  const ownOk = ['minutes', 'days', 'sessions'].includes(metric);
+  if (!ownOk) $('#sqb_mode').value = 'same';
+  $('#sqb_mode').disabled = !ownOk;
+  const same = $('#sqb_mode').value === 'same';
+  $('#sqb_targetWrap').classList.toggle('hidden', !same);
+  $('#sqb_targetLbl').textContent = `Target (${BATTLE_UNITS[metric]})`;
+  $('#sqb_sportWrap').classList.toggle('hidden', metric === 'swim_m');
+  const S = squadState(Squad.cur);
+  const to = squadBattleEnds($('#sqb_ends').value);
+  $('#sqb_hint').textContent = same ? `Both race to the same number until ${formatNiceDate(to, false)}.`
+    : `Each one's target is his own usual for this period (from his normal weeks) — fair even if one of you trains much more. Until ${formatNiceDate(to, false)}.`;
+}
+
+function saveSquadBattle() {
+  const S = squadState(Squad.cur);
+  if (!S) return;
+  const metric = $('#sqb_metric').value, mode = $('#sqb_mode').value;
+  const target = parseFloat(String($('#sqb_target').value).replace(',', '.'));
+  if (mode === 'same' && !(target > 0)) { toast('Set the target', 'warn'); return; }
+  const body = {
+    op: 'create', bid: squadId('bt'), title: $('#sqb_title').value.trim() || BATTLE_WHAT[metric], stake: $('#sqb_stake').value.trim(),
+    metric, sport: metric === 'swim_m' ? 'swim' : $('#sqb_sport').value, mode, target: mode === 'same' ? target : null,
+    finish: $('#sqb_finish').value, from: S.st.today, to: squadBattleEnds($('#sqb_ends').value)
+  };
+  squadQueue(Squad.cur, 'battle', body);
+  closeSheet('squadBattleSheet');
+  haptic('success');
+  const other = S.members.find(m => m.active && m.id !== S.me);
+  toast(`Challenge sent${other ? ` to ${other.name}` : ''} — it starts when accepted`, 'success');
+}
+
+async function squadBattleOp(bid, op) {
+  if (op === 'cancel' && !(await uiConfirm('Call off this battle?', 'It disappears for both of you.', { okText: 'Call it off', danger: true }))) return;
+  squadQueue(Squad.cur, 'battle', { op, bid });
+  haptic(op === 'accept' ? 'success' : 'light');
+  if (op === 'accept') toast('Battle on! ⚔️', 'success');
+}
+
+// In the chat timeline
+function squadBattleMsgHtml(S, e) {
+  const b = e.body || {};
+  const x = S.folded.battles.get(b.bid);
+  if (!x) return '';
+  const who = escapeHtml(squadName(S, e.author));
+  const t = escapeHtml(x.title || 'a battle');
+  const text = b.op === 'create' ? `⚔️ <b>${who}</b> started a battle: <b>${t}</b>` : b.op === 'accept' ? `⚔️ <b>${who}</b> accepted <b>${t}</b> — it's on` : b.op === 'decline' ? `${who} passed on ${t}` : `${who} called off ${t}`;
+  return `<div class="sq-sys sq-sys-battle" onclick="closePanel('squadChat'); squadView('home')">${text}</div>`;
+}
+
 // Week-by-week duel bars (Stats)
 function squadDuelBarsHtml(S) {
   const sc = S.score;
@@ -1201,7 +1402,7 @@ function squadDuelBarsHtml(S) {
 
 function squadReactionsHtml(S, ref) {
   const r = S.folded.reactions[ref] || {};
-  const chips = Object.entries(r).map(([e, who]) => `<button class="sq-rx ${who.has(S.me) ? 'mine' : ''}" onclick="event.stopPropagation(); squadReact('${ref}', '${e}')" title="${escapeHtml(Array.from(who).map(id => squadName(S, id)).join(', '))}">${e} ${who.size}</button>`).join('');
+  const chips = Object.entries(r).map(([e, who]) => `<button class="sq-rx ${who.has(S.me) ? 'mine' : ''}" onclick="event.stopPropagation(); squadReact(${squadArg(ref)}, ${squadArg(e)})" title="${escapeHtml(Array.from(who).map(id => squadName(S, id)).join(', '))}">${escapeHtml(e)} ${who.size}</button>`).join('');
   return chips;
 }
 
@@ -1210,8 +1411,8 @@ function squadActCardHtml(S, a, compact) {
   const sp = SPORTS[a.sport] || SPORTS.other;
   const stats = squadActStats(a);
   const comments = (S.folded.comments[a.ref] || []).length;
-  return `<div class="sq-act ${compact ? 'compact' : ''} ${a.pending ? 'pending' : ''}" style="--sc:${sp.color}" onclick="openSquadActivity('${escapeHtml(a.ref)}')">
-    <div class="sq-act-head">${squadAvatar(m, 'sm')}<div class="grow"><div class="sq-act-title">${icon(sp.icon, 'ic-sm')}${escapeHtml(a.title || sp.label)}</div><div class="tiny muted">${escapeHtml(m ? m.name : '')} · ${escapeHtml(formatNiceDate(`${a.date} ${a.start || ''}`.trim(), !!a.start))}</div></div>${a.load ? `<span class="sq-load">${a.load}<small>load</small></span>` : ''}</div>
+  return `<div class="sq-act ${compact ? 'compact' : ''} ${a.pending ? 'pending' : ''}" style="--sc:${sp.color}" onclick="openSquadActivity(${squadArg(a.ref)})">
+    <div class="sq-act-head">${squadAvatar(m, 'sm')}<div class="grow"><div class="sq-act-title">${icon(sp.icon, 'ic-sm')}${escapeHtml(a.title || sp.label)}</div><div class="tiny muted">${escapeHtml(m ? m.name : '')} · ${escapeHtml(formatNiceDate(`${a.date} ${a.start || ''}`.trim(), !!a.start))}${a.name && a.name !== a.title ? ` · ${escapeHtml(a.name)}` : ''}</div></div>${num(a.load) > 0 ? `<span class="sq-load">${Math.round(num(a.load))}<small>load</small></span>` : ''}</div>
     <div class="sq-act-stats">${stats.map(x => `<span>${escapeHtml(x)}</span>`).join('')}</div>
     ${a.pb && a.pb.length ? `<div class="sq-pb">⭐ Personal best: ${escapeHtml(a.pb.join(' · '))}</div>` : ''}
     ${!compact && a.verdict ? `<div class="sq-verdict">“${escapeHtml(a.verdict)}”</div>` : ''}
@@ -1290,7 +1491,7 @@ function squadCrewHtml(S) {
     </div>
     <div class="card sq-invite mt-12">
       <div class="card-title">${icon('link')}Invite</div>
-      <div class="card-sub">Send this code (or the link) to a friend. Up to 6 people.</div>
+      <div class="card-sub">Send this code (or the link) to your friend — a challenge is for two people.</div>
       <div class="sq-code">${escapeHtml(S.ch.invite.slice(0, 4))}-${escapeHtml(S.ch.invite.slice(4))}</div>
       <div class="btn-row"><button class="btn btn-secondary btn-sm" onclick="squadShareInvite()">${icon('share')}Share invite</button><button class="btn btn-secondary btn-sm" onclick="openSquadStart()">${icon('plus')}New challenge</button></div>
     </div>
@@ -1352,7 +1553,7 @@ function squadRenderChat(forceBottom) {
   $('#squadChatSub').textContent = others.length ? others.map(m => `${m.name}${m.last_seen ? ` · seen ${relativeTime(m.last_seen)}` : ''}`).join(' · ') : 'Share the invite code to bring a friend in';
   // Chat timeline: messages, system notes and shared workouts, in server order
   const timeline = S.st.events.concat(Squad.outbox.filter(o => o.cid === Squad.cur).map((o, i) => Object.assign({ seq: 1e12 + i, pending: true }, o.ev)))
-    .filter(e => e.kind === 'msg' || e.kind === 'system' || e.kind === 'activity')
+    .filter(e => e.kind === 'msg' || e.kind === 'system' || e.kind === 'activity' || (e.kind === 'battle' && e.body && e.body.op !== 'decline'))
     .sort((a, b) => a.seq - b.seq);
   // A new arc starts with a clean chat; earlier arcs stay one tap away
   const items = Squad.chatAll ? timeline : timeline.filter(e => squadArcEvent(S, e));
@@ -1369,7 +1570,8 @@ function squadRenderChat(forceBottom) {
       if (!a || shownActs.has(ref) || a.seq !== e.seq && !e.pending) continue; // newest version only
       shownActs.add(ref);
       html += `<div class="sq-msg act-msg">${squadActCardHtml(S, a, true)}</div>`;
-    } else html += squadMsgHtml(S, e);
+    } else if (e.kind === 'battle') html += squadBattleMsgHtml(S, e);
+    else html += squadMsgHtml(S, e);
   }
   if (!items.length) html = `<div class="empty">${icon('chat')}<div><b>Start the banter</b></div><div class="small mt-8">Mention @${SQUAD_AI} to ask the AI anything. Tap a message or a workout to react, reply, or ask for a review or a roast.</div></div>`;
   const typing = Squad.aiBusy[Squad.cur] || (S.ch.ai && S.ch.ai.busy);
@@ -1500,8 +1702,8 @@ function squadRenderActivity() {
     ${a.verdict ? `<div class="sq-verdict mt-8">${escapeHtml(m ? m.name : '')}'s coach: “${escapeHtml(a.verdict)}”</div>` : ''}
     ${a.note ? `<div class="small mt-8">Note: “${escapeHtml(a.note)}”</div>` : ''}
     ${a.laps_line ? `<details class="mt-8"><summary class="small">Every length</summary><div class="tiny muted mt-4">${escapeHtml(a.laps_line)}</div></details>` : ''}
-    <div class="sq-rx-row mt-12">${SQUAD_REACTIONS.map(r => { const who = ((S.folded.reactions[a.ref] || {})[r]) || new Set(); return `<button class="sq-rx ${who.has(S.me) ? 'mine' : ''}" onclick="squadReact('${escapeHtml(a.ref)}', '${r}')">${r}${who.size ? ` ${who.size}` : ''}</button>`; }).join('')}</div>
-    <div class="btn-row mt-12"><button class="btn btn-secondary btn-sm" onclick="squadAskAbout('review', '${escapeHtml(a.ref)}')">🔍 ${SQUAD_AI} review</button><button class="btn btn-secondary btn-sm" onclick="squadAskAbout('roast', '${escapeHtml(a.ref)}')">🔥 Roast</button></div>
+    <div class="sq-rx-row mt-12">${SQUAD_REACTIONS.map(r => { const who = ((S.folded.reactions[a.ref] || {})[r]) || new Set(); return `<button class="sq-rx ${who.has(S.me) ? 'mine' : ''}" onclick="squadReact(${squadArg(a.ref)}, '${r}')">${r}${who.size ? ` ${who.size}` : ''}</button>`; }).join('')}</div>
+    <div class="btn-row mt-12"><button class="btn btn-secondary btn-sm" onclick="squadAskAbout('review', ${squadArg(a.ref)})">🔍 ${SQUAD_AI} review</button><button class="btn btn-secondary btn-sm" onclick="squadAskAbout('roast', ${squadArg(a.ref)})">🔥 Roast</button></div>
     <div class="section-title"><span>Comments</span></div>
     ${comments || '<div class="tiny muted">No comments yet.</div>'}`;
 }

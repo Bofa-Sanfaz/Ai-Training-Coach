@@ -2,7 +2,7 @@
 // --------------------------------------------------------
 // GENERAL UTILITIES: numbers, dates, formatting, markdown
 // --------------------------------------------------------
-const APP_VERSION = '3.9.1';
+const APP_VERSION = '3.10.0';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));

@@ -50,8 +50,8 @@ const EXERCISES = [
   { k: 'strength', label: 'Strength', sport: 'other', type: 'WeightTraining', re: /strength|weight|lift|functional|push.?ups?|pull.?ups?|chin.?ups?|squat|lunge|curl|press|extension|dumbbell|barbell|kettlebell|deadlift|dips?\b|raise|pull.?down|bench|shrug/ },
   { k: 'aerobics', label: 'Aerobics', sport: 'other', type: 'Aerobics', re: /aerobic|step.?class|bodypump/ },
   { k: 'elliptical', label: 'Elliptical', sport: 'other', type: 'Elliptical', re: /ellip|cross.?trainer/ },
-  { k: 'rowing', label: 'Rowing', sport: 'other', type: 'Rowing', re: /row/ },
-  { k: 'stairs', label: 'Stair stepper', sport: 'other', type: 'StairStepper', re: /stair|stepper/ },
+  { k: 'rowing', label: 'Rowing', sport: 'other', type: 'Rowing', re: /\brow(ing)?\b|rower|\berg\b/ },
+  { k: 'stairs', label: 'Stair stepper', sport: 'other', type: 'StairStepper', re: /stair|stepper|step.?machine|stepmill/ },
   { k: 'hiit', label: 'HIIT', sport: 'other', type: 'HighIntensityIntervalTraining', re: /hiit|high.?intensity|interval|circuit/ },
   { k: 'crossfit', label: 'CrossFit', sport: 'other', type: 'Crossfit', re: /crossfit/ },
   { k: 'yoga', label: 'Yoga', sport: 'other', type: 'Yoga', re: /yoga/ },
@@ -63,7 +63,7 @@ const EXERCISES = [
   { k: 'padel', label: 'Padel', sport: 'other', type: 'Padel', re: /padel|paddle/ },
   { k: 'squash', label: 'Squash', sport: 'other', type: 'Squash', re: /squash/ },
   { k: 'badminton', label: 'Badminton', sport: 'other', type: 'Badminton', re: /badminton/ },
-  { k: 'boxing', label: 'Boxing', sport: 'other', type: 'Boxing', re: /box/ },
+  { k: 'boxing', label: 'Boxing', sport: 'other', type: 'Boxing', re: /\bbox(ing)?\b|kick.?box/ },
   { k: 'martial_arts', label: 'Martial arts', sport: 'other', type: 'MartialArts', re: /martial|karate|judo|taekwondo|jiu|mma|kung/ },
   { k: 'dance', label: 'Dance', sport: 'other', type: 'Dance', re: /danc|zumba/ },
   { k: 'jump_rope', label: 'Jump rope', sport: 'other', type: 'JumpRope', re: /rope|skipping/ },
@@ -78,7 +78,7 @@ function exerciseOf(w) {
   const others = EXERCISES.filter(e => e.sport === 'other' && e.re);
   const exact = others.find(e => e.type === (w && w.sport_type) && e.type !== 'Workout');
   if (exact) return exact;
-  const text = `${(w && w.sport_type) || ''} ${(w && w.name) || ''}`.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  const text = `${(w && w.sport_type) || ''} ${(w && w.name) || ''}`.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase();
   return others.find(e => e.re.test(text)) || EXERCISE.other;
 }
 

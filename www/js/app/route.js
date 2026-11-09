@@ -115,7 +115,9 @@ async function shareRideCard() {
 
     g.fillStyle = '#ffffff';
     g.font = '700 74px "Barlow Semi Condensed", sans-serif';
-    const title = rideTitle(w);
+    // The number, with the workout's own name when it has one ("Ride 42 · Evening Ride")
+    const name = String(w.name || '').trim();
+    const title = name && name.toLowerCase() !== rideTitle(w).toLowerCase() ? `${rideTitle(w)} · ${name}` : rideTitle(w);
     g.fillText(title.length > 26 ? `${title.slice(0, 25)}…` : title, 72, 290);
 
     // Route
@@ -137,11 +139,16 @@ async function shareRideCard() {
     }
 
     // Stats grid
+    // In the sport's own units; values marked as data errors (or indoor distance) show "--"
+    const sp = sportOf(w);
+    const km = mv(w, 'distance_km'), kmh = mv(w, 'avg_speed_kmh'), asc = mv(w, 'elevation_gain_m');
+    const dist = num(km) > 0 && sp !== 'other' ? distParts(w, km) : null;
+    const pace = num(kmh) > 0 && sp !== 'other' ? speedParts(w, kmh) : null;
     const stats = [
-      [`${fmtNum(w.distance_km, 1)}`, 'km'],
+      dist ? [dist.v, dist.unit] : [w.calories ? `${Math.round(w.calories)}` : '--', w.calories ? 'kcal' : 'km'],
       [rideDuration(w), 'moving'],
-      [`${fmtNum(w.avg_speed_kmh, 1)}`, 'km/h avg'],
-      [`${Math.round(num(w.elevation_gain_m))}`, 'm climbed'],
+      pace ? [pace.v, `${pace.unit} avg`] : [w.max_hr ? `${w.max_hr}` : '--', 'bpm peak'],
+      sp === 'swim' && w.swim && w.swim.swolf ? [`${Math.round(w.swim.swolf)}`, 'SWOLF'] : [hasVal(asc) && !isIndoor(w) ? `${Math.round(num(asc))}` : '--', 'm climbed'],
       [w.avg_hr ? `${w.avg_hr}` : '--', 'bpm avg'],
       [hasVal(w.trimp) ? `${Math.round(w.trimp)}` : (w.np_w ? `${w.np_w}` : '--'), hasVal(w.trimp) ? 'load (TRIMP)' : 'W NP']
     ];
@@ -167,7 +174,7 @@ async function shareRideCard() {
 
     const b64 = c.toDataURL('image/png').split(',')[1];
     const res = await saveOrShareFile(`RidePartner_${(w.exercise_code || 'ride').replace(/[^A-Za-z0-9]+/g, '_')}.png`, b64, { base64: true, mime: 'image/png', title: rideTitle(w) });
-    if (res.ok) toast(`Ride card ready → ${res.where}`, 'success');
+    if (res.ok) toast(`${SPORTS[sp].label} card ready → ${res.where}`, 'success');
   } catch (e) {
     toast(`Could not create the ride card: ${e.message}`, 'error');
   }

@@ -19,7 +19,9 @@ const MAX_MEMBERS = 2;
 const maxChallenges = env => int(env.SQUAD_MAX_CHALLENGES, 1, 1000, 3);
 const COLORS = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2'];
 const SPORTS = ['ride', 'run', 'walk', 'swim', 'other'];
-const KIND_LIMIT = { msg: 6000, activity: 12000, comment: 3000, reaction: 300, delete: 300, daily: 600 };
+const KIND_LIMIT = { msg: 6000, activity: 12000, comment: 3000, reaction: 300, delete: 300, daily: 600, battle: 1200 };
+const BATTLE_OPS = ['create', 'accept', 'decline', 'cancel'];
+const ACT_NUMBERS = ['dur_s', 'dist_m', 'pace_km', 'pace100', 'speed_kmh', 'swolf', 'pool_m', 'strokes', 'best100', 'reps', 'avg_hr', 'max_hr', 'load', 'steps', 'cadence', 'elev_m', 'rpe', 'calories'];
 const AI_MODES = ['ask', 'review', 'roast', 'report', 'arc'];
 // Daily wellness a member chose to share: field → [min, max]
 const DAILY_FIELDS = { weight_kg: [25, 300], rhr: [25, 150], hrv: [5, 300], sleep_min: [0, 1000], steps: [0, 150000] };
@@ -145,8 +147,11 @@ async function checkEvent(env, ch, me, e) {
     if (!body.text && !body.ai) fail(400, 'empty message');
   } else if (e.kind === 'activity') {
     body.key = str(body.key, 80);
-    if (!body.key || !validDate(body.date)) fail(400, 'activity needs key and date');
+    if (!/^[A-Za-z0-9_.:-]{1,80}$/.test(body.key) || !validDate(body.date)) fail(400, 'activity needs key and date');
     if (!SPORTS.includes(body.sport)) body.sport = 'other';
+    // Numbers stay numbers (they are drawn into the other member's screen)
+    for (const f of ACT_NUMBERS) if (body[f] !== undefined && !(typeof body[f] === 'number' && Number.isFinite(body[f]))) delete body[f];
+    if (body.start !== undefined && !/^\d{2}:\d{2}$/.test(String(body.start))) delete body.start;
   } else if (e.kind === 'daily') {
     if (!validDate(body.date)) fail(400, 'daily needs a date');
     const clean = { date: body.date };
@@ -160,6 +165,26 @@ async function checkEvent(env, ch, me, e) {
     body.emoji = str(body.emoji, 16);
     body.on = body.on !== false;
     if (!ref || !body.emoji) fail(400, 'reaction needs ref and emoji');
+  } else if (e.kind === 'battle') {
+    // Shape only; who may accept or cancel is decided when the log is folded (SquadCore.fold)
+    const bid = str(body.bid, 40);
+    if (!/^[A-Za-z0-9_-]{6,40}$/.test(bid) || !BATTLE_OPS.includes(body.op)) fail(400, 'bad battle');
+    const clean = { op: body.op, bid };
+    if (body.op === 'create') {
+      const from = validDate(body.from), to = validDate(body.to);
+      if (!from || !to || to < from || (Date.parse(to) - Date.parse(from)) / 86400000 > 92) fail(400, 'battle dates: up to 3 months');
+      if (!SquadCore.BATTLE_METRICS.includes(body.metric)) fail(400, 'unknown battle metric');
+      const mode = body.mode === 'same' ? 'same' : 'own';
+      if (mode === 'own' && !['minutes', 'days', 'sessions'].includes(body.metric)) fail(400, 'own-usual battles count minutes, days or sessions');
+      const target = Number(body.target);
+      if (mode === 'same' && !(target > 0 && target <= 100000)) fail(400, 'battle needs a target');
+      Object.assign(clean, {
+        title: str(body.title, 80) || 'Battle', stake: str(body.stake, 80), metric: body.metric, from, to, mode,
+        target: mode === 'same' ? Math.round(target * 10) / 10 : null, finish: body.finish === 'end' ? 'end' : 'first',
+        sport: SPORTS.includes(body.sport) ? body.sport : 'any'
+      });
+    }
+    out.body = clean;
   } else if (e.kind === 'delete') {
     if (!ref) fail(400, 'delete needs ref');
     if (ref.startsWith('act:')) {
@@ -184,7 +209,8 @@ async function createChallenge(env, req) {
   if (ends && ends < starts) fail(400, 'the end date is before the start');
   const name = str(b.name, 60) || 'Our challenge';
   // A private server: strangers can't fill the free database (or the cron's time) with challenges
-  const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM challenges').first();
+  // Only challenges someone is still in count (an abandoned test challenge doesn't block a new one)
+  const count = await env.DB.prepare("SELECT COUNT(DISTINCT challenge_id) AS n FROM members WHERE token_hash != ''").first();
   if (count.n >= maxChallenges(env)) fail(403, 'this server is not taking new challenges');
   const memberId = rid(12), cid = rid(14), t = token(), now = nowIso();
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -280,6 +306,8 @@ async function leave(env, req, cid) {
     // The AI key belongs to the owner: it leaves with him
     if (next) await env.DB.prepare('UPDATE challenges SET owner=?, ai_config=NULL WHERE id=?').bind(next.id, cid).run();
   }
+  // An open arc vote was counting him: it starts over (otherwise it waits for nobody, forever)
+  if (ch.arc_vote) await env.DB.prepare('UPDATE challenges SET arc_vote=NULL WHERE id=?').bind(cid).run();
   await append(env, cid, [systemEvent({ type: 'left', member: me.id, name: me.name })]);
   return json({ ok: true });
 }
@@ -383,7 +411,8 @@ async function arcAction(env, req, cid) {
   if (prev) arcs.push(prev);
   const len = ch.ends ? Math.round((Date.parse(`${ch.ends}T00:00:00Z`) - Date.parse(`${ch.starts}T00:00:00Z`)) / 86400000) : null;
   const ends = len !== null && len > 0 ? dayShift(today, len) : null;
-  const r = await env.DB.prepare('UPDATE challenges SET arc=?, arc_seq=?, arc_vote=NULL, arcs=?, starts=?, ends=? WHERE id=? AND arc=?')
+  // The new arc gets its own final recap at its end (final_done belonged to the arc that ended)
+  const r = await env.DB.prepare("UPDATE challenges SET arc=?, arc_seq=?, arc_vote=NULL, arcs=?, starts=?, ends=?, ai_state=json_remove(COALESCE(ai_state, '{}'), '$.final_done') WHERE id=? AND arc=?")
     .bind(next, ch.seq + 1, JSON.stringify(arcs), today, ends, cid, ch.arc || 0).run();
   if (!r.meta.changes) fail(409, 'the arc just changed — refresh');
   const brief = prev && Object.assign({}, prev, { baselines: undefined }); // the event stays small

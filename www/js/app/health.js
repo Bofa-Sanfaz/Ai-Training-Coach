@@ -230,6 +230,7 @@ async function importHealthWorkouts(H, from, to) {
   const sessSec = s => num(s.duration) || (new Date(s.endDate) - new Date(s.startDate)) / 1000;
   const onStrava = (start, sec = 0) => !!findSameWorkout(all, +start, sec, w => w.source !== 'health');
   // Strava often files watch treadmill / gym-bike sessions as a generic "Workout": take the watch's sport
+  let resported = false;
   for (const s of sessions) {
     const [sport, label, indoor] = HC_TYPES[s.workoutType];
     if (sport === 'other') continue;
@@ -238,6 +239,7 @@ async function importHealthWorkouts(H, from, to) {
     if (twin && !twin.sport && sportOf(twin) === 'other' && ['Workout', 'WeightTraining'].includes(twin.sport_type)) {
       await db.workouts.update(twin.id, { sport, indoor, name: twin.name && !/workout/i.test(twin.name) ? twin.name : label });
       Object.assign(twin, { sport, indoor });
+      resported = true;
     }
   }
   // Walks, hikes, football… → inbox (or straight in, if the athlete chose "always include")
@@ -255,10 +257,9 @@ async function importHealthWorkouts(H, from, to) {
   for (const it of always) {
     const w = await addHealthSession(H, it.raw, inboxSport(it.type), prettyType(it.type), false, all);
     if (w) added.push(w);
-  }  if (added.length) {
-    await renumberRides();
-    await announceNewRecords(recBefore, added.map(w => w.id));
   }
+  if (added.length || resported) await renumberRides(); // a new sport means a new number
+  if (added.length) await announceNewRecords(recBefore, added.map(w => w.id));
   return added.length;
 }
 
@@ -337,7 +338,7 @@ async function importSamsungSwims(full = false) {
   const deleted = await deletedWorkoutIds();
   const localDate = d => `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const inboxItems = [];
-  let added = 0;
+  let added = 0, resported = false;
   for (const s of (res && res.sessions) || []) {
     const start = new Date(s.start);
     const sid = -Math.round(start.getTime() / 1000);
@@ -358,6 +359,8 @@ async function importSamsungSwims(full = false) {
       // Strava filed a watch treadmill / gym-bike session as a generic "Workout": take the watch's sport
       if (twin.source !== 'health' && !twin.sport && sportOf(twin) === 'other' && sport !== 'other' && ['Workout', 'WeightTraining'].includes(twin.sport_type)) {
         await db.workouts.update(twin.id, { sport, indoor: kind[1] });
+        Object.assign(twin, { sport, indoor: kind[1] });
+        resported = true;
       }
       // Sessions imported earlier from Samsung Health gain the newer detail (laps, SWOLF, cadence…)
       if (String(twin.hc_type || '').startsWith('shd:') && twin.shd_v !== 2) {
@@ -404,10 +407,8 @@ async function importSamsungSwims(full = false) {
   if (inboxItems.length) for (const it of await routeToInbox(inboxItems)) if (await addSamsungSummary(it)) added++;
   await setConfig('swims_sdk_scanned', new Date().toISOString());
   await setConfig('shd_ver', '2');
-  if (added) {
-    await renumberRides();
-    await announceNewRecords(recBefore, all.slice(-added).map(w => w.id));
-  }
+  if (added || resported) await renumberRides();
+  if (added) await announceNewRecords(recBefore, all.slice(-added).map(w => w.id));
   return added;
 }
 
