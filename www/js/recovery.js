@@ -4,19 +4,15 @@
 // still works if the main app (or a library) fails to load.
 //  - Counts boot attempts; main.js resets the counter on success.
 //  - After 2 failed boots, or a boot that hangs, shows a recovery
-//    screen: retry, switch to the Classic (v2) interface,
-//    roll data back to the last restore point, or export raw data.
+//    screen: retry, roll data back to the last restore point, or export raw data.
 // --------------------------------------------------------
 (function () {
   'use strict';
   function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) {} }
 
-  // Remembered UI choice: classic rollback build
-  if (lsGet('rp_ui') === 'classic' && location.search.indexOf('modern') < 0) {
-    location.replace('classic.html');
-    return;
-  }
+  // The Classic (v2) rollback is gone: forget an old choice of it
+  try { window.localStorage.removeItem('rp_ui'); } catch (e) {}
 
   // Light is the default look; dark only when the rider picks it (or "System" on a dark phone)
   var theme = lsGet('rp_theme') || 'light';
@@ -154,14 +150,12 @@
       '<p style="color:#9fb0cf;font-size:14px;line-height:1.5;margin:0 0 6px;">' + (reason || 'Training Partner had trouble starting.') + ' Your data is stored on this phone and has not been deleted. Choose an option:</p>' +
       (errs ? '<pre style="white-space:pre-wrap;background:#111a2c;color:#f87171;padding:10px;border-radius:10px;font-size:11px;">' + errs.replace(/</g, '&lt;') + '</pre>' : '') +
       '<button id="rpRetry" style="' + btn + 'background:#fc5200;color:#fff;">Try again</button>' +
-      '<button id="rpClassic" style="' + btn + 'background:#1b2842;color:#fff;">Open Classic version (v2)</button>' +
       '<button id="rpRollback" style="' + btn + 'background:#1b2842;color:#fff;">Roll back data to last restore point</button>' +
       '<button id="rpExport" style="' + btn + 'background:#1b2842;color:#fff;">Export my data (JSON)</button>' +
       '<p id="rpRecoveryStatus" style="color:#38bdf8;font-size:13px;margin-top:14px;"></p>' +
       '</div>';
     document.body.appendChild(box);
     document.getElementById('rpRetry').onclick = function () { lsSet('rp_boot_fail', '0'); location.reload(); };
-    document.getElementById('rpClassic').onclick = function () { lsSet('rp_ui', 'classic'); lsSet('rp_boot_fail', '0'); location.href = 'classic.html'; };
     document.getElementById('rpRollback').onclick = rollbackData;
     document.getElementById('rpExport').onclick = exportRaw;
   };

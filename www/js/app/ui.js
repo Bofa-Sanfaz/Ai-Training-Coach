@@ -195,6 +195,29 @@ function openPanel(id, onClose) {
   pushBack(`panel:${id}`, () => closePanel(id));
 }
 
+// ---------- Sub-tabs: one section of a busy screen at a time (Trends, Compare) ----------
+// Markup: <div class="segmented subtabs" data-subtabs="trends"><button data-sub="form">…
+//         <div class="subpane" data-subpane="trends:form">…  The last choice is remembered.
+const SUBTAB_DEFAULT = { trends: 'form', compare: 'summary' };
+const SUBTAB_REDRAW = { 'trends:form': () => renderLoadChart(), 'trends:volume': () => renderWeeklyChart(), 'trends:progress': () => renderGlobalGraph() };
+function showSub(screen, key) {
+  const tabs = $$(`[data-subtabs="${screen}"] button`);
+  if (!key) { try { key = localStorage.getItem(`rp_sub_${screen}`); } catch (e) {} }
+  if (!tabs.some(b => b.dataset.sub === key)) key = SUBTAB_DEFAULT[screen] || (tabs[0] && tabs[0].dataset.sub);
+  try { localStorage.setItem(`rp_sub_${screen}`, key); } catch (e) {}
+  tabs.forEach(b => b.classList.toggle('active', b.dataset.sub === key));
+  $$(`[data-subpane^="${screen}:"]`).forEach(p => p.classList.toggle('hidden', p.dataset.subpane !== `${screen}:${key}`));
+  const pane = $(`[data-subpane="${screen}:${key}"]`);
+  if (!pane) return;
+  // Charts drawn while hidden were parked: draw them now (with their tap/hover handlers)
+  setTimeout(() => {
+    const redraw = SUBTAB_REDRAW[`${screen}:${key}`];
+    if (redraw && typeof trendsCache !== 'undefined' && trendsCache) { try { redraw(); } catch (e) { console.warn('subtab redraw', e); } }
+    if (typeof resizeChartsIn === 'function') resizeChartsIn(pane);
+    pane.querySelectorAll('.cmp-bar i').forEach((el, i) => setTimeout(() => el.classList.add('go'), 20 * i));
+  }, 30);
+}
+
 function closePanel(id) {
   const el = document.getElementById(id);
   if (!el || !el.classList.contains('open')) return;

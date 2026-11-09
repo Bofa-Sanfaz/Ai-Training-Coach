@@ -10,7 +10,7 @@ const PLAN_TYPES = {
   rest: { label: 'Rest', color: '#94a3b8' },
   recovery: { label: 'Recovery', color: '#94a3b8' },
   endurance: { label: 'Endurance', color: '#16a34a' },
-  long: { label: 'Long ride', color: '#16a34a' },
+  long: { label: 'Long session', color: '#16a34a' },
   tempo: { label: 'Tempo', color: '#eab308' },
   threshold: { label: 'Threshold', color: '#fc5200' },
   vo2: { label: 'VO2max', color: '#ef4444' },
@@ -173,7 +173,7 @@ async function applyPlanChanges(change, source) {
     const scope = ['this_week', 'next_week', 'default'].includes(change.targets.scope) ? change.targets.scope : 'this_week';
     const cur = await getWeeklyGoals(scope === 'default' ? null : formatLocalDate(addDays(startOfWeek(new Date()), scope === 'next_week' ? 7 : 0)));
     await setTargets(scope, Object.assign({}, cur, change.targets));
-    applied.push(`Targets (${scope.replace('_', ' ')}): ${[change.targets.km ? `${change.targets.km} km` : '', change.targets.hours ? `${change.targets.hours} h` : '', change.targets.rides ? `${change.targets.rides} rides` : ''].filter(Boolean).join(', ') || 'updated'}`);
+    applied.push(`Targets (${scope.replace('_', ' ')}): ${[change.targets.km ? `${change.targets.km} km` : '', change.targets.hours ? `${change.targets.hours} h` : '', change.targets.rides ? `${change.targets.rides} sessions` : ''].filter(Boolean).join(', ') || 'updated'}`);
   }
   return applied;
 }
@@ -184,7 +184,7 @@ function describePlanChange(change) {
   for (const d of change.template || []) lines.push(`Every ${d.weekday} → ${d.title || d.type}${d.duration_min ? ` · ${d.duration_min} min` : ''}${d.zone ? ` · ${d.zone}` : ''}`);
   if (change.targets) {
     const t = change.targets;
-    lines.push(`Weekly targets (${String(t.scope || 'this_week').replace('_', ' ')}) → ${[t.km ? `${t.km} km` : '', t.hours ? `${t.hours} h` : '', t.rides ? `${t.rides} rides` : '', t.note || ''].filter(Boolean).join(' · ')}`);
+    lines.push(`Weekly targets (${String(t.scope || 'this_week').replace('_', ' ')}) → ${[t.km ? `${t.km} km` : '', t.hours ? `${t.hours} h` : '', t.rides ? `${t.rides} sessions` : '', t.note || ''].filter(Boolean).join(' · ')}`);
   }
   return lines;
 }
@@ -201,7 +201,7 @@ function parsePlanJson(text) {
 
 async function generateWeekPlan() {
   if (planBusy) return;
-  const ok = await uiConfirm('Re-plan the next 7 days?', 'The AI adapts your weekly template to your current form, targets and recent rides. Your template itself is not changed — only these 7 days. You can reset any day back to your template.', { okText: 'Plan with AI' });
+  const ok = await uiConfirm('Re-plan the next 7 days?', 'The AI adapts your weekly template to your current form, targets and recent workouts. Your template itself is not changed — only these 7 days. You can reset any day back to your template.', { okText: 'Plan with AI' });
   if (!ok) return;
   planBusy = true;
   const btn = $('#btnPlan');
@@ -252,7 +252,7 @@ async function planCardHtml() {
     </div>`;
   }).join('');
 
-  const tgt = [targets.km ? `${targets.km} km` : '', targets.hours ? `${targets.hours} h` : '', targets.rides ? `${targets.rides} rides` : ''].filter(Boolean).join(' · ');
+  const tgt = [targets.km ? `${targets.km} km` : '', targets.hours ? `${targets.hours} h` : '', targets.rides ? `${targets.rides} sessions` : ''].filter(Boolean).join(' · ');
   return `<div class="card plan-card">
     <div class="row between">
       <div class="card-title">${icon('calendar')}Training plan</div>

@@ -197,7 +197,9 @@ async function renderComparison() {
       <div class="cmp-head"><span>${escapeHtml(name)}</span>${delta}</div>
       ${bar(a, 'a', disp(w1, 0))}${bar(b, 'b', disp(w2, 1), `style="--c:${color}"`)}${w3 ? bar(c, 'c', disp(w3, 2)) : ''}
     </div>`;
-  }).join('');
+  });
+  // Summary = the four that tell the story; All numbers = every row; Zones apart (sub-tabs)
+  const keyCells = cells.slice(0, 4).join(''), allCells = cells.join('');
 
   const zoneRow = (w, tag) => {
     const z = mv(w, 'zone_seconds');
@@ -205,15 +207,13 @@ async function renderComparison() {
     return `<div class="cmp-zone"><span class="cp-tag ${tag}">${tag.toUpperCase()}</span>${tot ? `<div class="zone-strip grow">${z.map((s, i) => `<span style="width:${(num(s) / tot) * 100}%;background:${PHYSIO.zones[i].color}"></span>`).join('')}</div>` : '<span class="tiny muted grow">no heart-rate zones</span>'}</div>`;
   };
 
+  const legend = `<div class="cmp-legend"><span><i class="lg a"></i>A · ${escapeHtml(rideCode(w1))} · ${escapeHtml(formatNiceDate(w1.date, false))}</span><span><i class="lg b" style="background:${color}"></i>B · ${escapeHtml(rideCode(w2))} · ${escapeHtml(formatNiceDate(w2.date, false))}</span>${w3 ? `<span><i class="lg c"></i>C · ${escapeHtml(rideCode(w3))}</span>` : ''}</div>`;
+  const hint = '<div class="hint mt-8">Green = better for B. Efficiency = speed per 100 heartbeats. Values marked as data errors are left out.</div>';
   $('#compareTableContainer').innerHTML = `
-    <div class="card cmp-card">
-      <div class="cmp-legend"><span><i class="lg a"></i>A · ${escapeHtml(rideCode(w1))} · ${escapeHtml(formatNiceDate(w1.date, false))}</span><span><i class="lg b" style="background:${color}"></i>B · ${escapeHtml(rideCode(w2))} · ${escapeHtml(formatNiceDate(w2.date, false))}</span>${w3 ? `<span><i class="lg c"></i>C · ${escapeHtml(rideCode(w3))}</span>` : ''}</div>
-      ${cells}
-      <div class="cmp-head mt-12"><span>Time in heart-rate zones</span></div>
-      ${zoneRow(w1, 'a')}${zoneRow(w2, 'b')}${w3 ? zoneRow(w3, 'c') : ''}
-      <div class="hint mt-8">Green = better for B. Efficiency = speed per 100 heartbeats. Values marked as data errors are left out.</div>
-    </div>`;
-  requestAnimationFrame(() => $$('#compareTableContainer .cmp-bar i').forEach((el, i) => setTimeout(() => el.classList.add('go'), 25 * i)));
+    <div class="subpane" data-subpane="compare:summary"><div class="card cmp-card">${legend}${keyCells}${cells.length > 4 ? `<button class="btn btn-ghost btn-xs mt-8" onclick="showSub('compare', 'all')">All ${cells.length} numbers →</button>` : ''}${hint}</div></div>
+    <div class="subpane" data-subpane="compare:all"><div class="card cmp-card">${legend}${allCells}${hint}</div></div>
+    <div class="subpane" data-subpane="compare:zones"><div class="card cmp-card">${legend}<div class="cmp-head"><span>Time in heart-rate zones</span></div>${zoneRow(w1, 'a')}${zoneRow(w2, 'b')}${w3 ? zoneRow(w3, 'c') : ''}</div></div>`;
+  showSub('compare');
 
   renderCompareChart(list);
   const saved = await getJsonConfig(`compare_ai_${compareKey(list)}`, null);

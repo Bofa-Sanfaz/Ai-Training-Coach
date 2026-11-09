@@ -1075,6 +1075,23 @@ span.agent-chip { cursor: default; }
 .sq-bar-t { height: 8px; border-radius: 6px; background: var(--surface-3); overflow: hidden; }
 .sq-bar-t i { display: block; height: 100%; border-radius: 6px; transition: width 0.8s var(--ease); }
 .sq-bar-v { text-align: right; color: var(--muted); font-weight: 700; }
+/* Sub-tabs on busy screens (Trends, Compare): one section at a time */
+.subtabs { position: sticky; top: calc(var(--appbar-h, 56px) + 4px); z-index: 5; margin: 4px 0 12px; overflow-x: auto; scrollbar-width: none; box-shadow: 0 6px 16px -10px rgba(15, 23, 42, .25); }
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs button { font-size: 0.76rem; padding: 9px 6px; white-space: nowrap; min-width: 0; }
+.subpane > .section-title:first-child { margin-top: 4px; }
+.det-chat-btn { width: 100%; }
+
+/* One fold for "more detail" everywhere: essentials stay on screen, the rest one tap away */
+.more-block { margin: 14px 0 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.more-block > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 14px; font-weight: 750; font-size: 0.9rem; }
+.more-block > summary::-webkit-details-marker { display: none; }
+.more-block > summary::after { content: ""; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin: -4px 4px 0 0; transition: transform 0.2s var(--ease); flex-shrink: 0; }
+.more-block[open] > summary::after { transform: rotate(-135deg); margin-top: 4px; }
+.more-block > summary > span:first-child { flex: 1; }
+.more-block[open] { padding-bottom: 6px; }
+.more-block > :not(summary) { margin-left: 12px; margin-right: 12px; }
+
 /* Profile: four groups instead of one long scroll */
 .profile-groups { position: sticky; top: calc(var(--appbar-h, 56px) + 4px); z-index: 5; margin-bottom: 12px; box-shadow: 0 6px 16px -10px rgba(15, 23, 42, .25); }
 .profile-groups button { font-size: 0.76rem; padding: 9px 4px; }
@@ -1282,7 +1299,8 @@ span.agent-chip { cursor: default; }
 .intro-ok { display: flex; gap: 8px; align-items: center; background: var(--good-soft); color: var(--good); border-radius: 12px; padding: 10px 12px; font-size: 0.86rem; margin-bottom: 12px; }
 .intro-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px calc(env(safe-area-inset-bottom) + 12px); border-top: 1px solid var(--border); background: var(--surface); }
 .intro-foot .btn { width: auto; }
-.sq-quick { grid-template-columns: repeat(5, 1fr); }
+.sq-quick { grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); }
+.is-native .web-only { display: none !important; }
 .sq-quick button { font-size: 0.66rem; padding: 10px 2px; }
 
 /* Manual log form */

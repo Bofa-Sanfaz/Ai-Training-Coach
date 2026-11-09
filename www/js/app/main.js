@@ -108,7 +108,7 @@ const WHATS_NEW = `
 - Search and filter rides; month grouping
 - Editable max/resting HR and zones (used everywhere, incl. AI prompts)
 - Export backups and PDFs through the Android share sheet
-- **Restore points** and a **Classic (v2) rollback** in Profile → Backup & rollback
+- **Restore points** in Profile → App & backup
 - Demo rides to explore the app without Strava
 
 ### Fixes
@@ -207,6 +207,9 @@ async function boot() {
     if (shot) { shot.className = 'btn btn-primary btn-sm'; shot.innerHTML = `${icon('camera')}<span>Screenshot</span>`; }
     try { await accountBoot(); } catch (e) { console.warn('account', e); }
   }
+  // The owner's phone syncs by itself (Strava + watch): screenshots and logging by hand are the
+  // friend's tools, so they stay out of his way (.web-only)
+  document.documentElement.classList.toggle('is-native', isNative());
   // First run (fresh install / friend's web app): the introduction, which also handles an invite link
   let intro = false;
   try { intro = await introNeeded(); } catch (e) { console.warn('intro', e); }
@@ -291,7 +294,7 @@ async function refreshStaleMetrics() {
     if (!stale.length) return;
     for (const w of stale) await ensureRideMetrics(w, undefined, true);
     if (Router.current === 'rides' && !$$('.panel.open').length) await renderRides();
-    if (stale.length > 2) toast(`Updated metrics for ${stale.length} rides`, 'success', 2200);
+    if (stale.length > 2) toast(`Updated metrics for ${stale.length} workouts`, 'success', 2200);
   } catch (e) {
     console.warn('Background metric refresh failed', e);
   }

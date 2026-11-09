@@ -30,13 +30,16 @@ async function renderCoachList() {
         <div class="thread-snippet">${lastMaster ? escapeHtml(String(lastMaster.message).slice(0, 80)) : 'Knows your whole season, your plan and targets — and can change them when you ask.'}</div>
       </div>
     </div>
-    ${await planCardHtml()}
-    <div class="section-title"><span>Ride conversations</span><span class="tiny muted">${workouts.length}</span></div>`;
+    <div class="section-title"><span>Workout chats</span><span class="tiny muted">${coachShowAll ? `all ${workouts.length}` : 'latest'}</span></div>`;
 
   if (!workouts.length) {
-    html += `<div class="empty">${icon('chat')}<div><b>No rides yet</b></div><div class="small mt-8">Each synced ride gets its own coach thread.</div></div>`;
+    html += `<div class="empty">${icon('chat')}<div><b>No workouts yet</b></div><div class="small mt-8">Each workout gets its own coach chat.</div></div>`;
   }
-  for (const w of workouts.slice(0, 300)) {
+  // By default only the workouts you've talked about, most recent first; every workout one tap away
+  const last = w => (byRide.get(Number(w.strava_id)) || {}).last;
+  const talked = workouts.filter(w => last(w)).sort((a, b) => String(last(b).created_at || '').localeCompare(String(last(a).created_at || '')));
+  const list = coachShowAll ? workouts.slice(0, 300) : (talked.length ? talked : workouts).slice(0, 8);
+  for (const w of list) {
     const e = byRide.get(Number(w.strava_id));
     const badge = !e || !e.coach ? '<span class="badge badge-new">New</span>' : (w.debrief_stale ? '<span class="badge badge-stale">Update</span>' : '');
     const snippet = e && e.last ? String(e.last.message).slice(0, 70) : [sportOf(w) === 'other' ? '' : distText(w), sportOf(w) === 'other' ? rideDuration(w) : speedText(w), `${w.avg_hr || '--'} bpm`].filter(Boolean).join(' · ');
@@ -49,8 +52,16 @@ async function renderCoachList() {
         </div>
       </div>`;
   }
+  if (workouts.length > list.length || coachShowAll) html += `<div class="center mt-12"><button class="btn btn-ghost btn-sm" onclick="coachShowAll = !coachShowAll; renderCoachList()">${coachShowAll ? 'Show only recent chats' : `Show all ${workouts.length} workouts`}</button></div>`;
+  // The weekly plan and targets: kept, but out of the way
+  html += `<details class="more-block mt-16" ${coachPlanOpen ? 'open' : ''} ontoggle="coachPlanOpen = this.open">
+    <summary><span>Training plan &amp; weekly targets</span><span class="tiny muted">optional</span></summary>
+    ${await planCardHtml()}
+  </details>`;
   host.innerHTML = html;
 }
+let coachShowAll = false;
+let coachPlanOpen = false;
 
 async function openMasterThread() {
   openPanel('threadPanel', () => { if (Router.current === 'coach') renderCoachList(); });
@@ -180,7 +191,7 @@ async function resolveProposal(id, apply) {
 }
 
 async function resetMasterThread() {
-  const ok = await uiConfirm(`Reset ${AETHER}?`, `This deletes the whole conversation with ${AETHER}. Your plan, targets and ride threads are not affected.`, { okText: 'Reset', danger: true });
+  const ok = await uiConfirm(`Reset ${AETHER}?`, `This deletes the whole conversation with ${AETHER}. Your plan, targets and workout chats are not affected.`, { okText: 'Reset', danger: true });
   if (!ok) return;
   await db.master_chat.clear();
   clearAttachment('HUB');

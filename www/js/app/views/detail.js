@@ -11,7 +11,7 @@ const attachments = { RIDE: null, HUB: null };
 
 async function openRide(id, { keepScroll = false, scrollToCoach = false } = {}) {
   const w = await db.workouts.get(id);
-  if (!w) { toast('Ride not found.', 'error'); return; }
+  if (!w) { toast('Workout not found.', 'error'); return; }
   const row = await db.streams.get(Number(w.strava_id));
   activeStream = row ? row.stream_data : null;
   currentWorkout = await ensureRideMetrics(w, activeStream);

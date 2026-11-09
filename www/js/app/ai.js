@@ -405,13 +405,13 @@ async function buildCompactPriorContinuum(target, limit) {
     const gap = prev ? ` (+${formatRecoveryGap(recoveryGapMs(prev, p))})` : '';
     lines.push(rideLedgerLine(p, await getAthleteWeightForDate(p.date, weights), note && note.message).replace(']: ', `${gap}]: `));
   }
-  let gapText = 'First ride in the series.';
+  let gapText = 'First session in the series.';
   if (prior.length) {
     const last = prior[prior.length - 1];
     gapText = `${formatRecoveryGap(recoveryGapMs(last, target))} since the end of the previous workout (${codeOf(last)}, ${formatFullDateWithDay(last.date)}).`;
   }
   const older = prior.length - recent.length;
-  return { continuumText: (older > 0 ? `(${older} older rides not listed)\n` : '') + lines.join('\n'), targetRecoveryGapText: gapText };
+  return { continuumText: (older > 0 ? `(${older} older sessions not listed)\n` : '') + lines.join('\n'), targetRecoveryGapText: gapText };
 }
 
 async function header(agent, roleLine, ctx) {

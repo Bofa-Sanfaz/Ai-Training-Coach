@@ -1120,8 +1120,8 @@ function squadHomeHtml(S) {
     ${squadTodayHtml(S)}
     ${squadChatRowHtml(S)}
     <div class="sq-quick">
-      <button onclick="openManualWorkout()">${icon('plus')}<span>Log workout</span></button>
-      <button onclick="openSquadImport()">${icon('camera')}<span>Screenshot</span></button>
+      ${isNative() ? '' : `<button onclick="openManualWorkout()">${icon('plus')}<span>Log workout</span></button>
+      <button onclick="openSquadImport()">${icon('camera')}<span>Screenshot</span></button>`}
       <button onclick="openSquadWeight()">${icon('scale')}<span>Log weight</span></button>
       <button onclick="openPhotos()">${icon('image')}<span>Photos</span></button>
       <button onclick="squadAskQuick()">${icon('sparkle')}<span>Ask ${SQUAD_AI}</span></button>
@@ -1199,8 +1199,11 @@ function squadBoardHtml(S) {
       <div class="sq-badges">${t.pbs ? `<span class="badge badge-intent">⭐ ${t.pbs} PB</span>` : ''}${x.streak >= 3 ? `<span class="badge badge-stale">🔥 ${x.streak}-day streak</span>` : ''}${t.points.bonus ? `<span class="badge badge-ok">+${Math.round(t.points.bonus)} bonus</span>` : ''}${x.baseline_from_challenge ? '<span class="badge badge-play">baseline: first week</span>' : ''}</div>
     </div>`;
   }).join('');
-  return `<div class="section-title"><span>Points this week</span><button class="btn btn-ghost btn-xs" onclick="openSquadRules()">${icon('info', 'ic-sm')}How scoring works</button></div>
-    <div class="sq-score-grid">${cards}</div>`;
+  return `<details class="more-block">
+      <summary><span>Points this week, in detail</span><span class="tiny muted">consistency · volume · improvement</span></summary>
+      <div class="sq-score-grid">${cards}</div>
+      <button class="btn btn-ghost btn-xs mt-8" onclick="openSquadRules()">${icon('info', 'ic-sm')}How scoring works</button>
+    </details>`;
 }
 
 // ---------- BATTLES ----------
@@ -1438,7 +1441,7 @@ function squadFeedHtml(S) {
     if (a.date !== day) { day = a.date; html += `<div class="month-head"><span>${escapeHtml(formatNiceDate(a.date, false))}</span></div>`; }
     html += squadActCardHtml(S, a);
   }
-  return `<div class="row between mb-8"><div class="tiny muted">${acts.length} workout${acts.length === 1 ? '' : 's'}</div><button class="btn btn-secondary btn-xs" onclick="openSquadImport()">${icon('camera', 'ic-sm')}Add from screenshot</button></div>
+  return `<div class="row between mb-8"><div class="tiny muted">${acts.length} workout${acts.length === 1 ? '' : 's'}</div>${isNative() ? '' : `<button class="btn btn-secondary btn-xs" onclick="openSquadImport()">${icon('camera', 'ic-sm')}Add from screenshot</button>`}</div>
     <div class="chip-rack mb-8">${chip('all', 'All')}${people.map(m => chip(m.id, escapeHtml(m.id === S.me ? 'Me' : m.name))).join('')}${sports.map(s => chip(s, `${icon(SPORTS[s].icon, 'ic-sm')}${SPORTS[s].plural}`)).join('')}</div>
     ${html || squadNoActsHtml()}
     ${older ? `<div class="center mt-12"><button class="btn btn-ghost btn-sm" onclick="Squad.feedAll=!Squad.feedAll; renderSquad()">${Squad.feedAll ? `Only Arc ${S.ch.arc}` : `Show ${older} from earlier arcs`}</button></div>` : ''}`;

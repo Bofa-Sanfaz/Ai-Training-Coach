@@ -50,6 +50,7 @@ async function renderTrends() {
   $('#sportSegTrends').innerHTML = sportSegHtml(everything, 'setSportFilter');
   const workouts = bySport(everything, sportFilter);
   trendsCache = { workouts, everything, series: computeLoadSeries(workouts) };
+  showSub('trends');
   renderLoadKpis();
   renderLoadChart();
   renderCalendar();
@@ -63,7 +64,7 @@ function renderLoadKpis() {
   const s = trendsCache.series;
   const host = $('#loadKpis');
   if (!s) {
-    host.innerHTML = `<div class="kpi" style="grid-column:1/-1"><div class="l">Training load</div><div class="s mt-8">Needs rides with heart-rate data. Sync Strava or load demo rides.</div></div>`;
+    host.innerHTML = `<div class="kpi" style="grid-column:1/-1"><div class="l">Training load</div><div class="s mt-8">Needs workouts with heart-rate data. Sync, or load demo rides in Profile → App &amp; backup.</div></div>`;
     return;
   }
   const i = s.dates.length - 1;
@@ -281,7 +282,7 @@ function renderGlobalGraph() {
     $('#global_banner_r').textContent = b ? signed(((a - b) / b) * 100, 1, '%') : '--';
   } else {
     $('#global_banner_l').textContent = 'Macro trajectory';
-    $('#global_banner_r').textContent = `${workouts.length} rides`;
+    $('#global_banner_r').textContent = `${workouts.length} sessions`;
   }
 
   const width = Math.max(el.parentElement.clientWidth - 12, workouts.length * 46);
@@ -316,7 +317,7 @@ async function renderGraphChatThread(extra = '') {
 async function generateGraphDebrief() {
   if (graphAiBusy) return;
   const workouts = await db.workouts.orderBy('date').toArray();
-  if (workouts.length < 2) { toast('Log at least 2 rides first.', 'warn'); return; }
+  if (workouts.length < 2) { toast('Log at least 2 workouts first.', 'warn'); return; }
   graphAiBusy = true;
   const btn = $('#btnGraphAI');
   setBusy(btn, true, 'Auditing season…');

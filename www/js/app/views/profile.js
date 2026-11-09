@@ -53,6 +53,9 @@ async function renderProfile() {
   $('#stravaState').innerHTML = connected
     ? `<span class="pos">● Connected to Strava</span>`
     : `<span class="neu">Not connected — save your Client Secret, then sign in.</span>`;
+  // Connected: the keys stay folded away; not yet: the setup is open
+  if ($('#stravaStateTop')) $('#stravaStateTop').innerHTML = $('#stravaState').innerHTML;
+  if ($('#stravaSetup') && !$('#stravaSetup').dataset.touched) { $('#stravaSetup').open = !connected; $('#stravaSetup').ontoggle = () => { $('#stravaSetup').dataset.touched = '1'; }; }
 
   const today = formatLocalDate(new Date());
   if (!$('#cfg_weight_date').value) $('#cfg_weight_date').value = today;
@@ -428,8 +431,8 @@ function setHaptics(on) {
 }
 
 async function recalculateAll(silentConfirm = false) {
-  if (!silentConfirm && !(await uiConfirm('Recalculate all rides?', 'Zone time, VAM, drift and training load are recomputed from the stored streams.', { okText: 'Recalculate' }))) return;
-  toast('Recalculating ride metrics…', 'info', 1500);
+  if (!silentConfirm && !(await uiConfirm('Recalculate all workouts?', 'Zone time, VAM, drift and training load are recomputed from the stored streams.', { okText: 'Recalculate' }))) return;
+  toast('Recalculating workout metrics…', 'info', 1500);
   const n = await recomputeAllMetrics();
   populateZoneSelect();
   toast(`Recalculated ${n} ride${n === 1 ? '' : 's'}`, 'success');
@@ -473,7 +476,7 @@ async function importDatabaseJson(event) {
     toast('Restoring backup…', 'info', 2500);
     await createRestorePoint('Before importing a backup file', 'auto');
     await restoreDump(data, { preserveSecrets: true });
-    await afterDataReplaced(`Restored ${data.workouts.length} rides`);
+    await afterDataReplaced(`Restored ${data.workouts.length} workouts`);
     haptic('success');
     switchTab('rides');
   } catch (e) {
@@ -509,7 +512,7 @@ async function createManualRestorePoint() {
 }
 
 async function rollbackTo(id) {
-  const ok = await uiConfirm('Roll back data?', 'Rides, chats and settings return to this restore point. Your current state is saved as a new restore point first, so this can be undone.', { okText: 'Roll back' });
+  const ok = await uiConfirm('Roll back data?', 'Workouts, chats and settings return to this restore point. Your current state is saved as a new restore point first, so this can be undone.', { okText: 'Roll back' });
   if (!ok) return;
   try {
     await rollbackToRestorePoint(id);
@@ -523,14 +526,6 @@ async function removeRestorePoint(id) {
   if (!(await uiConfirm('Delete restore point?', 'This cannot be undone.', { okText: 'Delete', danger: true }))) return;
   await deleteRestorePoint(id);
   await renderRestorePoints();
-}
-
-async function switchToClassic() {
-  const ok = await uiConfirm('Open Classic version?', 'Switches to the previous v2 interface. Your rides and chats are shared. Use the "Use v3" button at the top of Classic to come back.', { okText: 'Switch' });
-  if (!ok) return;
-  await createRestorePoint('Before switching to Classic v2', 'auto');
-  try { localStorage.setItem('rp_ui', 'classic'); } catch (e) {}
-  location.href = 'classic.html';
 }
 
 // --------------------------------------------------------

@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.12.0 — 2026-11-09 · less cramped
+- Trends and Compare show one section at a time (sub-tabs: Form · Calendar · Volume · Progress · Bests · AI / Summary · All numbers · Zones · Chart · AI; `showSub` in `ui.js`, choice remembered). All numbers kept.
+- Coach: Aether + recent workout chats first ("Show all"), training plan folded. Workout page: "Chat with your coach" button near the top.
+- Profile simpler: goals, zone limits/TRIMP/FTP, Strava keys (open until connected), Samsung swim options, model per coach, restore points and diagnostics under folds.
+- Owner's Android app: Screenshot / Log hidden (`.web-only`, friend's tools); Classic (v2) rollback removed (Profile and recovery screen). Training list shows 30 latest + "Show older".
+- Wording: "rides" → "workouts" where it means all sports.
+
 ## 3.11.1 — 2026-11-09 · design pass (contrast, tap targets)
 - Automated audit of every tab in light and dark (WCAG AA text contrast, tap targets ≥ 32 px): ~120 findings → a handful of decorative ones.
 - Colour tokens: brand split into `--brand-fill` (orange behind white text, 5.0:1) and `--brand-text` (orange as text: #c2410c light, #ff8a3d dark); darker `--muted` (#586579), `--good`, `--info`, `--bad`, `--lab-accent`, `--lab-pink`; lighter red for dark mode. All 44 orange-text uses and the white-on-orange fills (primary buttons, send, badges) moved to the right token. "This week" hero gradient deepened so its white labels stay readable.

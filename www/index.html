@@ -103,8 +103,8 @@
         <div class="screen-sub" id="ridesSub">Loading…</div>
       </div>
       <div class="row" style="gap:6px">
-        <button class="btn btn-secondary btn-sm" id="btnShot" onclick="openSquadImport()" aria-label="Add workouts from screenshots"><svg class="ic"><use href="#i-camera"/></svg></button>
-        <button class="btn btn-secondary btn-sm" onclick="openManualWorkout()" aria-label="Log a workout by hand"><svg class="ic"><use href="#i-plus"/></svg><span>Log</span></button>
+        <button class="btn btn-secondary btn-sm web-only" id="btnShot" onclick="openSquadImport()" aria-label="Add workouts from screenshots"><svg class="ic"><use href="#i-camera"/></svg></button>
+        <button class="btn btn-secondary btn-sm web-only" onclick="openManualWorkout()" aria-label="Log a workout by hand"><svg class="ic"><use href="#i-plus"/></svg><span>Log</span></button>
         <button id="btnSync" class="btn btn-primary btn-sm" onclick="syncAll()"><svg class="ic"><use href="#i-refresh"/></svg><span>Sync</span></button>
       </div>
     </div>
@@ -139,7 +139,9 @@
       </div>
     </div>
     <div id="sportSegTrends" class="mb-8"></div>
-    <div class="kpi-grid" id="loadKpis"></div>
+    <div class="segmented subtabs" data-subtabs="trends"><button data-sub="form" onclick="showSub('trends', 'form')">Form</button><button data-sub="calendar" onclick="showSub('trends', 'calendar')">Calendar</button><button data-sub="volume" onclick="showSub('trends', 'volume')">Volume</button><button data-sub="progress" onclick="showSub('trends', 'progress')">Progress</button><button data-sub="bests" onclick="showSub('trends', 'bests')">Bests</button><button data-sub="ai" onclick="showSub('trends', 'ai')">AI</button></div>
+    <div class="subpane" data-subpane="trends:form">
+<div class="kpi-grid" id="loadKpis"></div>
     <div class="section-title">
       <span>Fitness · Fatigue · Form</span>
       <span class="chip-rack" id="loadRange" style="padding:0">
@@ -157,7 +159,9 @@
     </div>
     <div class="hint" style="margin:2px 4px 0"><b id="loadRangeNote"></b> · Load = heart-rate TRIMP per session. Set max &amp; resting HR in Profile for accurate values.</div>
 
-    <div class="section-title">
+    </div>
+    <div class="subpane" data-subpane="trends:calendar">
+<div class="section-title">
       <span>Training calendar</span>
       <span class="row" style="gap:4px">
         <button class="icon-btn" style="width:32px;height:32px" onclick="shiftCalendar(-1)" aria-label="Previous month"><svg class="ic ic-sm"><use href="#i-back"/></svg></button>
@@ -165,9 +169,11 @@
         <button class="icon-btn" style="width:32px;height:32px" onclick="shiftCalendar(1)" aria-label="Next month"><svg class="ic ic-sm"><use href="#i-chevron"/></svg></button>
       </span>
     </div>
-    <div class="card cal-card"><div id="calendar" class="calendar"></div><div class="hint mt-8">Colour = training load that day. Tap a day to see its rides.</div></div>
+    <div class="card cal-card"><div id="calendar" class="calendar"></div><div class="hint mt-8">Colour = training load that day. Tap a day to see its workouts.</div></div>
 
-    <div class="section-title"><span>Weekly volume (16 weeks)</span></div>
+    </div>
+    <div class="subpane" data-subpane="trends:volume">
+<div class="section-title"><span>Weekly volume (16 weeks)</span></div>
     <div class="segmented" id="weeklySeg">
       <button class="active" data-m="dist">km</button>
       <button data-m="sec">Hours</button>
@@ -176,7 +182,9 @@
     </div>
     <div class="chart-card mt-8"><div id="weeklyChart" class="chart" style="min-height:230px"></div></div>
 
-    <div class="section-title"><span>Session-by-session progression</span><span class="tiny muted" id="globalSportNote"></span></div>
+    </div>
+    <div class="subpane" data-subpane="trends:progress">
+<div class="section-title"><span>Session-by-session progression</span><span class="tiny muted" id="globalSportNote"></span></div>
     <div class="chip-rack" id="globalMetricPills"></div>
     <div class="chart-card chart-scroll"><div id="globalChart" class="chart"></div></div>
     <div class="readout">
@@ -184,10 +192,14 @@
       <div class="sub" id="global_banner_sub">Tap a point to inspect it.</div>
     </div>
 
-    <div class="section-title"><span>Best efforts</span><span class="tiny muted">all time · last 6 weeks</span></div>
+    </div>
+    <div class="subpane" data-subpane="trends:bests">
+<div class="section-title"><span>Best efforts</span><span class="tiny muted">all time · last 6 weeks</span></div>
     <div id="bestEfforts"></div>
 
-    <div class="section-title"><span>AI season progression audit</span></div>
+    </div>
+    <div class="subpane" data-subpane="trends:ai">
+<div class="section-title"><span>AI season progression audit</span></div>
     <button class="model-chip" data-agent="trends" onclick="openModelPicker('trends')"></button>
     <button id="btnGraphAI" class="btn btn-primary" onclick="generateGraphDebrief()"><svg class="ic"><use href="#i-sparkle"/></svg>Analyze macro trends</button>
     <div class="chat" id="graphChatThread"></div>
@@ -195,7 +207,8 @@
       <input type="text" id="graphReplyInput" class="input grow" placeholder="Reply to the progression audit…" onkeydown="if(event.key==='Enter') sendGraphAthleteReply()" />
       <button class="icon-btn send-btn" onclick="sendGraphAthleteReply()" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
     </div>
-  </section>
+</div>
+      </section>
 
   <!-- ===================== COMPARE ===================== -->
   <section id="screen-compare" class="screen">
@@ -216,21 +229,26 @@
       </details>
     </div>
     <div id="compareVerdict"></div>
+    <div class="segmented subtabs" data-subtabs="compare"><button data-sub="summary" onclick="showSub('compare', 'summary')">Summary</button><button data-sub="all" onclick="showSub('compare', 'all')">All numbers</button><button data-sub="zones" onclick="showSub('compare', 'zones')">Zones</button><button data-sub="chart" onclick="showSub('compare', 'chart')">Chart</button><button data-sub="ai" onclick="showSub('compare', 'ai')">AI</button></div>
     <div id="compareTableContainer"></div>
-    <div class="section-title"><span>Overlay</span><span class="tiny muted" id="compareOverlayNote"></span></div>
+    <div class="subpane" data-subpane="compare:chart">
+<div class="section-title"><span>Overlay</span><span class="tiny muted" id="compareOverlayNote"></span></div>
     <div class="chart-card"><div id="compareChart" class="chart"></div></div>
-    <div class="section-title">AI comparison</div>
+    </div>
+    <div class="subpane" data-subpane="compare:ai">
+<div class="section-title">AI comparison</div>
     <button class="model-chip" data-agent="compare" onclick="openModelPicker('compare')"></button>
     <button id="btnCompareAI" class="btn btn-primary" onclick="generateAIComparison()"><svg class="ic"><use href="#i-sparkle"/></svg>Explain the difference</button>
     <div class="chat" id="compareAIBox"></div>
-  </section>
+</div>
+      </section>
 
   <!-- ===================== COACH ===================== -->
   <section id="screen-coach" class="screen">
     <div class="screen-head">
       <div>
         <div class="screen-title">Coach</div>
-        <div class="screen-sub">Season coach and per-ride conversations</div>
+        <div class="screen-sub">Your season coach and a chat for every workout</div>
       </div>
     </div>
     <div id="threadList"></div>
@@ -352,7 +370,7 @@
 
     <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-scale"/></svg>Weight log (kg)</div>
-      <div class="card-sub">Dated entries are used for W/kg and coach context on each ride date.</div>
+      <div class="card-sub">Dated entries are used for W/kg and coach context on each workout date.</div>
       <div class="input-row mt-12">
         <input type="date" id="cfg_weight_date" class="input" />
         <input type="number" id="cfg_weight_input" class="input" placeholder="kg" step="0.1" inputmode="decimal" style="max-width:96px" />
@@ -362,38 +380,38 @@
     </div>
 
     <div class="card" data-pgroup="you">
-      <div class="card-title"><svg class="ic"><use href="#i-flame"/></svg>Default weekly targets</div>
-      <div class="card-sub">Your standing targets. Change a single week (or let Aether do it) from the training plan in Coach. Leave blank for none.</div>
+      <div class="card-title"><svg class="ic"><use href="#i-flame"/></svg>Goals</div>
+      <details class="more-block">
+        <summary><span>Weekly targets &amp; training phase</span><span class="tiny muted">optional</span></summary>
+      <div class="label">Weekly targets</div>
+      <div class="hint">Leave blank for none. A single week can be changed from the plan in Coach.</div>
       <div class="input-row mt-12">
         <div class="field"><label>Distance (km)</label><input id="goal_km" class="input" type="number" min="0" inputmode="numeric" /></div>
         <div class="field"><label>Time (h)</label><input id="goal_hours" class="input" type="number" min="0" step="0.5" inputmode="decimal" /></div>
-        <div class="field"><label>Rides</label><input id="goal_rides" class="input" type="number" min="0" inputmode="numeric" /></div>
+        <div class="field"><label>Sessions</label><input id="goal_rides" class="input" type="number" min="0" inputmode="numeric" /></div>
       </div>
       <button class="btn btn-secondary" onclick="saveWeeklyGoals()">Save goals</button>
-    </div>
-
-    <div class="card" data-pgroup="you">
-      <div class="card-title"><svg class="ic"><use href="#i-target"/></svg>Training phase</div>
-      <div class="card-sub">Your broad focus. Each change is saved as a dated phase for coach prompts.</div>
+      <div class="label mt-16">Training phase</div>
+      <div class="hint">Your broad focus; each change is kept with its date for the coaches.</div>
       <div class="field mt-12"><input type="text" id="cfg_goal_input" class="input" placeholder="e.g. Aerobic base, Gran Fondo prep, Intervals" /></div>
       <div class="input-row">
         <input type="date" id="cfg_goal_date" class="input" />
         <button class="btn btn-primary btn-sm" style="flex:0 0 auto" onclick="saveTrainingGoal()">Set phase</button>
       </div>
       <div id="goalHistoryList" class="list list-scroll mt-8"></div>
+      </details>
     </div>
 
     <div class="card" data-pgroup="you">
       <div class="card-title"><svg class="ic"><use href="#i-heart"/></svg>Heart rate &amp; zones</div>
       <div class="card-sub">Used for zone time, training load, the intent picker, charts and every AI prompt.</div>
-      <div class="field mt-12"><label>FTP (W, optional)</label><input id="cfg_ftp" class="input" type="number" min="0" inputmode="numeric" placeholder="Only if you ride with a power meter" /><span class="hint">Used for IF / TSS on power-meter rides. Leave blank to estimate it from your best measured 20-minute power.</span></div>
-      <div class="input-row">
+      <div class="input-row mt-12">
         <div class="field"><label>Max HR</label><input id="cfg_max_hr" class="input" type="number" inputmode="numeric" oninput="previewZones()" /></div>
         <div class="field"><label>Resting HR</label><input id="cfg_rest_hr" class="input" type="number" inputmode="numeric" /></div>
-        <div class="field"><label>TRIMP weighting</label>
-          <select id="cfg_trimp_sex" class="input"><option value="M">Male (1.92)</option><option value="F">Female (1.67)</option></select>
-        </div>
       </div>
+      <div class="zone-preview" id="zonePreview"></div>
+      <details class="more-block">
+        <summary><span>Advanced: zone limits, TRIMP, FTP</span></summary>
       <div class="label mb-8">Zone start (bpm)</div>
       <div class="zone-editor">
         <div><label>Z2 ≥</label><input id="zb0" class="input" type="number" inputmode="numeric" oninput="previewZones()" /></div>
@@ -401,16 +419,21 @@
         <div><label>Z4 ≥</label><input id="zb2" class="input" type="number" inputmode="numeric" oninput="previewZones()" /></div>
         <div><label>Z5 ≥</label><input id="zb3" class="input" type="number" inputmode="numeric" oninput="previewZones()" /></div>
       </div>
-      <div class="zone-preview" id="zonePreview"></div>
-      <div class="btn-row mt-12">
-        <button class="btn btn-secondary btn-sm" onclick="autoZonesFromMax()">Auto from max HR</button>
-        <button class="btn btn-primary btn-sm" onclick="saveZones()">Save &amp; recalculate</button>
-      </div>
+        <button class="btn btn-secondary btn-sm mt-8" onclick="autoZonesFromMax()">Set zones from max HR</button>
+          <div class="field mt-12"><label>TRIMP weighting</label>
+          <select id="cfg_trimp_sex" class="input"><option value="M">Male (1.92)</option><option value="F">Female (1.67)</option></select>
+        </div>
+      <div class="field mt-12"><label>FTP (W, optional)</label><input id="cfg_ftp" class="input" type="number" min="0" inputmode="numeric" placeholder="Only if you ride with a power meter" /><span class="hint">Used for IF / TSS on power-meter rides. Leave blank to estimate it from your best measured 20-minute power.</span></div>
+      </details>
+      <button class="btn btn-primary btn-sm mt-12" onclick="saveZones()">Save &amp; recalculate</button>
     </div>
 
     <div class="card" data-pgroup="connect">
       <div class="card-title"><svg class="ic"><use href="#i-link"/></svg>Connections</div>
       
+      <div class="hint mt-8" id="stravaStateTop"></div>
+      <details class="more-block" id="stravaSetup">
+        <summary><span>Strava sign-in &amp; app keys</span><span class="tiny muted">one-time setup</span></summary>
       <div class="field mt-12"><label>Strava Client ID</label><input type="text" id="cfg_client_id" class="input" /></div>
       <div class="field"><label>Strava Client Secret</label><input type="password" id="cfg_client_secret" class="input" autocomplete="off" /></div>
       <button class="btn btn-primary" onclick="startAutomaticOAuth()">
@@ -426,6 +449,7 @@
         </div>
       </details>
       <button class="btn btn-secondary mt-12" onclick="saveConnections()">Save Strava settings</button>
+      </details>
     </div>
 
     <div class="card" data-pgroup="coach">
@@ -436,8 +460,10 @@
       <div class="card-sub" id="aiProvSub">The coach can use free APIs (Gemini, Groq, OpenRouter, Mistral) or paid ones (Claude, OpenAI, DeepSeek). Tap a provider to set its key and model.</div>
       <div id="providerList" class="list mt-8"></div>
       <label class="switch-row mt-8"><span><b>Automatic fallback</b><br><span class="hint" id="aiFallbackHint">If the active provider fails or hits a limit, try the others (free ones first).</span></span><input type="checkbox" id="cfg_ai_fallback" onchange="setAiFallback(this.checked)" /></label>
-      <div class="field-label mt-12">Model per coach</div>
-      <div id="agentModelList" class="list"></div>
+      <details class="more-block">
+        <summary><span>Model per coach</span><span class="tiny muted">optional — automatic by default</span></summary>
+        <div id="agentModelList" class="list"></div>
+      </details>
     </div>
 
     <div class="card" data-pgroup="coach">
@@ -452,12 +478,16 @@
 
     <div class="card" data-pgroup="coach">
       <div class="card-title"><svg class="ic"><use href="#i-star"/></svg>Coach skills</div>
-      <div class="card-sub">Coaching methods each AI follows (SKILL.md format). Built-in skills are written from open coaching protocols on GitHub. Import more from any GitHub link — only import skills you trust.</div>
-      <div id="skillList" class="mt-8"></div>
-      <div class="row mt-12">
-        <input id="skill_url" class="input grow" placeholder="https://github.com/…/SKILL.md" autocomplete="off" />
-        <button id="btnImportSkill" class="btn btn-secondary btn-sm" style="flex:0 0 auto" onclick="importSkillFromUrl()">Import</button>
-      </div>
+      <div class="card-sub">Coaching methods each AI follows — they work out of the box.</div>
+      <details class="more-block">
+        <summary><span>See and change skills</span><span class="tiny muted">which coach uses what · import from GitHub</span></summary>
+        <div id="skillList" class="mt-8"></div>
+        <div class="hint mt-8">SKILL.md format. Built-in skills are written from open coaching protocols on GitHub. Import more from any GitHub link — only import skills you trust.</div>
+        <div class="row mt-8">
+          <input id="skill_url" class="input grow" placeholder="https://github.com/…/SKILL.md" autocomplete="off" />
+          <button id="btnImportSkill" class="btn btn-secondary btn-sm" style="flex:0 0 auto" onclick="importSkillFromUrl()">Import</button>
+        </div>
+      </details>
     </div>
 
     <div class="card" data-pgroup="connect">
@@ -472,6 +502,8 @@
           <button class="btn btn-ghost btn-sm" onclick="disconnectHealth()">Pause import</button>
         </div>
       </div>
+<details class="more-block">
+        <summary><span>Swims from Samsung Health</span><span class="tiny muted">automatic reader · export fallback</span></summary>
       <div class="export-box mt-12 hidden" id="swimSdkBox">
         <b>Swims, treadmill &amp; gym — automatic</b>
         <div class="small mt-4" id="swimSdkState"></div>
@@ -489,6 +521,7 @@
         <input type="file" id="shExportInput" multiple class="hidden" onchange="importSamsungExport(event)" />
         <button class="btn btn-secondary btn-sm mt-8" onclick="$('#shExportInput').click()"><svg class="ic"><use href="#i-swim"/></svg>Import Samsung Health export</button>
       </div>
+      </details>
     </div>
 
     <div class="card hidden" data-pgroup="connect" id="accountCard">
@@ -531,26 +564,26 @@
     </div>
 
     <div class="card" data-pgroup="app">
-      <div class="card-title"><svg class="ic"><use href="#i-shield"/></svg>Backup &amp; rollback</div>
-      <div class="card-sub">Restore points are created automatically before updates, syncs, imports and recalculations. Roll back here if something goes wrong.</div>
+      <div class="card-title"><svg class="ic"><use href="#i-shield"/></svg>Backup</div>
+      <div class="card-sub">Save all your data to a file, or go back to an earlier state.</div>
       <div class="btn-row mt-12">
         <button class="btn btn-secondary btn-sm" onclick="exportDatabaseJson()"><svg class="ic"><use href="#i-upload"/></svg>Export JSON</button>
         <button class="btn btn-secondary btn-sm" onclick="$('#importDbFile').click()"><svg class="ic"><use href="#i-download"/></svg>Restore JSON</button>
       </div>
       <!-- no "accept" filter: Samsung's picker can hide/grey out .json files copied over USB -->
       <input type="file" id="importDbFile" class="hidden" onchange="importDatabaseJson(event)" />
-      <div class="section-title" style="margin-top:14px"><span>Restore points</span><button class="btn btn-ghost btn-xs" onclick="createManualRestorePoint()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Create</button></div>
-      <div id="restorePointList" class="list"></div>
-      <div class="callout warn mt-12">
-        <svg class="ic"><use href="#i-history"/></svg>
-        <div><b>Version rollback.</b> If this version misbehaves, switch to the previous Classic (v2) interface. Your rides and chats are shared, and you can come back any time.</div>
-      </div>
-      <button class="btn btn-secondary mt-8" onclick="switchToClassic()"><svg class="ic"><use href="#i-history"/></svg>Open Classic version (v2)</button>
+      <details class="more-block">
+        <summary><span>Restore points</span><span class="tiny muted">made automatically before changes</span></summary>
+        <button class="btn btn-ghost btn-xs mt-8" onclick="createManualRestorePoint()"><svg class="ic ic-sm"><use href="#i-plus"/></svg>Create one now</button>
+        <div id="restorePointList" class="list"></div>
+      </details>
     </div>
 
     <div class="card" data-pgroup="app">
       <div class="card-title"><svg class="ic"><use href="#i-terminal"/></svg>Diagnostics</div>
-      <div class="btn-row mt-12">
+      <details class="more-block">
+        <summary><span>Tools</span><span class="tiny muted">test Strava · recalculate · demo rides</span></summary>
+      <div class="btn-row mt-8">
         <button class="btn btn-secondary btn-sm" onclick="testStravaConnection()">Test Strava</button>
         <button class="btn btn-secondary btn-sm" onclick="recalculateAll()">Recalculate metrics</button>
       </div>
@@ -559,6 +592,7 @@
         <button class="btn btn-secondary btn-sm" onclick="removeDemoData()">Remove demo rides</button>
       </div>
       <div id="stravaDiagBox" class="diag-box hidden"></div>
+      </details>
     </div>
 
     <div data-pgroup="app"><div class="version-tag" id="versionTag"></div>
@@ -591,6 +625,7 @@
       <div id="det_badges" class="row wrap mb-12"></div>
       <div id="det_route" class="route-card hidden"></div>
       <div class="hero-grid" id="det_hero"></div>
+      <button class="btn btn-secondary btn-sm mt-12 det-chat-btn" onclick="$('#coachSection').scrollIntoView({ behavior: 'smooth', block: 'start' })"><svg class="ic ic-sm"><use href="#i-chat"/></svg>Chat with your coach about this workout</button>
       <div class="section-title"><span>How did it feel?</span><span id="det_rpe_label" class="tiny muted"></span></div>
       <div class="card feel-card">
         <div class="feel-row" id="det_feel"></div>
@@ -929,10 +964,10 @@
 <div class="sheet" id="intentSheet" role="dialog" aria-modal="true">
   <div class="sheet-grip"></div>
   <div class="row between">
-    <div class="grow"><div class="sheet-title" id="intentModalTitle">Ride intent</div><div class="sheet-sub" id="intentModalSub"></div></div>
+    <div class="grow"><div class="sheet-title" id="intentModalTitle">Workout intent</div><div class="sheet-sub" id="intentModalSub"></div></div>
     <span class="badge badge-new" id="intentQueueCount"></span>
   </div>
-  <div class="label mt-16">Ride nature</div>
+  <div class="label mt-16">Workout type</div>
   <div class="pick-grid">
     <div id="pillTypePlay" class="pick" onclick="selectRideType('PLAY')"><svg class="ic ic-lg"><use href="#i-play"/></svg>Play / Commute</div>
     <div id="pillTypeTraining" class="pick selected" onclick="selectRideType('TRAINING')"><svg class="ic ic-lg"><use href="#i-target"/></svg>Structured training</div>
@@ -1103,7 +1138,7 @@
   <div class="sheet-title">What's new in v3</div>
   <div class="sheet-sub mb-12">Training Partner has been rebuilt.</div>
   <div class="md small" id="whatsNewBody"></div>
-  <button class="btn btn-primary mt-16" onclick="closeSheet('whatsNewSheet')">Let's ride</button>
+  <button class="btn btn-primary mt-16" onclick="closeSheet('whatsNewSheet')">Let's go</button>
 </div>
 
 <!-- DIALOG -->

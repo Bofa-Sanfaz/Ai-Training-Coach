@@ -126,7 +126,7 @@ async function renderRides() {
   $('#sportSegRides').innerHTML = sportSegHtml(all, 'setSportFilter');
 
   if (!all.length) {
-    list.innerHTML = `<div class="empty mt-16">${icon('bike')}<div><b>No rides stored yet</b></div>
+    list.innerHTML = `<div class="empty mt-16">${icon('bike')}<div><b>No workouts yet</b></div>
       <div class="small mt-8">${isNative() ? 'Sign in to Strava in <b>Profile → Connections</b>, then tap <b>Sync</b>.' : 'Tap <b>Screenshot</b> or <b>Log</b> above to add your first workout.'}<br/>Want to look around first? Load demo rides in Profile → App &amp; backup.</div>
       ${isNative() ? `<button class="btn btn-primary btn-sm mt-12" onclick="openProfileGroup('connect')">Open Connections</button>` : ''}</div>`;
     return;
@@ -142,7 +142,7 @@ async function renderRides() {
 
   const shown = all.filter(w => rideMatches(w, coachIds));
   if (!shown.length) {
-    list.innerHTML = `<div class="empty mt-16">${icon('search')}<div><b>No rides match</b></div><div class="small mt-8">Try another filter or search term.</div></div>`;
+    list.innerHTML = `<div class="empty mt-16">${icon('search')}<div><b>No workouts match</b></div><div class="small mt-8">Try another filter or search term.</div></div>`;
     return;
   }
 
@@ -154,14 +154,19 @@ async function renderRides() {
     const agg = aggregateRides(monthRides);
     html += `<div class="month-head"><span>${escapeHtml(month)}</span><span>${monthRides.length} · ${formatHours(agg.sec)}${agg.bySport.ride ? ` · ${fmtNum(agg.bySport.ride.dist, 0)} km ridden` : ''}</span></div><div>${monthRides.map(w => rideCardHtml(w, coachIds)).join('')}</div>`;
   };
-  for (const w of shown.slice(0, 400)) {
+  // The latest ones first; older months one tap away (a search or filter shows every match)
+  const limit = rideQuery || rideFilter !== 'all' ? 400 : ridesLimit;
+  for (const w of shown.slice(0, limit)) {
     const m = monthLabel(w.date);
     if (m !== month) { flush(); month = m; monthRides = []; }
     monthRides.push(w);
   }
   flush();
+  const more = Math.min(shown.length, 400) - limit;
+  if (more > 0) html += `<div class="center mt-12 mb-12"><button class="btn btn-secondary btn-sm" onclick="ridesLimit += 30; renderRides()">Show older (${more})</button></div>`;
   list.innerHTML = html;
 }
+let ridesLimit = 30;
 
 function rideCardHtml(w, coachIds) {
   const reviewed = coachIds.has(Number(w.strava_id));
@@ -304,7 +309,7 @@ function editCurrentRideIntent() {
   if (!currentWorkout) return;
   intentModalQueue = [];
   activeIntentItem = currentWorkout;
-  fillIntentSheet(currentWorkout, 'Edit ride intent');
+  fillIntentSheet(currentWorkout, 'Edit workout intent');
   openSheet('intentSheet', () => { activeIntentItem = null; });
 }
 

@@ -176,6 +176,6 @@ async function shareRideCard() {
     const res = await saveOrShareFile(`RidePartner_${(w.exercise_code || 'ride').replace(/[^A-Za-z0-9]+/g, '_')}.png`, b64, { base64: true, mime: 'image/png', title: rideTitle(w) });
     if (res.ok) toast(`${SPORTS[sp].label} card ready → ${res.where}`, 'success');
   } catch (e) {
-    toast(`Could not create the ride card: ${e.message}`, 'error');
+    toast(`Could not create the share card: ${e.message}`, 'error');
   }
 }
