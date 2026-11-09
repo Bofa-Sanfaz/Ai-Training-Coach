@@ -1123,7 +1123,7 @@ function squadHomeHtml(S) {
       <button onclick="openManualWorkout()">${icon('plus')}<span>Log workout</span></button>
       <button onclick="openSquadImport()">${icon('camera')}<span>Screenshot</span></button>
       <button onclick="openSquadWeight()">${icon('scale')}<span>Log weight</span></button>
-      <button onclick="openPhotos()">${icon('user')}<span>Photos</span></button>
+      <button onclick="openPhotos()">${icon('image')}<span>Photos</span></button>
       <button onclick="squadAskQuick()">${icon('sparkle')}<span>Ask ${SQUAD_AI}</span></button>
     </div>
     ${squadBattlesHtml(S)}
@@ -1199,7 +1199,7 @@ function squadBoardHtml(S) {
       <div class="sq-badges">${t.pbs ? `<span class="badge badge-intent">⭐ ${t.pbs} PB</span>` : ''}${x.streak >= 3 ? `<span class="badge badge-stale">🔥 ${x.streak}-day streak</span>` : ''}${t.points.bonus ? `<span class="badge badge-ok">+${Math.round(t.points.bonus)} bonus</span>` : ''}${x.baseline_from_challenge ? '<span class="badge badge-play">baseline: first week</span>' : ''}</div>
     </div>`;
   }).join('');
-  return `<div class="section-title"><span>This week</span><button class="btn btn-ghost btn-xs" onclick="openSquadRules()">${icon('info', 'ic-sm')}How scoring works</button></div>
+  return `<div class="section-title"><span>Points this week</span><button class="btn btn-ghost btn-xs" onclick="openSquadRules()">${icon('info', 'ic-sm')}How scoring works</button></div>
     <div class="sq-score-grid">${cards}</div>`;
 }
 
@@ -1838,7 +1838,7 @@ async function joinSquadChallenge() {
     await setConfig('squad_server', server);
     await setConfig('squad_name', me);
     // A fresh web app gets its owner's name from joining (the personal coach uses it too)
-    if (!(await getConfig('athlete_name'))) { await setConfig('athlete_name', me); await loadPhysioConfig(); $('#brandSub').textContent = `Coach for ${ATHLETE.name}`; }
+    if (!(await getConfig('athlete_name'))) { await setConfig('athlete_name', me); await loadPhysioConfig(); $('#brandSub').textContent = brandSubText(); }
     const baseline = await squadBaseline(r.challenge.starts);
     await squadCall(entry, 'PATCH', '/me', { sports: baseline.sports, baseline }).catch(() => {});
     if (location.hash.includes('join=')) history.replaceState(null, '', location.pathname + location.search);

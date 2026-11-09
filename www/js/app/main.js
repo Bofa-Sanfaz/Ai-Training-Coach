@@ -117,6 +117,9 @@ const WHATS_NEW = `
 - Climbing VAM no longer needs a heart-rate strap; recovery gaps account for ride duration
 - Strava sync survives rate limits and finds all ride types`;
 
+// "Coach for Mustafa" once a name is set (not the placeholder "Coach for Athlete")
+const brandSubText = () => (ATHLETE.name && ATHLETE.name !== 'Athlete' ? `Coach for ${ATHLETE.name}` : 'AI training coach');
+
 function showWhatsNew() {
   $('#whatsNewBody').innerHTML = renderMarkdown(WHATS_NEW);
   openSheet('whatsNewSheet');
@@ -168,7 +171,7 @@ async function boot() {
   setupThemeSeg();
   populateZoneSelect();
   await refreshModelSelectors();
-  $('#brandSub').textContent = `Coach for ${ATHLETE.name}`;
+  $('#brandSub').textContent = brandSubText();
 
   const App = capPlugin('App');
   if (App) {

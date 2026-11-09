@@ -176,7 +176,7 @@ async function introSaveYou() {
     await saveWeightHistory(h);
   }
   await loadPhysioConfig();
-  $('#brandSub').textContent = `Coach for ${ATHLETE.name}`;
+  $('#brandSub').textContent = brandSubText();
   if (changedHr && (await db.workouts.count())) await recalculateAll(true);
   return true;
 }

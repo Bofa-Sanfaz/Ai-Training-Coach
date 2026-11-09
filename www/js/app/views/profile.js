@@ -388,7 +388,9 @@ function previewZones() {
   if (validateBounds(bounds, max) || !(max > 0)) { host.innerHTML = '<span style="flex:1;background:var(--surface-3);color:var(--muted)">Check zone values</span>'; return; }
   const lo = Math.max(80, bounds[0] - 25);
   const edges = [lo, ...bounds, max];
-  host.innerHTML = ZONE_META.map((z, i) => `<span style="flex:${Math.max(1, edges[i + 1] - edges[i])};background:${z.color}">${z.key}</span>`).join('');
+  // Label colour picked per zone so it stays readable (dark on the light grey/yellow zones)
+  const ink = hex => { const n = parseInt(String(hex).slice(1), 16); const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.55 ? '#0f172a' : '#ffffff'; };
+  host.innerHTML = ZONE_META.map((z, i) => `<span style="flex:${Math.max(1, edges[i + 1] - edges[i])};background:${z.color};color:${ink(z.color)};text-shadow:none">${z.key}</span>`).join('');
 }
 
 function autoZonesFromMax() {
